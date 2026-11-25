@@ -203,6 +203,13 @@ cross-channel reviewed identities, DST/skipped-date calendars, 7d/30d/custom
 bounds, standalone view context, immutable CLI output and private-run denial.
 The workflow guard also exercises collection-to-summary without changed inputs.
 
+The [CONTACTS-025 graph](spec/contacts-local-graph.md) adds `contacts:graph` and
+`check:graph` to CI. Synthetic cases exercise exact frequency thresholds,
+recency, direct/group/membership separation, interval membership bounds, unknown
+coverage, identical report filters across views, cohort pagination, native
+keyboard links, responsive scrolling, HTML escaping, private denial, immutable
+publication and CLI 0/2/1. No browser dependency or service is required at runtime.
+
 The [CONTACTS-026 opportunity report](spec/contacts-opportunities.md) adds
 `contacts:opportunities`, `opportunities.test.cjs` and `check:opportunities` to CI.
 Synthetic cases cover threshold boundaries, matched complete versus uncertain/

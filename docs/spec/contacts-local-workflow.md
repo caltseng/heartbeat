@@ -4,7 +4,8 @@ Status: synthetic collection, source reconciliation and identity review are
 runnable, including the landed CONTACTS-021/022 contracts. Synthetic Google/email
 acquisition and text conversion have separate commands below. CONTACTS-023 now
 adds synthetic cross-source aggregation; CONTACTS-024 adds the shared Heartbeat
-period report and summary presentation skill. Graphs remain future work.
+period report and summary presentation skill. CONTACTS-025 adds the pinned
+synthetic-only private local HTML/SVG graph.
 [CONTACTS-027](contacts-curated-records.md) adds separate synthetic note capture,
 curated groups, explicit connections and rhythms using reviewed households.
 [CONTACTS-028](contacts-reconnection-review.md) composes those saved records with
@@ -160,6 +161,25 @@ channel and timeline rows with their full context. Standalone `selectView`
 envelopes preserve the same metadata and report digest. No narrative-generated
 numbers, dropped inactive peers, implicit empty-history zeros or source access.
 
+### Synthetic local graph handoff
+
+The [CONTACTS-025 graph contract](contacts-local-graph.md) consumes that exact
+saved `report.json`, not raw collection data. Prepare a local
+`graph.synthetic.json` with `schemaVersion:1`, `dataClass:"synthetic"`,
+`report:"report.json"`, its exact lowercase SHA-256 `reportDigest`, and a fresh
+`output:"..\\graph-001"`.
+
+```powershell
+npm run contacts:graph -- --request .private\contacts\reports\summary-001\graph.synthetic.json
+if ($LASTEXITCODE -eq 1) { throw 'Graph failed; inspect the pinned report before retrying.' }
+npm run check:private
+```
+
+Open the generated `graph.html` directly in a browser. It contains inline SVG
+maps, shared summary/people/channel/timeline views and keyboard-linked evidence,
+with no service, remote assets or JavaScript. Exit 2 retains explicit partial
+coverage. To change filters, regenerate the summary and graph together.
+
 ### Other implemented synthetic entry points
 
 These are separate local producers, not live connectors or an all-in-one job.
@@ -206,7 +226,7 @@ Identity review uses its own version-1 request, with the exact collection digest
 expected mapping revision, reason and explicit operations. There is no shared
 global configuration; source adapters own their documented local requests.
 
-Example layout; graph entries remain reserved for later implementation:
+Example layout; use separate fresh report/graph generations:
 
 ```text
 .private/contacts/
@@ -228,7 +248,8 @@ Example layout; graph entries remain reserved for later implementation:
     aggregates.<uuid>.tmp           # transient atomic no-replace publication
     report.json                     # implemented CONTACTS-024; choose its own fresh run
     report.<uuid>.tmp               # transient atomic no-replace publication
-    graph.html / graph.svg          # future CONTACTS-025
+    graph.html                     # CONTACTS-025 inline SVG, own fresh generation
+    graph.html.<uuid>.tmp           # transient atomic no-replace publication
 ```
 
 | Producer -> consumer | Version and handoff | Gate / required evidence |
@@ -239,16 +260,16 @@ Example layout; graph entries remain reserved for later implementation:
 | Identity review -> curated records | Implemented `schemaVersion:1` `curated.json`, defined by 027 | Pin canonical view digest plus curation revision; preserve original IDs/text and separate capture/encounter dates. Only explicit connections affect confirmed dates; source changes never overwrite notes. |
 | Collection + mapping -> reducer | Implemented `schemaVersion:1` `aggregates.json`; [contract defined by 023](contacts-aggregation.md) | Pin exact collection bytes (SHA-256), data class, explicit saved mapping revision and resolved half-open period/time zone/as-of. Reconcile source IDs, direct/group roles, exclusions and unknown/lower-bound coverage. |
 | Reducer -> Heartbeat summary | Implemented `schemaVersion:1` `report.json`; [contract defined by 024](contacts-period-summary.md) | Shared dataset with exact collection digest/mapping revision, filters, period/zone/as-of, source freshness/coverage, exclusions, deterministic statements, full people cohort and coverage-aware daily timeline. Standalone views retain shared context/digest. |
-| Shared report -> Heartbeat graph | Reserved private `graph.html` / `graph.svg`; renderer defined by 025 | Same report revision/digest, period and filters in all views; explain group-only/inactive/unknown categories. Offline files, no remote assets, telemetry or hosted service. |
+| Shared report -> Heartbeat graph | Implemented private `graph.html` with inline SVG; [025 contract](contacts-local-graph.md) | Pin exact report-byte digest; same period/filters across summary/people/channel/timeline/map/evidence. Explain group-only/inactive/unknown categories. Offline, no remote assets, telemetry or service. |
 
-Reserved graph filenames are **not implemented schemas or CLI commands**. Each future
+Standalone `graph.svg` remains reserved, not emitted. Each future
 JSON producer must declare `schemaVersion`, preserve `dataClass` and pin input
 revisions/digests; consumers must reject unsupported versions, mismatched data
 classes/periods/revisions and missing inputs, never substitute empty/stale data.
 CONTACTS-023 owns the implemented aggregate schema; CONTACTS-024 owns its
 implemented version-1 shared report and presentation contract;
 CONTACTS-022's implemented overlay contract remains unchanged.
-CONTACTS-025 depends on this workflow, not on this item shipping its renderer.
+CONTACTS-025's renderer consumes the saved report, preserving this workflow.
 Do not pass the raw collection directly to a graph or derive totals in a renderer.
 
 Source-acquisition artifacts `handoff.json`, `checkpoint.json`, `report.json`
@@ -273,7 +294,7 @@ collector's output-location checks), and leave prior valid output intact on
 failure. Explicitly label partial datasets as observed/lower-bound; interrupted
 or invalid inputs block downstream work. Use the reviewed overlay, explicit
 synthetic curation and structured aggregates:
-there is no rendered summary, graph or all-in-one command.
+the graph now renders shared report views, but no all-in-one command is added.
 
 ## Recovery without losing source evidence
 

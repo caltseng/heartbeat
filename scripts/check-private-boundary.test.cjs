@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const crypto = require('node:crypto');
 const { execFileSync, spawnSync } = require('node:child_process');
 const { checkBoundary, OUTPUT_ROOTS } = require('./check-private-boundary.cjs');
 
@@ -34,7 +35,8 @@ test('private ignored workflow stays local, including reports and graph files', 
     'whatsapp.synthetic.json.12345678-abcd.tmp', 'request.synthetic.json.12345678-abcd.tmp',
     'handoff.json', 'checkpoint.json', 'aggregates.json', 'aggregate.synthetic.json',
     'aggregates.12345678-1234-1234-1234-123456789abc.tmp', 'report.json', 'summary.synthetic.json',
-    'report.12345678-1234-1234-1234-123456789abc.tmp', 'graph.html', 'graph.svg']) {
+    'report.12345678-1234-1234-1234-123456789abc.tmp', 'graph.html', 'graph.svg',
+    'graph.json', 'graph.synthetic.json', 'graph.html.12345678-abcd.tmp']) {
     f.write(path.join('.private', 'contacts', 'synthetic', file));
   }
   f.write(path.join('docs', 'spec', 'contacts-local-workflow.md'));
@@ -79,7 +81,8 @@ test('reserved private handoffs fail outside ignored storage', t => {
     'handoff.json', 'checkpoint.json', 'aggregates.json', 'aggregate.json', 'aggregate.synthetic.json',
     'aggregates.12345678-1234-1234-1234-123456789abc.tmp',
     'report.json', 'summary.json', 'summary.synthetic.json', 'opportunities.json', 'opportunities.synthetic.json',
-    'report.12345678-1234-1234-1234-123456789abc.tmp', 'graph.html', 'graph.svg', '.env.local', 'private.key']) {
+    'report.12345678-1234-1234-1234-123456789abc.tmp', 'graph.html', 'graph.svg',
+    'graph.json', 'graph.synthetic.json', 'graph.html.12345678-abcd.tmp', '.env.local', 'private.key']) {
     const target = f.write(path.join('accidental', name));
     assert.throws(() => checkBoundary(f.root), /Private operational artifact/);
     fs.unlinkSync(target);
@@ -169,6 +172,16 @@ test('documented synthetic collection-to-review-to-aggregation handoff stays pri
   assert.equal(report.views.summary.metrics.messages.observed, 4);
   assert.equal(report.views.timeline.reduce((total, row) => total + row.observedMessages, 0), 4);
   assert.deepEqual(report.views.perChannel, dataset.perChannel);
+  const reportBytes = fs.readFileSync(summarized.file);
+  const graphRequest = f.write(path.join('.private', 'contacts', 'demo', 'graph.synthetic.json'),
+    JSON.stringify({ schemaVersion: 1, dataClass: 'synthetic', report: summarized.file,
+      reportDigest: crypto.createHash('sha256').update(reportBytes).digest('hex'),
+      output: '../reports/graph-001' }));
+  const graphed = run(path.join(__dirname, 'contacts', 'graph.cjs'), ['--request', graphRequest]);
+  const graph = fs.readFileSync(graphed.file, 'utf8');
+  assert.ok(graph.includes('Heartbeat local interaction graph'));
+  assert.ok(graph.includes(graphed.reportDigest));
+  assert.deepEqual(fs.readFileSync(summarized.file), reportBytes);
   assert.deepEqual(fs.readFileSync(result.file), mappingBytes);
   assert.deepEqual(fs.readFileSync(path.join(demo, 'collection.json')), snapshot);
   assert.doesNotThrow(() => checkBoundary(f.root));

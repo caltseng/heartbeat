@@ -20,7 +20,8 @@ CONTACTS-023 adds a synthetic-only [cross-source reducer and skill](contacts-agg
 CONTACTS-030 adds [synthetic audience selection and reviewed lists](contacts-life-update-audience.md);
 real wording/preferences, private runs and sending remain unauthorized/disabled.
 CONTACTS-024 adds a synthetic-only [shared period dataset and summary skill](contacts-period-summary.md).
-Live acquisition, private note capture and the map are not implemented. Remaining CONTACTS
+CONTACTS-025 adds the synthetic-only [private local HTML/SVG graph](contacts-local-graph.md).
+Live acquisition and private note capture are not implemented. Remaining CONTACTS
 execution is blocked until the Heartbeat bootstrap is verified checked in.
 
 ## 1. Purpose
