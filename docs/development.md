@@ -24,11 +24,20 @@ npm run check
 npm run ci
 ```
 
-`test:contacts` runs Node's built-in test runner for the collector, email/Google
-adapters, text/Messenger/WhatsApp converters and identity review. `npm test` also runs the
-private-boundary tests using temporary Git repositories. `check` checks all
-collection/demo, adapter, converter, review and test CommonJS files' syntax and
-runs `check:private`; `ci` runs checks and tests. Tests generate synthetic fixtures in
+`test:contacts` uses Node's built-in directory discovery for all `*.test.cjs`
+files under `scripts/contacts`; `npm test` discovers tests throughout `scripts`,
+including the private-boundary tests using temporary Git repositories. `check`
+recursively checks every CommonJS (`.cjs`) file under `scripts` and runs
+`check:private`; `ci` runs `check` and `test`. New modules and tests in these
+directories need no `package.json` edit. Existing module-specific `check:*`
+commands remain available for focused syntax checks, but CI does not need their
+enumeration. Shared synthetic test helpers in `scripts/contacts/fixtures.cjs`
+provide per-test temporary directories with cleanup and identity mapping
+inspection/application with current revision and digest preconditions.
+Scenario-specific inputs and assertions stay in each test file.
+Keep helper filenames outside Node's test naming patterns (including `test-*`)
+so helpers are not counted as empty test files.
+Tests generate synthetic fixtures in
 temporary directories and clean them up; they include actual CLI 0/2/1 exits,
 all five families, replay, connector provenance, resume, rollback, record
 conflicts, direct/group roles, missing-versus-empty history, DST/custom intervals,
@@ -191,7 +200,7 @@ and versions before acting.
    sender/recipient roles, timestamps, cursors, coverage and provenance. Do not
    duplicate collection/storage logic or add unneeded dependencies.
 4. Add focused synthetic cases to `scripts/contacts/collect.test.cjs` (or an
-   adapter-specific test with an explicit npm test entry when needed). Exercise
+   adapter-specific `*.test.cjs` file discovered automatically). Exercise
    pagination/expiry/failure, unknown coverage, replay and format ambiguity.
    Never commit native real-account exports or copy another checkout's data.
 5. Update the relevant source skill, capability matrix and affected docs. Adding

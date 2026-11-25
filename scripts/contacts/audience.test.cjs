@@ -1,19 +1,17 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { collect } = require('./collect.cjs');
 const { handoff, period } = require('./demo.cjs');
-const { review } = require('./identity-review.cjs');
+const { tempFolder, mappingFixture } = require('./fixtures.cjs');
 const { curate } = require('./curated.cjs');
 const { audienceReview } = require('./audience.cjs');
 
 const preference = { text: 'Use the explicitly requested neutral version.', reason: 'Synthetic stated wording preference, not a belief classification.' };
 function fixture(t) {
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'heartbeat-audience-synthetic-'));
-  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const folder = tempFolder(t, 'heartbeat-audience-synthetic-');
   const source = handoff('google-contacts', null);
   source.pages[0].identities = [
     { id: 'a', idKind: 'local', isSelf: false, displayName: 'Synthetic A',
@@ -29,13 +27,10 @@ function fixture(t) {
     schemaVersion: 1, dataClass: 'synthetic', period, output: 'store',
     sources: [{ source: source.source, account: source.account, connector: source.connector, mode: 'metadata-import', input: 'input.json' }]
   }, folder);
-  const mappingRequest = { schemaVersion: 1, dataClass: 'synthetic', collection: collected.file, output: 'mapping', reason: 'Synthetic canonical review' };
-  const map = operations => {
-    const current = review(mappingRequest, folder, true);
-    return review({ ...mappingRequest, expectedRevision: current.revision, collectionDigest: current.collectionDigest, operations }, folder);
-  };
+  const { inspect: inspectMapping, apply: map } =
+    mappingFixture(folder, collected.file, 'mapping', 'Synthetic canonical review');
   map([]);
-  const people = Object.fromEntries(review(mappingRequest, folder, true).identities.map(identity => [JSON.parse(identity.key)[3], identity.personId]));
+  const people = Object.fromEntries(inspectMapping().identities.map(identity => [JSON.parse(identity.key)[3], identity.personId]));
   map([
     { type: 'household', id: 'household-a', label: 'Synthetic couple', people: [people.a, people.b] },
     { type: 'household', id: 'household-c', label: 'Synthetic singleton', people: [people.c] },

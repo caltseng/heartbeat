@@ -2,11 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { collect } = require('./collect.cjs');
 const { handoff } = require('./demo.cjs');
 const { review } = require('./identity-review.cjs');
+const { tempFolder, mappingFixture } = require('./fixtures.cjs');
 const { aggregate, run } = require('./aggregate.cjs');
 
 const period = { preset: 'custom', timeZone: 'America/Los_Angeles',
@@ -18,8 +18,7 @@ function message(id, senderId, timestamp, extra = {}) {
     recipients: [{ identityId: senderId === 'self' ? 'a' : 'self', role: 'to' }], ...extra };
 }
 function fixture(t, change = () => {}) {
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'contacts-aggregate-synthetic-'));
-  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const folder = tempFolder(t, 'contacts-aggregate-synthetic-');
   const inputs = [
     handoff('email', 'email'), handoff('text-messages', 'sms'),
     handoff('whatsapp', 'whatsapp'), handoff('google-contacts', null)
@@ -71,21 +70,17 @@ function fixture(t, change = () => {}) {
   // Replay to prove source-event IDs, not import attempts or connector observations, are counted.
   const collected = collect(request, folder);
   const collection = JSON.parse(fs.readFileSync(collected.file, 'utf8'));
-  const reviewRequest = { schemaVersion: 1, dataClass: 'synthetic', collection: collected.file,
-    output: 'review', expectedRevision: 0, reason: 'Synthetic explicit registration.', operations: [] };
-  const inspected = review(reviewRequest, folder, true);
-  reviewRequest.collectionDigest = inspected.collectionDigest;
-  review(reviewRequest, folder);
+  const identityMapping = mappingFixture(folder, collected.file, 'review', 'Synthetic explicit registration.');
+  const inspected = identityMapping.inspect();
+  identityMapping.apply([]);
   const mappingFile = path.join(folder, 'review', 'identity-review.json');
   let mapping = JSON.parse(fs.readFileSync(mappingFile, 'utf8'));
   const person = (source, id) => mapping.view.assignments[key(source, 'identity', id)];
-  reviewRequest.expectedRevision = 1;
-  reviewRequest.operations = [{
+  identityMapping.apply([{
     type: 'merge', people: [person('email', 'a'), person('text-messages', 'a')], into: person('email', 'a'),
     evidence: [{ kind: 'provider', identityKeys: [key('email', 'identity', 'a'), key('text-messages', 'identity', 'a')],
       reference: 'Synthetic reviewed provider equivalence.' }]
-  }];
-  review(reviewRequest, folder);
+  }]);
   mapping = JSON.parse(fs.readFileSync(mappingFile, 'utf8'));
   const options = { period, identityMappingRevision: 2, collectionDigest: inspected.collectionDigest };
   const reduce = (extra = {}) => aggregate(collection, mapping, { ...options, ...extra });

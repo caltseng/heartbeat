@@ -2,19 +2,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { collect } = require('./collect.cjs');
 const { handoff } = require('./demo.cjs');
 const { review } = require('./identity-review.cjs');
+const { tempFolder, mappingFixture } = require('./fixtures.cjs');
 const { summary, selectView, run } = require('./summary.cjs');
 
 const period = { preset: 'custom', timeZone: 'America/Los_Angeles',
   start: '2026-10-31T07:00:00Z', end: '2026-11-03T08:00:00Z', asOf: '2026-11-03T08:00:00Z' };
 const key = (source, type, id) => JSON.stringify([source, 'fixture-account', type, id]);
 function fixture(t, change = () => {}) {
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'heartbeat-summary-synthetic-'));
-  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const folder = tempFolder(t, 'heartbeat-summary-synthetic-');
   const inputs = [handoff('email', 'email'), handoff('text-messages', 'sms')];
   for (const input of inputs) {
     input.coverage = { start: period.start, end: period.end, completeness: 'complete', basis: 'Synthetic interval.' };
@@ -49,11 +48,9 @@ function fixture(t, change = () => {}) {
   change(inputs, request);
   for (const input of inputs) fs.writeFileSync(path.join(folder, `${input.source}.json`), JSON.stringify(input));
   const collected = collect(request, folder);
-  const reviewRequest = { schemaVersion: 1, dataClass: 'synthetic', collection: collected.file,
-    output: 'mapping', expectedRevision: 0, reason: 'Synthetic separate identities.', operations: [] };
-  const inspection = review(reviewRequest, folder, true);
-  reviewRequest.collectionDigest = inspection.collectionDigest;
-  review(reviewRequest, folder);
+  const identityMapping = mappingFixture(folder, collected.file, 'mapping', 'Synthetic separate identities.');
+  const inspection = identityMapping.inspect();
+  identityMapping.apply([]);
   const mappingFile = path.join(folder, 'mapping', 'identity-review.json');
   const mapping = JSON.parse(fs.readFileSync(mappingFile, 'utf8'));
   const collection = JSON.parse(fs.readFileSync(collected.file, 'utf8'));
