@@ -1,31 +1,26 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { collect } = require('./collect.cjs');
 const { handoff, period } = require('./demo.cjs');
-const { review } = require('./identity-review.cjs');
+const { tempFolder, mappingFixture } = require('./fixtures.cjs');
 const { curate } = require('./curated.cjs');
 const { prayer } = require('./prayer.cjs');
 
 function fixture(t) {
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'contacts-prayer-synthetic-'));
-  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const folder = tempFolder(t, 'contacts-prayer-synthetic-');
   const source = handoff('email', 'email');
   fs.writeFileSync(path.join(folder, 'input.json'), JSON.stringify(source));
   const collection = collect({
     schemaVersion: 1, dataClass: 'synthetic', period, output: 'store',
     sources: [{ source: 'email', account: source.account, connector: source.connector, mode: 'metadata-import', input: 'input.json' }]
   }, folder).file;
-  const mapping = { schemaVersion: 1, dataClass: 'synthetic', collection, output: 'mapping', reason: 'Synthetic review' };
-  const applyMapping = operations => {
-    const current = review(mapping, folder, true);
-    return review({ ...mapping, expectedRevision: current.revision, collectionDigest: current.collectionDigest, operations }, folder);
-  };
+  const { inspect: inspectMapping, apply: applyMapping } =
+    mappingFixture(folder, collection, 'mapping', 'Synthetic review');
   applyMapping([]);
-  const person = Object.keys(review(mapping, folder, true).view.people)[0];
+  const person = Object.keys(inspectMapping().view.people)[0];
   applyMapping([{ type: 'household', id: 'household-a', label: 'Synthetic household', people: [person] }]);
   const curation = { schemaVersion: 1, dataClass: 'synthetic', collection, mapping: 'mapping', output: 'curated', reason: 'Synthetic notes' };
   const applyNotes = operations => {
