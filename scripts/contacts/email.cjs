@@ -1,8 +1,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
-const { resolvePeriod, outputLocation } = require('./collect.cjs');
+const { hashJSON, readJSONValue, writeExclusive, runCLI, outputLocation } = require('./lib.cjs');
+const { resolvePeriod } = require('./collect.cjs');
 
 const CONNECTOR = 'gmail-metadata-v1';
 const HEADERS = ['From', 'To', 'Cc', 'Bcc', 'Date', 'List-Id', 'Precedence', 'Auto-Submitted'];
@@ -28,7 +28,7 @@ function canonical(value) {
     Object.keys(value).sort().map(key => [key, canonical(value[key])]));
   return value;
 }
-const digest = value => crypto.createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
+const digest = value => hashJSON(canonical(value));
 function address(value) {
   requireValue(typeof value === 'string' &&
     /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/.test(value));
@@ -329,7 +329,7 @@ async function runFixture(request, folder) {
   requireSynthetic(request.config?.dataClass);
   requireValue(text(request.fixture) && text(request.output));
   requireValue(request.previous === undefined || text(request.previous));
-  const read = file => JSON.parse(fs.readFileSync(path.resolve(folder, file), 'utf8').replace(/^\uFEFF/, ''));
+  const read = file => readJSONValue(path.resolve(folder, file));
   const previous = request.previous ? read(request.previous) : null;
   const result = await acquireEmail(request.config, fixtureTransport(read(request.fixture)), previous);
   const output = outputLocation(path.resolve(folder, request.output));
@@ -340,9 +340,7 @@ async function runFixture(request, folder) {
     fs.chmodSync(staging, 0o700);
     for (const [name, value] of Object.entries({ 'handoff.json': result.handoff,
       'checkpoint.json': result.checkpoint, 'report.json': result.report })) {
-      const fd = fs.openSync(path.join(staging, name), 'wx', 0o600);
-      try { fs.writeFileSync(fd, JSON.stringify(value, null, 2) + '\n'); fs.fsyncSync(fd); }
-      finally { fs.closeSync(fd); }
+      writeExclusive(path.join(staging, name), JSON.stringify(value, null, 2) + '\n');
     }
     fs.renameSync(staging, output);
   } finally {
@@ -351,19 +349,18 @@ async function runFixture(request, folder) {
   return { output, exitCode: result.exitCode };
 }
 if (require.main === module) {
-  (async () => {
-    try {
-      const args = process.argv.slice(2);
-      requireValue(args.length === 2 && args[0] === '--synthetic-request', 'invalid_arguments');
-      const file = path.resolve(args[1]);
-      const request = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
-      const result = await runFixture(request, path.dirname(file));
-      process.stdout.write('Synthetic email acquisition persisted; coverage is partial.\n');
-      process.exitCode = result.exitCode;
-    } catch (error) {
-      process.stderr.write(`Email acquisition failed [${error instanceof EmailError ? error.code : 'input_or_storage_failure'}].\n`);
-      process.exitCode = 1;
-    }
-  })();
+  runCLI(async () => {
+    const args = process.argv.slice(2);
+    requireValue(args.length === 2 && args[0] === '--synthetic-request', 'invalid_arguments');
+    const file = path.resolve(args[1]);
+    const request = readJSONValue(file);
+    const result = await runFixture(request, path.dirname(file));
+    process.stdout.write('Synthetic email acquisition persisted; coverage is partial.\n');
+    return result.exitCode;
+  }, error => {
+    process.stderr.write(`Email acquisition failed [${error instanceof EmailError ? error.code : 'input_or_storage_failure'}].\n`);
+    return 1;
+  });
 }
+
 module.exports = { acquireEmail, fixtureTransport, runFixture };

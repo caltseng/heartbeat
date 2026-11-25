@@ -2,10 +2,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { TextDecoder, isDeepStrictEqual } = require('node:util');
-const { outputLocation, resolvePeriod } = require('./collect.cjs');
+const { hash, stripBOM, hasUnsupportedTextControls, readJSONValue, persistText, openLock, releaseLock,
+  runCLI, outputLocation } = require('./lib.cjs');
+const { resolvePeriod } = require('./collect.cjs');
 
 const PROFILE = 'whatsapp-ios-txt-metadata-v1';
-const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 class ConversionError extends Error {
   constructor(code, status = 'failed') { super(code); this.code = code; this.status = status; }
 }
@@ -92,8 +93,8 @@ function convert(bytes, manifest, registry = []) {
   let txt;
   try { txt = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes); }
   catch { throw new ConversionError('invalid_utf8'); }
-  txt = txt.replace(/^\uFEFF/, '');
-  need(!/\r(?!\n)|[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFEFF]/.test(txt), 'unsupported_txt_layout', 'unsupported');
+  txt = stripBOM(txt);
+  need(!hasUnsupportedTextControls(txt), 'unsupported_txt_layout', 'unsupported');
   const lines = txt === '' ? [] : txt.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n');
   need(lines.length <= 100000, 'txt_structure_limit', 'unsupported');
   for (const line of lines) {
@@ -177,15 +178,7 @@ function convert(bytes, manifest, registry = []) {
 }
 
 function atomic(file, value) {
-  const temporary = `${file}.${crypto.randomUUID()}.tmp`;
-  const fd = fs.openSync(temporary, 'wx', 0o600);
-  try {
-    try { fs.writeFileSync(fd, value); }
-    finally { fs.closeSync(fd); }
-    fs.renameSync(temporary, file);
-  } finally {
-    if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
-  }
+  persistText(file, value, `${file}.${crypto.randomUUID()}.tmp`);
 }
 function immutable(file, value) {
   if (fs.existsSync(file)) {
@@ -194,7 +187,7 @@ function immutable(file, value) {
 }
 function run(argv) {
   need(argv.length === 6 && argv[0] === '--txt' && argv[2] === '--manifest' && argv[4] === '--output', 'invalid_arguments');
-  const manifest = JSON.parse(fs.readFileSync(argv[3], 'utf8').replace(/^\uFEFF/, ''));
+  const manifest = readJSONValue(argv[3]);
   need(manifest?.dataClass === 'synthetic', 'private_collection_disabled');
   const folder = outputLocation(argv[5]);
   const registryFile = path.join(folder, 'whatsapp-registry.synthetic.json');
@@ -206,11 +199,7 @@ function run(argv) {
   fs.mkdirSync(folder, { recursive: true, mode: 0o700 });
   const lock = path.join(folder, 'whatsapp-conversion.lock');
   let fd;
-  try { fd = fs.openSync(lock, 'wx', 0o600); }
-  catch (error) {
-    if (error.code === 'EEXIST') throw new ConversionError('conversion_locked');
-    throw error;
-  }
+  fd = openLock(lock, () => new ConversionError('conversion_locked'));
   try {
     const latest = fs.existsSync(registryFile) ? JSON.parse(fs.readFileSync(registryFile, 'utf8')) : [];
     const { handoff, audit } = convert(bytes, manifest, latest);
@@ -228,17 +217,18 @@ function run(argv) {
     process.stdout.write(JSON.stringify({ status: 'partial', code: 'snapshot_unknown_history', live: false }) + '\n');
     return 2;
   } finally {
-    fs.closeSync(fd);
-    fs.unlinkSync(lock);
+    releaseLock(lock, fd);
   }
 }
 if (require.main === module) {
-  try { process.exitCode = run(process.argv.slice(2)); }
-  catch (error) {
+  runCLI(() => {
+    return run(process.argv.slice(2));
+  }, error => {
     const known = error instanceof ConversionError;
     process.stderr.write(JSON.stringify({ status: known ? error.status : 'failed',
       code: known ? error.code : 'conversion_input_or_io_error' }) + '\n');
-    process.exitCode = known && error.status !== 'failed' ? 2 : 1;
-  }
+    return known && error.status !== 'failed' ? 2 : 1;
+  });
 }
+
 module.exports = { convert, ConversionError };

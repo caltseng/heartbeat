@@ -1,9 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
+const { hashJSON, publish, runCLI, readJSON, requireValue, object, outputLocation } = require('./lib.cjs');
 const { aggregate } = require('./aggregate.cjs');
-const { readJSON, requireValue, object, outputLocation } = require('./collect.cjs');
-const { publish } = require('./local-json.cjs');
 
 function messageCount(observed, complete) {
   return { observed, total: complete ? observed : null,
@@ -127,7 +125,7 @@ function selectView(report, name) {
     report.heading === 'Heartbeat period summary' && report.context && report.views &&
     ['summary', 'peopleTable', 'perChannel', 'timeline'].includes(name), 'Invalid Heartbeat reporting view.');
   return { heading: report.heading, schemaVersion: report.schemaVersion, dataClass: report.dataClass,
-    reportDigest: crypto.createHash('sha256').update(JSON.stringify(report)).digest('hex'),
+    reportDigest: hashJSON(report),
     context: structuredClone(report.context), view: name, data: structuredClone(report.views[name]) };
 }
 function run(request, folder = process.cwd()) {
@@ -150,17 +148,18 @@ function run(request, folder = process.cwd()) {
   return { heading: report.heading, file, status: report.context.status, exitCode: report.context.exitCode };
 }
 if (require.main === module) {
-  try {
+  runCLI(() => {
     const args = process.argv.slice(2);
     requireValue(args.length === 2 && args[0] === '--request',
       'Usage: node scripts\\contacts\\summary.cjs --request <request.json>', 'invalid_arguments');
     const file = path.resolve(args[1]);
     const result = run(readJSON(file).value, path.dirname(file));
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-    process.exitCode = result.exitCode;
-  } catch (error) {
+    return result.exitCode;
+  }, error => {
     process.stderr.write(`Summary failed [${error.code || 'unexpected_error'}]: ${error.message}\n`);
-    process.exitCode = 1;
-  }
+    return 1;
+  });
 }
+
 module.exports = { summary, selectView, run };

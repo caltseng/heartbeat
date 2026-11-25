@@ -1,14 +1,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
-const { outputLocation } = require('./collect.cjs');
+const { hashJSON, readJSONValue: readJSON, createGuard, persist, openLock, releaseLock, runCLI,
+  outputLocation } = require('./lib.cjs');
 const { review } = require('./identity-review.cjs');
-const { persist } = require('./local-json.cjs');
 
-function requireValue(condition, message, code = 'invalid_curation') {
-  if (!condition) throw Object.assign(new Error(message), { code });
-}
+const requireValue = createGuard('invalid_curation');
 function object(value, fields, label) {
   requireValue(value && typeof value === 'object' && !Array.isArray(value) &&
     Object.keys(value).every(key => fields.includes(key)), `Invalid ${label} fields.`);
@@ -37,7 +34,6 @@ function instant(value) {
   requireValue(typeof value === 'string' && Number.isFinite(Date.parse(value)) &&
     new Date(value).toISOString() === value, 'Invalid capture instant.');
 }
-function readJSON(file) { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); }
 function validateRecords(records, mapping) {
   object(records, ['groups', 'notes', 'connections', 'rhythms'], 'curated records');
   for (const field of ['groups', 'notes', 'connections', 'rhythms']) dictionary(records[field]);
@@ -88,18 +84,14 @@ function curate(request, requestFolder = process.cwd(), inspect = false) {
   }, requestFolder, true);
   requireValue(mapping.revision > 0, 'Register canonical people and households with identity review first.');
   const binding = { revision: mapping.revision, view: mapping.view };
-  const mappingDigest = crypto.createHash('sha256').update(JSON.stringify(binding)).digest('hex');
+  const mappingDigest = hashJSON(binding);
   const output = outputLocation(path.resolve(requestFolder, text(request.output, 'output')));
   const file = path.join(output, 'curated.json');
   const lock = path.join(output, 'curated.lock');
   let lockFd;
   if (!inspect) {
     fs.mkdirSync(output, { recursive: true, mode: 0o700 });
-    try { lockFd = fs.openSync(lock, 'wx', 0o600); }
-    catch (error) {
-      if (error.code === 'EEXIST') throw Object.assign(new Error('Curated store is locked; verify the writer stopped before removing this exact lock.'), { code: 'store_locked' });
-      throw error;
-    }
+    lockFd = openLock(lock, () => Object.assign(new Error('Curated store is locked; verify the writer stopped before removing this exact lock.'), { code: 'store_locked' }));
   }
   try {
     if (!inspect) fs.writeFileSync(lockFd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }) + '\n');
@@ -171,21 +163,22 @@ function curate(request, requestFolder = process.cwd(), inspect = false) {
     persist(file, state);
     return result();
   } finally {
-    if (lockFd !== undefined) { fs.closeSync(lockFd); fs.unlinkSync(lock); }
+    releaseLock(lock, lockFd);
   }
 }
 if (require.main === module) {
-  try {
+  runCLI(() => {
     const args = process.argv.slice(2);
     requireValue(args.length === 2 && ['--inspect', '--request'].includes(args[0]),
       'Usage: node scripts\\contacts\\curated.cjs --inspect <request.json> | --request <request.json>', 'invalid_arguments');
     const file = path.resolve(args[1]);
     const result = curate(readJSON(file), path.dirname(file), args[0] === '--inspect');
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-    process.exitCode = result.exitCode;
-  } catch (error) {
+    return result.exitCode;
+  }, error => {
     process.stderr.write(`Curated relationships failed [${error.code || 'unexpected_error'}]: ${error.message}\n`);
-    process.exitCode = 1;
-  }
+    return 1;
+  });
 }
+
 module.exports = { curate };

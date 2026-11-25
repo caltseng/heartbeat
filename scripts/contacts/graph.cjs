@@ -1,8 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { readJSON, requireValue, object, outputLocation } = require('./collect.cjs');
+const { publishText, runCLI, readJSON, requireValue, object, outputLocation } = require('./lib.cjs');
 const { selectView } = require('./summary.cjs');
-const { publishText } = require('./local-json.cjs');
 
 const BANDS = [
   { id: 'frequent', radius: 105, label: 'Direct: at least 50% of local dates' },
@@ -236,17 +235,18 @@ function run(request, folder = process.cwd()) {
     status: report.value.context.status, exitCode: report.value.context.exitCode };
 }
 if (require.main === module) {
-  try {
+  runCLI(() => {
     const args = process.argv.slice(2);
     requireValue(args.length === 2 && args[0] === '--request',
       'Usage: node scripts\\contacts\\graph.cjs --request <request.json>', 'invalid_arguments');
     const file = path.resolve(args[1]);
     const result = run(readJSON(file).value, path.dirname(file));
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-    process.exitCode = result.exitCode;
-  } catch (error) {
+    return result.exitCode;
+  }, error => {
     process.stderr.write(`Graph failed [${error.code || 'unexpected_error'}]: ${error.message}\n`);
-    process.exitCode = 1;
-  }
+    return 1;
+  });
 }
+
 module.exports = { graphModel, render, run };

@@ -1,6 +1,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { collect, outputLocation, persist, readJSON, instant, requireValue, object } = require('./collect.cjs');
+const { openLock, releaseLock, CollectionError, runCLI, outputLocation, readJSON, instant, requireValue,
+  object } = require('./lib.cjs');
+const { collect, persist } = require('./collect.cjs');
 
 function retentionCutoff(now) {
   const date = new Date(instant(now, 'now'));
@@ -132,11 +134,7 @@ function operate(request, requestFolder = process.cwd()) {
     fs.unlinkSync(lock);
   }
   let fd;
-  try { fd = fs.openSync(lock, 'wx', 0o600); }
-  catch (error) {
-    if (error.code === 'EEXIST') requireValue(false, 'Store is locked; recover only after its owner exits.', 'store_locked');
-    throw error;
-  }
+  fd = openLock(lock, () => new CollectionError('store_locked', 'Store is locked; recover only after its owner exits.'));
   let collectionRequest, previousHistory;
   try {
     fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, startedAt: now }));
@@ -190,8 +188,7 @@ function operate(request, requestFolder = process.cwd()) {
     state.operations = { ...state.operations, schemaVersion: 1, asOf: now, cutoff };
     persist(file, state);
   } finally {
-    fs.closeSync(fd);
-    fs.unlinkSync(lock);
+    releaseLock(lock, fd);
   }
   const result = collect(collectionRequest, requestFolder, now);
   const sources = sourceStatus({ manifest: result.manifest, history: previousHistory }, now, maxAgeHours);
@@ -199,17 +196,18 @@ function operate(request, requestFolder = process.cwd()) {
   return { title: 'Heartbeat source refresh', ...result, sources, exitCode: stale ? 2 : result.exitCode };
 }
 if (require.main === module) {
-  try {
+  runCLI(() => {
     const args = process.argv.slice(2);
     requireValue(args.length === 2 && args[0] === '--request',
       'Usage: node scripts\\contacts\\operations.cjs --request <operation.synthetic.json>');
     const file = path.resolve(args[1]);
     const result = operate(readJSON(file).value, path.dirname(file));
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-    process.exitCode = result.exitCode;
-  } catch (error) {
+    return result.exitCode;
+  }, error => {
     process.stderr.write(`Operation failed [${error.code || 'unexpected_error'}]: ${error.message}\n`);
-    process.exitCode = 1;
-  }
+    return 1;
+  });
 }
+
 module.exports = { operate, retentionCutoff };

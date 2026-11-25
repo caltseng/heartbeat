@@ -1,20 +1,16 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
-const { resolvePeriod, outputLocation } = require('./collect.cjs');
-const { publish } = require('./local-json.cjs');
+const { hash, readJSONWithDigest: readJSON, createGuard, publish, runCLI, outputLocation } = require('./lib.cjs');
+const { resolvePeriod } = require('./collect.cjs');
 
 const CHANNELS = {
   email: ['email'], 'text-messages': ['sms', 'mms', 'rcs', 'imessage'],
   messenger: ['messenger'], whatsapp: ['whatsapp'], 'google-contacts': []
 };
 const ROLES = ['to', 'cc', 'bcc', 'recipient'];
-const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const sorted = values => [...new Set(values)].sort();
 const accountKey = (source, account) => JSON.stringify([source, account]);
-function requireValue(condition, message, code = 'invalid_aggregation') {
-  if (!condition) throw Object.assign(new Error(message), { code });
-}
+const requireValue = createGuard('invalid_aggregation');
 function object(value, fields, label) {
   requireValue(value && typeof value === 'object' && !Array.isArray(value), `${label} must be an object.`);
   requireValue(Object.keys(value).every(key => fields.includes(key)), `${label} contains unsupported fields.`);
@@ -338,10 +334,6 @@ function aggregate(collection, mapping, options) {
     ]
   };
 }
-function readJSON(file) {
-  const raw = fs.readFileSync(file, 'utf8');
-  return { value: JSON.parse(raw.replace(/^\uFEFF/, '')), digest: hash(raw) };
-}
 function run(request, folder = process.cwd()) {
   object(request, ['schemaVersion', 'dataClass', 'collection', 'mapping', 'identityMappingRevision', 'period', 'channels', 'output'], 'request');
   requireValue(request.schemaVersion === 1 && request.dataClass === 'synthetic',
@@ -362,17 +354,18 @@ function run(request, folder = process.cwd()) {
   return { heading: report.heading, file, status: report.status, exitCode: report.exitCode };
 }
 if (require.main === module) {
-  try {
+  runCLI(() => {
     const args = process.argv.slice(2);
     requireValue(args.length === 2 && args[0] === '--request',
       'Usage: node scripts\\contacts\\aggregate.cjs --request <request.json>', 'invalid_arguments');
     const file = path.resolve(args[1]);
     const result = run(readJSON(file).value, path.dirname(file));
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-    process.exitCode = result.exitCode;
-  } catch (error) {
+    return result.exitCode;
+  }, error => {
     process.stderr.write(`Aggregation failed [${error.code || 'unexpected_error'}]: ${error.message}\n`);
-    process.exitCode = 1;
-  }
+    return 1;
+  });
 }
+
 module.exports = { aggregate, run };

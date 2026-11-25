@@ -1,16 +1,12 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
-const { outputLocation } = require('./collect.cjs');
-const { persist } = require('./local-json.cjs');
+const { hash: digest, readJSONWithDigest: readJSON, createGuard, persist, openLock, releaseLock, runCLI,
+  outputLocation } = require('./lib.cjs');
 
 const SOURCES = ['google-contacts', 'email', 'text-messages', 'messenger', 'whatsapp'];
-const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 const own = (value, key) => Object.hasOwn(value, key);
-function requireValue(condition, message, code = 'invalid_review') {
-  if (!condition) throw Object.assign(new Error(message), { code });
-}
+const requireValue = createGuard('invalid_review');
 function object(value, fields, label) {
   requireValue(value && typeof value === 'object' && !Array.isArray(value), `${label} must be an object.`);
   requireValue(Object.keys(value).every(key => fields.includes(key)), `${label} contains unsupported fields.`);
@@ -23,10 +19,6 @@ function list(value, label, minimum = 0) {
   requireValue(Array.isArray(value) && value.length >= minimum && new Set(value).size === value.length,
     `${label} must be an array of distinct values.`);
   return value;
-}
-function readJSON(file) {
-  const raw = fs.readFileSync(file, 'utf8');
-  return { value: JSON.parse(raw.replace(/^\uFEFF/, '')), digest: digest(raw) };
 }
 const personId = key => `person-${digest(key)}`;
 function identifier(value) {
@@ -211,11 +203,7 @@ function review(request, requestFolder = process.cwd(), inspect = false) {
   let lockFd;
   const lock = path.join(output, 'identity-review.lock');
   if (!inspect) {
-    try { lockFd = fs.openSync(lock, 'wx', 0o600); }
-    catch (error) {
-      if (error.code === 'EEXIST') throw Object.assign(new Error('Identity review is locked; verify the writer stopped before removing this exact lock.'), { code: 'store_locked' });
-      throw error;
-    }
+    lockFd = openLock(lock, () => Object.assign(new Error('Identity review is locked; verify the writer stopped before removing this exact lock.'), { code: 'store_locked' }));
   }
   try {
     if (!inspect) fs.writeFileSync(lockFd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }) + '\n');
@@ -298,21 +286,22 @@ function review(request, requestFolder = process.cwd(), inspect = false) {
       ...sourceState, inactiveIdentityKeys: state.inactiveIdentityKeys
     };
   } finally {
-    if (lockFd !== undefined) { fs.closeSync(lockFd); fs.unlinkSync(lock); }
+    releaseLock(lock, lockFd);
   }
 }
 if (require.main === module) {
-  try {
+  runCLI(() => {
     const args = process.argv.slice(2);
     requireValue(args.length === 2 && ['--request', '--inspect'].includes(args[0]),
       'Usage: node scripts\\contacts\\identity-review.cjs --inspect <request.json> | --request <request.json>', 'invalid_arguments');
     const file = path.resolve(args[1]);
     const result = review(readJSON(file).value, path.dirname(file), args[0] === '--inspect');
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-    process.exitCode = result.exitCode;
-  } catch (error) {
+    return result.exitCode;
+  }, error => {
     process.stderr.write(`Identity review failed [${error.code || 'unexpected_error'}]: ${error.message}\n`);
-    process.exitCode = 1;
-  }
+    return 1;
+  });
 }
+
 module.exports = { review };

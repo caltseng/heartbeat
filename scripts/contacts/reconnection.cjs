@@ -1,17 +1,13 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
-const { outputLocation, readJSON } = require('./collect.cjs');
+const { hashJSON: digest, createGuard, persist, publish, openLock, releaseLock, runCLI, outputLocation,
+  readJSON } = require('./lib.cjs');
 const { summary } = require('./summary.cjs');
 const { curate } = require('./curated.cjs');
 const { prayer } = require('./prayer.cjs');
-const { persist, publish } = require('./local-json.cjs');
 
-const digest = value => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
-function requireValue(condition, message, code = 'invalid_reconnection') {
-  if (!condition) throw Object.assign(new Error(message), { code });
-}
+const requireValue = createGuard('invalid_reconnection');
 function object(value, fields) {
   requireValue(value && typeof value === 'object' && !Array.isArray(value) &&
     Object.keys(value).every(key => fields.includes(key)), 'Unsupported reconnection fields.');
@@ -167,11 +163,7 @@ function reconnection(request, folder = process.cwd(), mode = '--inspect') {
   let lockFd;
   if (mode !== '--inspect') {
     fs.mkdirSync(output, { recursive: true, mode: 0o700 });
-    try { lockFd = fs.openSync(lock, 'wx', 0o600); }
-    catch (error) {
-      if (error.code === 'EEXIST') throw Object.assign(new Error('Reconnection store is locked; verify the writer stopped.'), { code: 'store_locked' });
-      throw error;
-    }
+    lockFd = openLock(lock, () => Object.assign(new Error('Reconnection store is locked; verify the writer stopped.'), { code: 'store_locked' }));
   }
   try {
     if (lockFd !== undefined) fs.writeFileSync(lockFd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }) + '\n');
@@ -248,24 +240,25 @@ function reconnection(request, folder = process.cwd(), mode = '--inspect') {
     persist(file, state);
     return result();
   } finally {
-    if (lockFd !== undefined) { fs.closeSync(lockFd); fs.unlinkSync(lock); }
+    releaseLock(lock, lockFd);
   }
 }
 if (require.main === module) {
-  try {
+  runCLI(() => {
     const args = process.argv.slice(2);
     requireValue(args.length === 2 && ['--inspect', '--request', '--report'].includes(args[0]),
       'Expected a command and synthetic request file.', 'invalid_arguments');
     const file = path.resolve(args[1]);
     const result = reconnection(readJSON(file).value, path.dirname(file), args[0]);
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-    process.exitCode = result.exitCode;
-  } catch (error) {
+    return result.exitCode;
+  }, error => {
     const knownCodes = ['invalid_reconnection', 'private_collection_disabled', 'store_locked',
       'unsafe_output', 'revision_conflict', 'evidence_conflict', 'invalid_arguments', 'collection_conflict'];
     const code = knownCodes.includes(error.code) ? error.code : 'reconnection_failed';
     process.stderr.write(`Reconnection review failed [${code}].\n`);
-    process.exitCode = 1;
-  }
+    return 1;
+  });
 }
+
 module.exports = { reconnection };
