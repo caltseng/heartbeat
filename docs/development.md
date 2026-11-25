@@ -113,5 +113,9 @@ Preserve `contacts-*` skill names, `scripts/contacts/`, schema version and store
 names unless a separately specified compatibility change requires otherwise.
 Heartbeat names the product and future local reports/maps, not a bulk schema
 rename. Identity review is a separate synthetic-only overlay; see its
-[contract and engineering decisions](spec/contacts-identity-review.md). Future
-reducers, note capture and renderers remain distinct work items.
+[contract and engineering decisions](spec/contacts-identity-review.md).
+The [CONTACTS-027 curated store](spec/contacts-curated-records.md) adds
+`contacts:curate` and `curated.test.cjs`: exact original notes, explicit connections,
+groups, per-household rhythms, reference preservation, atomic rollback and CLI
+0/2/1 exits. It reuses canonical reviewed households; no real notes are authorized.
+Reducers and renderers remain distinct work items.

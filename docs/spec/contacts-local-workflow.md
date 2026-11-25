@@ -3,8 +3,10 @@
 Status: synthetic collection, source reconciliation and identity review are
 runnable, including the landed CONTACTS-021/022 contracts. Synthetic Google/email
 acquisition and text conversion have separate commands below. Aggregation,
-Heartbeat reports/graphs and note capture remain future CONTACTS-023 through
-027 work. This workflow composes those stages without claiming future delivery. The
+Heartbeat reports/graphs remain future CONTACTS-023 through 025 work.
+[CONTACTS-027](contacts-curated-records.md) adds separate synthetic note capture,
+curated groups, explicit connections and rhythms using reviewed households.
+This workflow composes those stages without claiming future delivery. The
 [technical contract](contacts-technical-spec.md), [product contract](contacts-store-spec.md)
 and [register](contacts-work-items.md) remain authoritative.
 
@@ -121,6 +123,7 @@ shape and prerequisites rather than constructing requests from real accounts.
 | `npm run contacts:text-xml -- --xml <fixture.xml> --manifest <manifest.json> --output <fresh-directory>` | [Selected synthetic XML profile](contacts-text-converter.md); `text.synthetic.json` and a collection request. |
 | `npm run contacts:messenger -- --synthetic-request <request.json>` | [Selected synthetic JSON snapshot profile](contacts-messenger-converter.md); local IDs, overlap guard and unknown history, not a personal API. |
 | `npm run contacts:whatsapp -- --txt <fixture.txt> --manifest <manifest.json> --output <synthetic-store>` | [Selected synthetic iOS TXT profile](contacts-whatsapp-format-gate.md#contacts-020-operation-and-delegated-decisions); immutable registry, acquisition handoff/request and unknown snapshot history. |
+| `npm run contacts:curate -- --inspect <request.json>` / `--request <request.json>` | [Curated records](contacts-curated-records.md); synthetic `curated.json`, canonical household/person references, original notes and explicit connections. Real note content is unauthorized. |
 
 Feed successful/explicitly partial normalized handoffs into `contacts:collect`
 with their exact source/account/connector and coverage. Native acquisition
@@ -134,6 +137,9 @@ retention/deletion and interrupted-purge recovery. Follow its separate
 managed stores use operations refresh/resync rather than direct collection.
 Keep curated overlays separate from cache/derived targets. Operation requests
 are private operational artifacts guarded by `check:private`, too.
+Keep `contacts:curate` output in its own directory (the `curated` subdirectory
+or a separate sibling), never directly in the managed-store root: curation's
+`curated.lock` and `curated.json.<pid>.tmp` are not metadata purge inventory.
 No private source access or recurring schedule is enabled.
 
 ## Local configuration and versioned file handoffs
@@ -162,6 +168,10 @@ Example layout; `reports` entries alone are reserved for later implementations:
     identity-review.json            # CONTACTS-022 handoff
     identity-review.lock            # only during an identity-review write
     identity-review.json.<pid>.tmp   # transient atomic-write staging file
+  curated/
+    curated.json                    # CONTACTS-027 synthetic curated records
+    curated.lock                    # only during curation
+    curated.json.<pid>.tmp           # transient atomic-write staging file
   reports/<chosen-run>/
     aggregates.json                 # future CONTACTS-023
     report.json                     # future CONTACTS-024
@@ -173,6 +183,7 @@ Example layout; `reports` entries alone are reserved for later implementations:
 | Acquisition/demo -> collector | Existing `schemaVersion:1` request and source envelopes | Same data class; explicit source/account/connector, self IDs, roles, period, coverage and provenance. All desired unavailable sources are entries, not omissions. |
 | Collector -> identity review | Existing `schemaVersion:1` `collection.json` | Read records, checkpoints, manifest and history as one atomic generation; retain source keys and unknown coverage. Do not edit source evidence to resolve a person. |
 | Identity review -> reducer | Implemented `schemaVersion:1` `identity-review.json`, defined by 022 | Monotonic `revision`, exact `collectionDigest`, current `view`, `identityDigests`, inactive links and append-only history. Read an explicitly pinned revision/digest; preserve aliases and unresolved/inactive people. Names/group membership cannot imply merges or households. |
+| Identity review -> curated records | Implemented `schemaVersion:1` `curated.json`, defined by 027 | Pin canonical view digest plus curation revision; preserve original IDs/text and separate capture/encounter dates. Only explicit connections affect confirmed dates; source changes never overwrite notes. |
 | Collection + mapping -> reducer | Reserved `aggregates.json`; schema defined by 023 | Pin exact collection bytes (SHA-256), data class, mapping revision and resolved half-open period/time zone/as-of. Reconcile source IDs, direct/group roles, exclusions and unknown/lower-bound coverage. |
 | Reducer -> Heartbeat summary | Reserved `report.json`; schema defined by 024 | Versioned shared dataset with the same input references, filters, source freshness/coverage, exclusions, counts and daily timeline. Narrative must not invent numbers. |
 | Shared report -> Heartbeat graph | Reserved private `graph.html` / `graph.svg`; renderer defined by 025 | Same report revision/digest, period and filters in all views; explain group-only/inactive/unknown categories. Offline files, no remote assets, telemetry or hosted service. |
@@ -206,8 +217,8 @@ Persist derived generations separately from collection. Future producers must
 validate first, write atomically inside the same private boundary (reuse the
 collector's output-location checks), and leave prior valid output intact on
 failure. Explicitly label partial datasets as observed/lower-bound; interrupted
-or invalid inputs block downstream work. Until those consumers exist, stop at
-the reviewed overlay: there is no numerical report, graph or all-in-one command.
+or invalid inputs block downstream work. Until those consumers exist, use only the reviewed overlay and explicit synthetic
+curation: there is no numerical report, graph or all-in-one command.
 
 ## Recovery without losing source evidence
 

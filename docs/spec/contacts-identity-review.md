@@ -4,7 +4,9 @@ Implemented local synthetic-only overlay and independent
 [`contacts-identity-review` skill](../../.github/skills/contacts-identity-review/SKILL.md).
 The collector, schema version 1, source keys, skills and observations retain their
 existing contracts. There is no live acquisition, note editor, aggregation or
-graph renderer here. Bootstrap prerequisite was satisfied by owner-merged
+graph renderer in this overlay. [CONTACTS-027](contacts-curated-records.md) separately
+adds synthetic note capture and consumes these canonical household/person IDs.
+Bootstrap prerequisite was satisfied by owner-merged
 PR #1, commit `6b6299475b0d1dbcf2bd005c87d383ee97537e2b`.
 
 ## Request and workflow

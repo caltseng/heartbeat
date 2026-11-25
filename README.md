@@ -49,6 +49,12 @@ matches, reversible splits/undo and optional curated household links. It is
 synthetic-only and never rewrites source records or notes. Follow the
 [review workflow and contract](docs/spec/contacts-identity-review.md).
 
+CONTACTS-027 adds `contacts:curate` for synthetic original notes, explicit
+meaningful connections, curated groups and household-specific rhythms. It reuses
+canonical reviewed households and never infers connections from message activity.
+See the [local workflow and decision record](docs/spec/contacts-curated-records.md).
+Real note content remains unauthorized under the metadata-only privacy policy.
+
 Cross-source numerical aggregation, summaries,
 reconnection signals and Heartbeat's map are **not implemented**. Missing source
 data means unknown, not zero. No private accounts, devices, browser sessions,
