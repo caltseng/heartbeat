@@ -31,7 +31,8 @@ test('private ignored workflow stays local, including reports and graph files', 
     'whatsapp-registry.synthetic.json', 'whatsapp-conversion.lock', 'whatsapp.synthetic.json',
     'whatsapp.synthetic.json.12345678-abcd.tmp', 'request.synthetic.json.12345678-abcd.tmp',
     'handoff.json', 'checkpoint.json', 'aggregates.json', 'aggregate.synthetic.json',
-    'aggregates.12345678-1234-1234-1234-123456789abc.tmp', 'report.json', 'graph.html', 'graph.svg']) {
+    'aggregates.12345678-1234-1234-1234-123456789abc.tmp', 'report.json', 'summary.synthetic.json',
+    'report.12345678-1234-1234-1234-123456789abc.tmp', 'graph.html', 'graph.svg']) {
     f.write(path.join('.private', 'contacts', 'synthetic', file));
   }
   f.write(path.join('docs', 'spec', 'contacts-local-workflow.md'));
@@ -73,7 +74,8 @@ test('reserved private handoffs fail outside ignored storage', t => {
     'request.synthetic.json.12345678-abcd.tmp',
     'handoff.json', 'checkpoint.json', 'aggregates.json', 'aggregate.json', 'aggregate.synthetic.json',
     'aggregates.12345678-1234-1234-1234-123456789abc.tmp',
-    'report.json', 'graph.html', 'graph.svg', '.env.local', 'private.key']) {
+    'report.json', 'summary.json', 'summary.synthetic.json',
+    'report.12345678-1234-1234-1234-123456789abc.tmp', 'graph.html', 'graph.svg', '.env.local', 'private.key']) {
     const target = f.write(path.join('accidental', name));
     assert.throws(() => checkBoundary(f.root), /Private operational artifact/);
     fs.unlinkSync(target);
@@ -153,6 +155,16 @@ test('documented synthetic collection-to-review-to-aggregation handoff stays pri
   assert.equal(dataset.identityMappingRevision, 1);
   assert.equal(dataset.totals.observedMessages, 4);
   assert.equal(dataset.audit.uniqueSourceEvents, 4);
+  const summaryFile = f.write(path.join('.private', 'contacts', 'demo', 'summary.synthetic.json'),
+    JSON.stringify({ ...aggregationRequest, output: '../reports/summary-001' }));
+  const summarized = run(path.join(__dirname, 'contacts', 'summary.cjs'), ['--request', summaryFile]);
+  const report = JSON.parse(fs.readFileSync(summarized.file, 'utf8'));
+  assert.equal(report.context.collectionDigest, dataset.collectionDigest);
+  assert.equal(report.context.identityMappingRevision, dataset.identityMappingRevision);
+  assert.deepEqual(report.context.period, dataset.period);
+  assert.equal(report.views.summary.metrics.messages.observed, 4);
+  assert.equal(report.views.timeline.reduce((total, row) => total + row.observedMessages, 0), 4);
+  assert.deepEqual(report.views.perChannel, dataset.perChannel);
   assert.deepEqual(fs.readFileSync(result.file), mappingBytes);
   assert.deepEqual(fs.readFileSync(path.join(demo, 'collection.json')), snapshot);
   assert.doesNotThrow(() => checkBoundary(f.root));

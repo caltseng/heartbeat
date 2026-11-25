@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { resolvePeriod, outputLocation } = require('./collect.cjs');
+const { publish } = require('./local-json.cjs');
 
 const CHANNELS = {
   email: ['email'], 'text-messages': ['sms', 'mms', 'rcs', 'imessage'],
@@ -357,14 +358,7 @@ function run(request, folder = process.cwd()) {
   const output = outputLocation(path.resolve(folder, request.output));
   fs.mkdirSync(output, { recursive: true, mode: 0o700 });
   const file = path.join(output, 'aggregates.json');
-  const temporary = path.join(output, `aggregates.${crypto.randomUUID()}.tmp`);
-  try {
-    const fd = fs.openSync(temporary, 'wx', 0o600);
-    try { fs.writeFileSync(fd, JSON.stringify(report, null, 2) + '\n'); fs.fsyncSync(fd); }
-    finally { fs.closeSync(fd); }
-    // Same-directory hard linking atomically publishes without replacing an existing report or symlink.
-    fs.linkSync(temporary, file);
-  } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
+  publish(file, report);
   return { heading: report.heading, file, status: report.status, exitCode: report.exitCode };
 }
 if (require.main === module) {

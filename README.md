@@ -67,8 +67,13 @@ explicit mapping revision, per-person/thread/channel/day counts, coverage and
 an auditable source-event ledger. Follow the
 [aggregation contract and decisions](docs/spec/contacts-aggregation.md).
 
-Period-summary presentation, reconnection signals and Heartbeat's map are
-**not implemented**. Missing source
+CONTACTS-024 adds `contacts:summary` and the focused `contacts-summary` skill:
+one immutable synthetic `report.json` supplies deterministic summary statements,
+the complete reviewed people cohort, channel counts and coverage-aware daily
+timeline. All views share period/zone/as-of, mapping binding, source freshness,
+coverage and exclusions. See the [reporting contract and decisions](docs/spec/contacts-period-summary.md).
+
+Reconnection signals and Heartbeat's map are **not implemented**. Missing source
 data means unknown, not zero. No private accounts, devices, browser sessions,
 credentials or real data are included or authorized by this repository.
 

@@ -3,8 +3,8 @@
 Status: synthetic collection, source reconciliation and identity review are
 runnable, including the landed CONTACTS-021/022 contracts. Synthetic Google/email
 acquisition and text conversion have separate commands below. CONTACTS-023 now
-adds synthetic cross-source aggregation; Heartbeat summary presentation/graphs
-remain future work.
+adds synthetic cross-source aggregation; CONTACTS-024 adds the shared Heartbeat
+period report and summary presentation skill. Graphs remain future work.
 [CONTACTS-027](contacts-curated-records.md) adds separate synthetic note capture,
 curated groups, explicit connections and rhythms using reviewed households.
 This workflow composes those stages without claiming future delivery. The
@@ -131,7 +131,27 @@ Exit 2 saves an explicitly partial dataset, not empty success. The exact mapping
 history revision must bind the collection bytes. Inputs remain unchanged; each
 new run publishes a separate immutable `aggregates.json` with version, filters,
 period/zone/as-of, source coverage, exclusion ledger and observed/lower-bound
-metrics. No summary renderer, graph, source access or private run is enabled.
+metrics. No graph, source access or private run is enabled.
+
+### Synthetic summary handoff
+
+Copy that aggregation request to `demo-031\summary.synthetic.json`, keeping the
+same collection, explicit mapping revision, period and optional channels, but
+choose a fresh output such as `"..\\reports\\summary-001"`.
+
+```powershell
+npm run contacts:summary -- --request .private\contacts\demo-031\summary.synthetic.json
+if ($LASTEXITCODE -eq 1) { throw 'Summary failed; preserve the pinned inputs and inspect the error.' }
+npm run check:private
+```
+
+The [CONTACTS-024 contract](contacts-period-summary.md) defines one immutable
+`report.json` built directly through the reducer, with no intermediate aggregate
+write. Exit 2 saves explicit partial coverage, not empty success. Use the focused
+`contacts-summary` skill to copy computed statements and format the saved people,
+channel and timeline rows with their full context. Standalone `selectView`
+envelopes preserve the same metadata and report digest. No narrative-generated
+numbers, dropped inactive peers, implicit empty-history zeros or source access.
 
 ### Other implemented synthetic entry points
 
@@ -178,7 +198,7 @@ Identity review uses its own version-1 request, with the exact collection digest
 expected mapping revision, reason and explicit operations. There is no shared
 global configuration; source adapters own their documented local requests.
 
-Example layout; summary/graph entries remain reserved for later implementations:
+Example layout; graph entries remain reserved for later implementation:
 
 ```text
 .private/contacts/
@@ -198,7 +218,8 @@ Example layout; summary/graph entries remain reserved for later implementations:
   reports/<chosen-run>/
     aggregates.json                 # implemented CONTACTS-023
     aggregates.<uuid>.tmp           # transient atomic no-replace publication
-    report.json                     # future CONTACTS-024
+    report.json                     # implemented CONTACTS-024; choose its own fresh run
+    report.<uuid>.tmp               # transient atomic no-replace publication
     graph.html / graph.svg          # future CONTACTS-025
 ```
 
@@ -209,15 +230,15 @@ Example layout; summary/graph entries remain reserved for later implementations:
 | Identity review -> reducer | Implemented `schemaVersion:1` `identity-review.json`, defined by 022 | Monotonic `revision`, exact `collectionDigest`, current `view`, `identityDigests`, inactive links and append-only history. Read an explicitly pinned revision/digest; preserve aliases and unresolved/inactive people. Names/group membership cannot imply merges or households. |
 | Identity review -> curated records | Implemented `schemaVersion:1` `curated.json`, defined by 027 | Pin canonical view digest plus curation revision; preserve original IDs/text and separate capture/encounter dates. Only explicit connections affect confirmed dates; source changes never overwrite notes. |
 | Collection + mapping -> reducer | Implemented `schemaVersion:1` `aggregates.json`; [contract defined by 023](contacts-aggregation.md) | Pin exact collection bytes (SHA-256), data class, explicit saved mapping revision and resolved half-open period/time zone/as-of. Reconcile source IDs, direct/group roles, exclusions and unknown/lower-bound coverage. |
-| Reducer -> Heartbeat summary | Reserved `report.json`; schema defined by 024 | Versioned shared dataset with the same input references, filters, source freshness/coverage, exclusions, counts and daily timeline. Narrative must not invent numbers. |
+| Reducer -> Heartbeat summary | Implemented `schemaVersion:1` `report.json`; [contract defined by 024](contacts-period-summary.md) | Shared dataset with exact collection digest/mapping revision, filters, period/zone/as-of, source freshness/coverage, exclusions, deterministic statements, full people cohort and coverage-aware daily timeline. Standalone views retain shared context/digest. |
 | Shared report -> Heartbeat graph | Reserved private `graph.html` / `graph.svg`; renderer defined by 025 | Same report revision/digest, period and filters in all views; explain group-only/inactive/unknown categories. Offline files, no remote assets, telemetry or hosted service. |
 
-Reserved filenames are **not implemented schemas or CLI commands**. Each future
+Reserved graph filenames are **not implemented schemas or CLI commands**. Each future
 JSON producer must declare `schemaVersion`, preserve `dataClass` and pin input
 revisions/digests; consumers must reject unsupported versions, mismatched data
 classes/periods/revisions and missing inputs, never substitute empty/stale data.
-CONTACTS-023 owns the implemented aggregate schema; CONTACTS-024 owns its future
-exact summary schema, version migration and validators;
+CONTACTS-023 owns the implemented aggregate schema; CONTACTS-024 owns its
+implemented version-1 shared report and presentation contract;
 CONTACTS-022's implemented overlay contract remains unchanged.
 CONTACTS-025 depends on this workflow, not on this item shipping its renderer.
 Do not pass the raw collection directly to a graph or derive totals in a renderer.
