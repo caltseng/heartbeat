@@ -14,11 +14,11 @@ npm run check
 npm run ci
 ```
 
-`test:contacts`/`npm test` run Node's built-in test runner, including
-`email.test.cjs`, `google.test.cjs` and `text-xml.test.cjs`. `check` checks the
-collection/demo, email/Google adapter, text converter and test CommonJS files'
-syntax. `ci` runs both.
-Tests generate synthetic fixtures in
+`test:contacts` runs Node's built-in test runner for the collector, email/Google
+adapters, text converter and identity review. `npm test` also runs the
+private-boundary tests using temporary Git repositories. `check` checks all
+collection/demo, adapter, converter, review and test CommonJS files' syntax and
+runs `check:private`; `ci` runs checks and tests. Tests generate synthetic fixtures in
 temporary directories and clean them up; they include actual CLI 0/2/1 exits,
 all five families, replay, connector provenance, resume, rollback, record
 conflicts, direct/group roles, missing-versus-empty history, DST/custom intervals,
@@ -57,6 +57,18 @@ The [source operations contract](spec/contacts-source-operations.md) covers
 synthetic refresh/resync, stale/disconnected sources, calendar retention,
 inventoried cache deletion, replay fences and interrupted-purge recovery.
 All checks remain dependency-free, synthetic and account-free.
+
+The [local workflow](spec/contacts-local-workflow.md) defines current commands,
+future versioned handoffs and recovery. `npm run check:private` rejects nonempty
+public output roots and private operational Git candidates, including force-added
+ignored files. Synthetic negative tests seed contacts docs/tooling, renamed data,
+checkpoints and graphs into every guarded output root. No public build/deployment
+pipeline is added. Audit any additional public export path explicitly with
+`npm run check:private -- --output <directory>`; new output locations/artifact
+names must extend the guard. This check is not payload scanning or access control.
+A synthetic demo/replay/inspect/review CLI integration case additionally verifies
+the versioned overlay pins an unchanged collection and remains ignored locally;
+force-adding its generated mapping fails the Git delivery guard.
 
 GitHub Actions runs `.github/workflows/ci.yml` for PRs targeting `main` and pushes
 to `main`, on Node 20.11.0. Its stable job/check name is

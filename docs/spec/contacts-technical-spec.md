@@ -351,6 +351,11 @@ bounded local lifecycle, not real protection or machine-wide deletion.
 
 ## 6. Manifest and downstream handoff
 
+See the [CONTACTS-031 local workflow](contacts-local-workflow.md) for executable
+synthetic commands, request-as-configuration, recovery and reserved versioned
+handoffs to later identity/reducer/report/graph implementations. Its publication
+guard runs in CI without introducing a public build or changing collection v1.
+
 The manifest records data class, collection time, exact period, each requested
 source/account/connector, status, coverage/basis, retrieval time, pagination state,
 next cursor, duplicate-record count, persisted-page count, upstream errors or

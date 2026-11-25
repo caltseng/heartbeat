@@ -102,6 +102,11 @@ a certification of network-filesystem or full power-loss recovery.
 
 ## Future Heartbeat summaries and map
 
+The [local workflow contract](spec/contacts-local-workflow.md) connects existing
+commands/configuration/recovery to reserved versioned handoffs for later stages.
+It also specifies the automated no-public-output guard; no renderer or reporting
+command is implemented by that integration.
+
 Later reducers must reconcile source IDs and reviewed identity mappings before
 counting. They must preserve half-open time intervals, time-zone-aware active-day
 unions, direct/group distinctions, exclusions, uncertainty and provenance.
