@@ -97,7 +97,7 @@ Identical snapshot reimports must retain IDs and deduplicate through the shared
 importer. A changed, repackaged, overlapping or differently sharded export gets a
 different snapshot namespace; it is **not safely additive**. CONTACTS-018 must
 reject an overlapping import into the same source/account until reviewed event
-translation/reconciliation exists (CONTACTS-021), rather than count it twice or
+translation/reconciliation is integrated for this route (using CONTACTS-021), rather than count it twice or
 deduplicate by message content. Do not change the account namespace to hide
 overlap. A new snapshot is not live sync or a deletion feed.
 

@@ -54,9 +54,10 @@ function temp(t) {
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   return dir;
 }
-function importResult(dir, handoff, connector = handoff.connector) {
+function importResult(dir, handoff, connector = handoff.connector, overlapReview) {
   fs.writeFileSync(path.join(dir, 'handoff.json'), JSON.stringify({ ...handoff, connector }));
   return collect({ schemaVersion: 1, dataClass: 'synthetic', period: scenario().manifest.period,
+    ...(overlapReview ? { overlapReview } : {}),
     output: path.join(dir, 'store'), sources: [{ source: 'messenger', account: handoff.account,
       connector, mode: 'metadata-import', input: 'handoff.json' }] }, dir);
 }
@@ -144,6 +145,21 @@ test('interruption, digest mismatch, missing shard numbers and truncated/encrypt
   shard.path = shard.path.replace('message_2', 'message_3');
   gap.files.set(shard.path, bytes);
   assert.ok(convertSnapshot(gap.manifest, gap.read).report.errors.some(error => error.code === 'missing_shards'));
+});
+test('shared overlap reviews do not bypass the Messenger immutable snapshot gate', t => {
+  const fixture = scenario(), dir = temp(t);
+  const first = convertSnapshot(fixture.manifest, fixture.read);
+  importResult(dir, first.handoff);
+  const before = stored(dir).records;
+  mutateShard(fixture, 0, native => { native.title = 'Changed synthetic packaging'; });
+  const changed = convertSnapshot(fixture.manifest, fixture.read);
+  const review = { revision: 'fixture-messenger-overlap', reviewedAt: at,
+    basis: 'Synthetic candidate translation; route gate remains enforced.',
+    mappings: [{ source: 'messenger', account: first.handoff.account, connector: first.handoff.connector,
+      type: 'event', id: changed.handoff.pages[0].events[0].id, targetId: first.handoff.pages[0].events[0].id }] };
+  const result = importResult(dir, changed.handoff, changed.handoff.connector, review);
+  assert.equal(result.manifest.sources[0].error.code, 'snapshot_overlap');
+  assert.deepEqual(stored(dir).records, before);
 });
 test('retrying interrupted conversion into the same store adds only missing events, not duplicate messages', t => {
   const fixture = scenario(), dir = temp(t);

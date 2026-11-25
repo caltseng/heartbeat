@@ -75,8 +75,10 @@ declared files or changing bytes changes the namespace. The importer, under its
 existing store lock and before record/cursor mutation, rejects a different
 snapshot or another connector in that same Messenger account in either import
 order (`snapshot_overlap`). This deliberately rejects even apparently disjoint
-snapshots until CONTACTS-021 translation exists. Do not change the account to
-evade overlap. Changed mappings in one snapshot can yield explicit record
+snapshots until reviewed snapshot translations are integrated for this route.
+CONTACTS-021's shared `overlapReview` machinery does not lift the stricter
+Messenger snapshot gate. Do not change the account to evade overlap.
+Changed mappings in one snapshot can yield explicit record
 conflicts, not destructive identity rewrites.
 
 Each shard is validated/projected atomically in memory; failed shards contribute
@@ -116,7 +118,7 @@ approval for transient content handling as well as local controls/source/run gat
 | --- | --- | --- |
 | Implement the selected offline, synthetic-only JSON profile with standard-library Node; no API/browser route or dependencies. | A verified authorized structured reader was unavailable in 017. Assumes declared invented shapes, not a current producer. | Two root variants, unsupported layouts/wrappers and private-run rejection. Revisit only with separately authorized local producer-shape validation or a verified reader contract. |
 | Exact manifest files/digests, local reviewed identity slots, strict field/layout gate and no recursive discovery. Check redirection from the selected root down, not above it: OS aliases such as macOS `/var` are not export-controlled components. | Heuristic parsing/name matching risks identity collisions and accidental private input. Rejecting every filesystem ancestor breaks legitimate OS/profile aliases. Current format has no guaranteed provider IDs. | Multi-shard, duplicate-name/self/departed-sender, digest, allowed-ancestor-alias and rejected-root/descendant-redirection cases. A new producer/layout or duplicate-label identity evidence needs a reviewed profile revision. |
-| One immutable snapshot namespace, conservative bidirectional overlap rejection in the shared importer. | Timestamp/content matching loses legitimate duplicate events; additive changed snapshots double-count. All snapshots may overlap until proven otherwise. | Replay, interruption recovery, equal timestamps and unchanged store records after rejected overlap. Revisit with CONTACTS-021 reviewed translations, not account aliases. |
+| One immutable snapshot namespace, conservative bidirectional overlap rejection in the shared importer. | Timestamp/content matching loses legitimate duplicate events; additive changed snapshots double-count. All snapshots may overlap until proven otherwise. | Replay, interruption recovery, equal timestamps and unchanged store records after rejected overlap. Revisit with a separate route extension integrating CONTACTS-021 reviewed translations, not account aliases. |
 | Retain unknown coverage/null bounds, report missing/unsupported history; no complete success. | Requested dates, first/last events and file exhaustion cannot establish full upstream history. No encrypted backup is verified. | Truncated/encrypted/missing/empty/unsupported cases stay partial or unsupported with nonzero exits. Revisit only with source-specific coverage evidence. |
 | Per-shard rollback, all-or-nothing immutable output publication, rerun instead of a native cursor. | Incremental native checkpoints add state without a remote paging API; shards are local immutable units. Assumes bounded local fixture size; entire export is held in memory. | Failed JSON/timestamps/rosters do not leak shard records; retry deduplicates. Revisit for an explicitly bounded large-export streaming requirement or CONTACTS-032 operations. |
 

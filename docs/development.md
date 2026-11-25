@@ -41,6 +41,12 @@ The [text converter](spec/contacts-text-converter.md)
 adds synthetic direct/four-person MMS, DST instants, XML failures, role/setup
 ambiguity, content exclusion and immutable archive replay checks. No live
 endpoint or actual device/producer export is verified.
+CONTACTS-021 additionally covers append-only revisions, branch resolution,
+mutation targets/tombstones, historical membership, thread-specific coverage,
+and reviewed different-ID connector translations with retained source evidence.
+Text archive binding tests also reject unbound pre-existing text events after
+explicit revisions, without changing their records or reserving an archive.
+See the [revision contract and decision record](spec/contacts-source-revisions.md).
 
 GitHub Actions runs `.github/workflows/ci.yml` for PRs targeting `main` and pushes
 to `main`, on Node 20.11.0. Its stable job/check name is
