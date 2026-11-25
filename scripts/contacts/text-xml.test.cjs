@@ -219,9 +219,19 @@ test('failed first page does not reserve archive, and existing unbound text even
   delete handoff.textArchive;
   handoff.connector = request.sources[0].connector = 'legacy-handoff';
   assert.equal(run().manifest.sources[0].status, 'partial');
+  const event = handoff.pages[0].events[0];
+  event.revision = { id: 'classification-reviewed', supersedes: '$initial' };
+  event.classification = event.classification === 'interpersonal' ? 'unclassified' : 'interpersonal';
+  assert.equal(run().manifest.sources[0].status, 'partial');
+  const beforeBinding = JSON.parse(fs.readFileSync(path.join(folder, 'collection.json')));
+  const eventKey = JSON.stringify([handoff.source, handoff.account, 'event', event.id]);
+  assert.equal(beforeBinding.records[eventKey].revisions.length, 2);
   handoff.textArchive = binding;
   handoff.connector = request.sources[0].connector = binding.profile;
   assert.equal(run().manifest.sources[0].error.code, 'text_archive_conflict');
+  const afterBinding = JSON.parse(fs.readFileSync(path.join(folder, 'collection.json')));
+  assert.equal(afterBinding.textArchives, undefined);
+  assert.deepEqual(afterBinding.records, beforeBinding.records);
 });
 
 test('CLI writes only private metadata bundle, reports partial, imports/replays, and never leaks failing input', t => {

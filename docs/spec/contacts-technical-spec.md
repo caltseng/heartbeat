@@ -143,8 +143,9 @@ supplied metadata snapshot covers the requested interval according to its declar
 coverage, not that a remote account is connected or independently audited.
 For activity, a source-wide complete interval must be covered by every included
 thread; differing or unverified thread histories require partial/unknown source
-coverage. Per-thread coverage/revision enrichment is CONTACTS-021, not an excuse
-to mark incomplete threads complete in this initial handoff.
+coverage. [CONTACTS-021](contacts-source-revisions.md) adds explicit per-thread
+evidence and conservative completeness checks; legacy inherited source-wide
+declarations remain labeled as such.
 
 `maxPages` is an optional positive per-source page budget. `resume:true` starts at
 the last committed cursor for the same source/account/connector and exact resolved
@@ -237,8 +238,8 @@ for the exact fields, private registry, unknown coverage and exit behavior.
 | --- | --- |
 | Identity | `id`, `idKind: provider/local`, explicit `isSelf`; optional `displayName` and `addresses: [{type: email/phone, value}]`. Self identity must be established, not inferred from a name. |
 | Thread | `id`, `idKind`, `kind: direct/group/broadcast/unknown`; optional `title`. A two-person direct thread must include exactly one self identity and one other identity before direct events are accepted. |
-| Membership | `threadId`, `identityId`; both records must already exist or be in this page. Membership alone creates no activity. This initial membership record has no historical validity interval; it must not be used to reconstruct historical group rosters. |
-| Observation | `id`, `idKind`, `eventType: message/reaction/membership/edit/deletion`, thread, sender (nullable for non-message events), timestamp, channel, recipients and classification. Messages require a known sender; references must resolve. No event can occur after its retrieval timestamp. |
+| Membership | `threadId`, `identityId`; both records must already exist or be in this page. Optional `validFrom`/`validUntil` preserve historical half-open intervals. Legacy unbounded records do not establish historical rosters. Membership alone creates no activity. |
+| Observation | `id`, `idKind`, `eventType: message/reaction/membership/edit/deletion`, thread, sender (nullable for non-message events), timestamp, channel, recipients and classification. Edits/deletions require `targetId`; unresolved targets stay visible. Messages require a known sender; references must resolve. No event can occur after its retrieval timestamp. |
 | Recipient | Identity plus `to/cc/bcc/recipient` role; preserve email roles and never turn a multi-recipient event into one direct message per recipient. |
 | Classification | `interpersonal/bulk/automated/unclassified`; collection retains all classes. Later summaries explicitly exclude bulk/automated and disclose unclassified records; no classifier is implemented yet. |
 | Coverage | `start/end` (nullable when unknown), `completeness: complete/partial/unknown`, and a human-readable basis. Contact coverage is an identity snapshot, not an activity interval; complete identity snapshots may have null bounds. |
@@ -258,17 +259,22 @@ reimports of the same acquisition, and retain unresolved matches. Native export
 converters must define a stable local-ID strategy before use; matching text or
 participant names is not a deduplication strategy.
 
-Overlapping connectors for the same underlying source must use the same reviewed
-source/account namespace and event IDs. The collector stores an event once and
-retains both connector provenances. If their IDs differ, review/translation is
-required **before import**; this implementation cannot automatically detect that
-overlap and must not be used to claim reconciled cross-connector totals.
-Separate messages on different channels remain separate, even with identical text.
+Overlapping connectors use the same reviewed source/account namespace. Matching
+IDs deduplicate with both provenances; different IDs require an explicit private
+`overlapReview` before import. Translations are connector-specific and persisted,
+not inferred from names, text or timestamps. Separate messages on different
+channels remain separate. Unreviewed different IDs do not certify distinct
+messages or reconciled cross-connector totals.
 
-Conflicting metadata for the same key fails the page without overwriting the old
-record. A new edit/deletion event may be retained under its own ID/type, but target
-reconciliation, changing profiles, and temporal membership updates need the
-explicit revision design in CONTACTS-021. Do not count those event types as messages.
+Conflicting metadata under the same ID/revision fails the page without replacing
+the old record. Optional explicit identity/thread/event revisions preserve an
+append-only ancestry and expose branches instead of last-write-wins. Read the
+unique current versions through `reconciliation.records`, retaining original
+`records` as evidence. Tombstones, mutation targets, historical membership,
+per-thread coverage, translation examples and delegated decisions are defined in
+the [CONTACTS-021 contract](contacts-source-revisions.md). Edit/deletion/membership
+events and revisions are never additional messages. Honor
+`manifest.reconciliationRequired` before claiming reconciled output.
 
 Every stored record has provenance containing connector, SHA-256 input digest,
 page cursor and retrieval instant; its key supplies source/account/original ID.
