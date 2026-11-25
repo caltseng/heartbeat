@@ -7,6 +7,7 @@ const { spawnSync } = require('node:child_process');
 const { collect } = require('./collect.cjs');
 const { handoff, period } = require('./demo.cjs');
 const { operate, retentionCutoff } = require('./operations.cjs');
+const { review } = require('./identity-review.cjs');
 
 function fixture(t) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'heartbeat-operations-'));
@@ -167,6 +168,24 @@ test('explicit deletion blocks old acquisition and old events even in a freshly 
   assert.ok(count > 0);
   f.run('resync', { collectionRequest: f.request });
   assert.equal(eventCount(f.state()), count);
+});
+
+test('metadata deletion preserves the landed identity overlay and its canonical note references byte-for-byte', t => {
+  const f = fixture(t);
+  const request = { schemaVersion: 1, dataClass: 'synthetic', collection: f.file,
+    output: path.join(f.request.output, 'curated'), expectedRevision: 0,
+    reason: 'Synthetic explicit identity registration', operations: [] };
+  request.collectionDigest = review(request, f.folder, true).collectionDigest;
+  review(request, f.folder);
+  const file = path.join(request.output, 'identity-review.json');
+  const before = fs.readFileSync(file, 'utf8');
+  const personId = Object.keys(JSON.parse(before).view.people)[0];
+  const notes = JSON.stringify({ notes: [{ personId, text: 'Unchanged synthetic note.' }] });
+  fs.writeFileSync(f.notes, notes);
+  f.run('delete', { confirm: 'purge-cached-metadata' });
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  assert.equal(fs.readFileSync(f.notes, 'utf8'), notes);
+  assert.deepEqual(f.state().records, {});
 });
 
 test('interrupted purge blocks direct collection and recover completes exact-file deletion idempotently', t => {

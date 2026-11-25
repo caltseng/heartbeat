@@ -57,6 +57,12 @@ path deletion, automatic backup or trash copy. External original inputs are
 **not** erased or certified by this command; do not describe a managed-store
 purge as machine-wide deletion.
 
+The landed CONTACTS-022 mapping is a separate curated overlay. Keep its output
+under `curated` or in a separate sibling directory, not `cache`/`derived`. Purge
+does not rewrite its canonical IDs, note references or review audit; current
+collection digests naturally become stale. Source-key/audit retention in curated
+overlays still needs its own real-data policy enforcement before private use.
+
 ## Refresh, stale coverage and resync
 
 Add `collectionRequest` containing the existing collection request object to
