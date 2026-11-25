@@ -74,13 +74,14 @@ file. Every desired source must have an entry, even if it is unavailable.
 | `contacts-google-identities` | Validate/import identity metadata handoffs | [CONTACTS-011 selects proposed `people.connections.list`](contacts-google-capability.md), with `contacts.readonly` and contact-only fields. No authorized Google tool is verified; no OAuth client or People API adapter ships here. Snapshot completeness is not historical contact completeness; sync/deletion reconciliation remains future work. |
 | `contacts-email-activity` | Validate/import email metadata handoffs | [CONTACTS-013](contacts-email-access.md) selects proposed Gmail API `gmail.metadata` enumeration (no search `q`), not connected access. Stable IDs, sent timestamps, known roles and explicit partial history are required. No Gmail HTTP adapter ships here; classifications remain explicit. |
 | `contacts-text-activity` | Validate/import SMS/MMS/RCS/iMessage metadata handoffs | [CONTACTS-015](contacts-text-format-gate.md) selects Android 14 / SyncTech 10.30.009 full XML, design profile v1 for SMS/MMS with explicit protocol evidence. No device is verified; CONTACTS-016 converter is not implemented. RCS/iMessage/native backups remain unsupported by that profile. |
-| `contacts-messenger-activity` | Validate/import personal Messenger metadata handoffs | No verified personal-inbox API is configured here. A reported successful Muse browser query is UI-assisted acquisition evidence only, not a callable API, metadata contract, or history guarantee. Do not inherit that private session. |
+| `contacts-messenger-activity` | Validate/import personal Messenger metadata handoffs | [CONTACTS-017 selects proposed local JSON snapshot conversion](contacts-messenger-capability.md) for 018; no native converter or structured personal reader is available. Export producer version and encrypted-backup layout remain unverified. Page/business APIs and Muse queries do not establish personal-inbox history; no private session reuse or real-data remote AI processing. |
 | `contacts-whatsapp-activity` | Validate/import WhatsApp metadata handoffs | No verified personal-inbox connector is configured here. Native exports need a separately validated converter. Business inbox access is not evidence of access to existing personal groups. |
 
 All five are **import-capable**, not live-connected. Native export conversion and
 live acquisition remain distinct work items. Beeper and direct API credentials
-are not installed or assumed. Muse may supply structured acquisition evidence
-after a separate authorized workflow; the model and visualization remain here.
+are not installed or assumed. Muse UI evidence does not establish structured
+personal Messenger access or authorize real-data remote AI processing; the
+Heartbeat model and local visualization remain here.
 
 ## 3. Request contract
 
