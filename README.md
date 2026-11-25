@@ -2,7 +2,7 @@
 
 ![Heartbeat wordmark with a custom ping-and-reply H, coral upper-left packet and ink lower-right packet](docs/assets/heartbeat-wordmark.png)
 
-Heartbeat is a user-centered relationship and interaction graph, with a planned
+Heartbeat is a user-centered relationship and interaction graph, with a synthetic
 local visualization of observed communication frequency and recency. It is a
 **single-user local tool with a private JSON store**, not a hosted application.
 Households and explicit meaningful connections belong to the longer-term curated
@@ -78,7 +78,12 @@ the complete reviewed people cohort, channel counts and coverage-aware daily
 timeline. All views share period/zone/as-of, mapping binding, source freshness,
 coverage and exclusions. See the [reporting contract and decisions](docs/spec/contacts-period-summary.md).
 
-Reconnection signals and Heartbeat's map are **not implemented**. Missing source
+CONTACTS-025 adds `contacts:graph`: a pinned summary becomes a private standalone
+HTML file with inline SVG hub-and-spoke and person-to-thread maps, labeled
+frequency bands, recency, keyboard selection and shared people/channel/timeline
+views. Open locally without a service. See the [graph contract and decisions](docs/spec/contacts-local-graph.md).
+
+Reconnection signals are **not implemented**. Missing source
 data means unknown, not zero. No private accounts, devices, browser sessions,
 credentials or real data are included or authorized by this repository.
 

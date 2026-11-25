@@ -12,14 +12,18 @@ function persist(file, state) {
 }
 
 function publish(file, state) {
+  publishText(file, JSON.stringify(state, null, 2) + '\n');
+}
+
+function publishText(file, contents) {
   const temporary = `${file.replace(/\.json$/i, '')}.${crypto.randomUUID()}.tmp`;
   try {
     const fd = fs.openSync(temporary, 'wx', 0o600);
-    try { fs.writeFileSync(fd, JSON.stringify(state, null, 2) + '\n'); fs.fsyncSync(fd); }
+    try { fs.writeFileSync(fd, contents); fs.fsyncSync(fd); }
     finally { fs.closeSync(fd); }
     // A hard link publishes atomically without replacing an existing file or symlink.
     fs.linkSync(temporary, file);
   } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
 }
 
-module.exports = { persist, publish };
+module.exports = { persist, publish, publishText };
