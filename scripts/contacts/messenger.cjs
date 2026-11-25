@@ -201,9 +201,11 @@ function convertSnapshot(manifest, readShard) {
 function readLocalShard(root, relative) {
   const base = path.resolve(root);
   const file = path.join(base, ...relative.split('/'));
-  let current = path.parse(base).root;
-  // Reject redirection in every component, including the selected export root.
-  for (const part of file.slice(current.length).split(path.sep)) {
+  requireValue(!fs.lstatSync(base).isSymbolicLink(), 'redirected_input');
+  requireValue(fs.statSync(base).isDirectory(), 'shard_unreadable');
+  let current = base;
+  // OS aliases above the selected root are not export-controlled paths.
+  for (const part of relative.split('/')) {
     current = path.join(current, part);
     requireValue(!fs.lstatSync(current).isSymbolicLink(), 'redirected_input');
   }

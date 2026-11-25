@@ -23,6 +23,8 @@ The [CONTACTS-018 Messenger converter](docs/spec/contacts-messenger-converter.md
 projects declared synthetic JSON snapshot shards into metadata-only handoffs,
 with stable local IDs, overlap rejection and explicit unknown history. It rejects
 private runs and does not support encrypted backups or arbitrary archive layouts.
+It also provides a [synthetic-only text XML converter](docs/spec/contacts-text-converter.md)
+for the one profile selected by CONTACTS-015.
 
 CONTACTS-010 records the [owner-approved metadata policy](docs/privacy.md).
 The importer currently accepts **synthetic requests only**: private imports fail

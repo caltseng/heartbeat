@@ -277,3 +277,26 @@ test('redirected export directories are not followed; malformed JSON and empty s
   assert.deepEqual(converted.handoff.pages[0].events, []);
   assert.equal(converted.handoff.coverage.completeness, 'unknown');
 });
+test('trusted OS aliases above inputRoot are allowed without permitting redirected export descendants', t => {
+  const dir = temp(t), fixture = scenario();
+  const parent = path.join(dir, 'real-parent'), root = path.join(parent, 'export');
+  for (const [relative, bytes] of fixture.files) {
+    const file = path.join(root, ...relative.split('/'));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, bytes);
+  }
+  const alias = path.join(dir, 'alias-parent');
+  fs.symlinkSync(parent, alias, 'junction');
+  const result = runRequest({ manifest: fixture.manifest, inputRoot: path.join(alias, 'export'),
+    output: 'allowed-ancestor-alias' }, dir);
+  assert.equal(result.report.convertedShards, 3);
+  assert.equal(result.handoff.pages[0].events.length, 3);
+  const redirected = path.join(dir, 'redirected-descendant');
+  fs.mkdirSync(redirected);
+  fs.symlinkSync(path.join(root, 'messages'), path.join(redirected, 'messages'), 'junction');
+  const rejected = runRequest({ manifest: fixture.manifest, inputRoot: redirected,
+    output: 'rejected-descendant-alias' }, dir);
+  assert.equal(rejected.report.status, 'unsupported');
+  assert.ok(rejected.report.errors.some(error => error.code === 'redirected_input'));
+  assert.equal(rejected.handoff, null);
+});

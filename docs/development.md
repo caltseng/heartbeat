@@ -15,8 +15,9 @@ npm run ci
 ```
 
 `test:contacts`/`npm test` run Node's built-in test runner, including
-`email.test.cjs`, `google.test.cjs` and `messenger.test.cjs`. `check` checks the collection/demo,
-email/Google adapters, Messenger converter and test CommonJS files' syntax. `ci` runs both.
+`email.test.cjs`, `google.test.cjs`, `text-xml.test.cjs` and `messenger.test.cjs`.
+`check` checks the collection/demo, email/Google adapters, text/Messenger
+converters and test CommonJS files' syntax. `ci` runs both.
 Tests generate synthetic fixtures in
 temporary directories and clean them up; they include actual CLI 0/2/1 exits,
 all five families, replay, connector provenance, resume, rollback, record
@@ -36,6 +37,10 @@ Google tests cover the selected request parameters, duplicates, expiry/resync,
 quota/auth failure, conservative
 revisions/deletions, checkpoint binding and failed atomic writes. No live endpoint
 is called or verified; Google acquisition has only a synthetic transport.
+The [text converter](spec/contacts-text-converter.md)
+adds synthetic direct/four-person MMS, DST instants, XML failures, role/setup
+ambiguity, content exclusion and immutable archive replay checks. No live
+endpoint or actual device/producer export is verified.
 
 GitHub Actions runs `.github/workflows/ci.yml` for PRs targeting `main` and pushes
 to `main`, on Node 20.11.0. Its stable job/check name is
