@@ -5,8 +5,9 @@
 `npm run contacts:operate -- --request <operation.synthetic.json>` provides
 user-invoked `status`, `refresh`, `resync`, `retain`, `delete` and `recover`.
 It operates the existing version-1 **synthetic metadata-handoff route**, including
-handoffs from Google 012, Gmail 014 and text XML 016. It neither calls a provider
-nor implements the pending Messenger/WhatsApp converters. Unavailable sources
+handoffs from Google 012, Gmail 014, text XML 016 and the landed synthetic
+Messenger 018 converter. It neither calls a provider nor implements the pending
+WhatsApp converter. Unavailable sources
 must still be declared, never replaced with empty successful handoffs.
 
 Private operations fail before resolving a store. CONTACTS-010's owner-approved

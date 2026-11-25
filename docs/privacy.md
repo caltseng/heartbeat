@@ -46,8 +46,15 @@ source/operations work must implement and validate these controls before lifting
 the guard; a source adapter must check them before acquisition, not after fetching
 or writing a handoff. Approval alone never makes unverified protection acceptable.
 
+No Windows protection verifier ships, so no private import is enabled.
+
 The earlier future-retention/deletion decisions below are now exercised by that
 synthetic CLI; their real-data verification and consent gates remain unchanged.
+
+The [Messenger JSON converter](spec/contacts-messenger-converter.md) also rejects
+private conversion before reading native shards. Its synthetic content projection
+does not authorize transient handling of real native exports, which may contain
+content excluded by the approved metadata-only policy.
 
 Use synthetic data for development, CI, review and examples. Synthetic requests,
 demo generation, replay/resume and explicit unavailable/unsupported source reports
@@ -85,7 +92,7 @@ This checklist is a run gate, not a renewed questionnaire about the approved pol
 | Google contacts | Synthetic normalized identity import plus CONTACTS-012 acquisition | [CONTACTS-011/012](spec/contacts-google-capability.md) selects read-only `people.connections.list`, not connected access. No network transport, OAuth or credential loader ships. Private acquisition fails closed before output access (`private_collection_disabled`, exit 1), with no artifacts. Exact source/account and each-run approval plus verified local controls remain required under approved CONTACTS-010 policy. Revisions/deletions stay staged and partial pending 021. |
 | Email | Synthetic normalized handoff import plus [014 synthetic Gmail metadata adapter](spec/contacts-email-adapter.md), following [013's selected route](spec/contacts-email-access.md) | Exact Gmail account/source and each-run approval plus verified local controls remain required; no HTTP transport, connected tool or credentials. The adapter rejects private runs. `gmail.metadata` excludes bodies and search `q`; self/aliases, hidden BCC, partial history and classifications remain explicit. |
 | SMS/MMS/RCS/iMessage | Synthetic normalized text metadata import plus [synthetic SMS/MMS XML conversion](spec/contacts-text-converter.md) | [CONTACTS-015](spec/contacts-text-format-gate.md) selects Android 14/SyncTech 10.30.009 full XML; 016 implements only that synthetic profile. Exact source/account and each-run approval, local controls, actual device/SIM/self/protocol evidence and history limits remain required. Raw-export/content processing is not authorized by this metadata-only policy. Real conversion is rejected; no device or backup inspection is authorized. |
-| Personal Messenger | Synthetic normalized metadata handoff import only | [CONTACTS-017](spec/contacts-messenger-capability.md) selects proposed local JSON snapshot conversion; converter 018, exact source/account and each-run approval plus verified local controls remain required. Producer version, encrypted-backup layout and history coverage are unverified. Business APIs/Muse queries do not establish personal access; real-data remote-AI processing is prohibited. |
+| Personal Messenger | Synthetic normalized handoff import plus [018 JSON snapshot converter](spec/contacts-messenger-converter.md) | [CONTACTS-017](spec/contacts-messenger-capability.md) selects local versioned conversion, not a personal API. Private conversion is disabled; exact source/account and each-run approval, verified local controls and actual producer-shape validation remain required. Raw-export/content processing is not authorized by the metadata-only policy. Producer version, encrypted-backup layout and history coverage are unverified. Business APIs/Muse queries do not establish personal access; real-data remote-AI processing is prohibited. |
 | Personal WhatsApp | Synthetic normalized metadata handoff import only | [CONTACTS-019](spec/contacts-whatsapp-format-gate.md) selects synthetic-only iOS Without Media TXT design profile v1, archive-local IDs and evidence-based source zones. No producer/device certified; converter 020 remains future work. Approved CONTACTS-010 policy does not permit raw-content export processing; that needs a separate content boundary, exact source/account and each-run approval plus verified local controls. Private imports fail closed. Linked-device history is not full history; no pairing or business-API equivalence. |
 
 ## Missing data is not zero

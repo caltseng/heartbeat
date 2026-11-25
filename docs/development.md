@@ -15,7 +15,7 @@ npm run ci
 ```
 
 `test:contacts` runs Node's built-in test runner for the collector, email/Google
-adapters, text converter and identity review. `npm test` also runs the
+adapters, text/Messenger converters and identity review. `npm test` also runs the
 private-boundary tests using temporary Git repositories. `check` checks all
 collection/demo, adapter, converter, review and test CommonJS files' syntax and
 runs `check:private`; `ci` runs checks and tests. Tests generate synthetic fixtures in
@@ -29,6 +29,10 @@ denial without account/manifest disclosure. No live endpoint is verified.
 The [CONTACTS-014 adapter](spec/contacts-email-adapter.md) adds native Gmail
 metadata fixtures, separate native/handoff cursors, page rollback, auth/expiry,
 classification and a synthetic-only CLI with immutable private output.
+The [CONTACTS-018 Messenger converter](spec/contacts-messenger-converter.md)
+adds synthetic direct/group JSON shards, stable snapshot-local IDs, conservative
+overlap rejection, interrupted conversion/retry and unsupported history/layout
+cases. Its CLI also rejects private conversion.
 Google tests cover the selected request parameters, duplicates, expiry/resync,
 quota/auth failure, conservative
 revisions/deletions, checkpoint binding and failed atomic writes. No live endpoint
