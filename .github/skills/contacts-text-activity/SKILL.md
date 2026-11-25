@@ -11,6 +11,8 @@ Follow its authorization boundary and the
 accepts normalized handoffs, not raw XML. A separate
 [CONTACTS-016 converter](../../../docs/spec/contacts-text-converter.md) handles
 synthetic XML fixtures only.
+Private manifests fail with exit 1 / `private_collection_disabled` before the
+converter inspects the raw XML path; do not relabel real data as synthetic.
 The [CONTACTS-015 format gate](../../../docs/spec/contacts-text-format-gate.md)
 selects owner-operated Android 14 / SyncTech SMS Backup & Restore 10.30.009
 full XML (`synctech-xml-metadata-v1`) for that bounded converter.

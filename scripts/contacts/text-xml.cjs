@@ -118,7 +118,7 @@ function convert(bytes, manifest) {
   shape(manifest, ['schemaVersion', 'dataClass', 'profile', 'producerVersion', 'androidVersion', 'backupKind',
     'account', 'archive', 'period', 'retrievedAt', 'identities', 'selfBySubId', 'threads', 'rows']);
   need(manifest.schemaVersion === 1 && manifest.profile === PROFILE, 'unsupported_profile', 'unsupported');
-  need(manifest.dataClass === 'synthetic', 'private_conversion_not_authorized', 'requires_setup');
+  need(manifest.dataClass === 'synthetic', 'private_collection_disabled');
   need(manifest.producerVersion === '10.30.009' && manifest.androidVersion === '14' && manifest.backupKind === 'full',
     'unsupported_acquisition_profile', 'unsupported');
   id(manifest.account);
@@ -256,6 +256,7 @@ function convert(bytes, manifest) {
 function run(argv) {
   need(argv.length === 6 && argv[0] === '--xml' && argv[2] === '--manifest' && argv[4] === '--output', 'invalid_arguments');
   const manifest = JSON.parse(fs.readFileSync(argv[3], 'utf8').replace(/^\uFEFF/, ''));
+  need(manifest?.dataClass === 'synthetic', 'private_collection_disabled');
   const stat = fs.statSync(argv[1]);
   need(stat.size <= 32 * 1024 * 1024, 'xml_size_limit', 'unsupported');
   const handoff = convert(fs.readFileSync(argv[1]), manifest);

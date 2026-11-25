@@ -29,7 +29,7 @@ an arbitrary file because it has an `.xml` extension.
 | Route | Callable now | Selected next step / limitation |
 | --- | --- | --- |
 | Shared `contacts:collect` metadata handoff | Yes, schemaVersion 1 | Import normalized `text-messages` only; no XML input. |
-| Local SyncTech XML to metadata | Synthetic only | [CONTACTS-016](contacts-text-converter.md) implements only this selected profile and synthetic fixtures. Real conversion is rejected as `requires_setup`; no device or actual export is verified. |
+| Local SyncTech XML to metadata | Synthetic only | [CONTACTS-016](contacts-text-converter.md) implements only this selected profile and synthetic fixtures. Private conversion fails before raw XML inspection with exit 1 / `private_collection_disabled`; no device or actual export is verified. |
 | Device or Android database reader | No | Owner-created local export only; no ADB, root, database probing, bridge, pairing or default-app switch. |
 | RCS, including Google/Samsung messages serialized as SMS/MMS | No | Unsupported in v1; XML container type alone cannot prove transport. Ambiguous protocol must not become SMS/MMS. |
 | iMessage/iOS/macOS databases, Apple/iCloud backups | No | Unsupported; this Android route provides no Apple history. |

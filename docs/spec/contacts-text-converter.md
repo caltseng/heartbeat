@@ -16,7 +16,9 @@ The converter requires both the pinned `File Created By SMS Backup & Restore
 v10.30.009 ...` XML comment and a separate acquisition manifest. These are
 assertions supplied by the fixture author, not proof of actual transport,
 ownership or authorization. Real conversion is deliberately rejected with
-`requires_setup` / `private_conversion_not_authorized`; CONTACTS-010, source and
+exit **1**, `failed` / `private_collection_disabled`, before the CLI stats or
+reads the raw XML path. The programmatic converter rejects private class with
+the same error. CONTACTS-010, source and
 raw-content processing approval plus a separately reviewed real-run path are
 still required. Changing a real manifest to `synthetic` does not authorize it.
 
@@ -117,6 +119,8 @@ references, invalid UTF-8 and namespaces fail. Content values never classify a
 message's transport. Retain the immutable original and manifest outside git;
 the converter does not make copies of raw content.
 
+Conversion exits **1** with `failed` / `private_collection_disabled` for a
+nonsynthetic manifest, before any raw archive inspection or output creation.
 Conversion exits **2** with `status: partial` on a valid bundle (history is
 unknown), or **2** with `requires_setup`/`unsupported` and a static reason code.
 Malformed input, wrong digest, nonempty/unsafe output, invalid arguments and
@@ -145,7 +149,7 @@ policy**. No decision grants real-source access, external processing or sending.
 
 | Decision / rationale | Alternative and assumption | Validation / revisit condition |
 | --- | --- | --- |
-| Keep executable conversion synthetic-only. This avoids encoding an unapproved real-run boundary. | A private-mode approval flag would imply an authorization workflow that does not exist. Synthetic fixtures suffice for this item. | Private class rejection and sanitized CLI errors tested. Revisit only after CONTACTS-010/source/raw-content approvals and a reviewed bounded real-run design. |
+| Keep executable conversion synthetic-only and reject private manifests before raw-file inspection. This avoids encoding an unapproved real-run boundary or transiently processing content. | A private-mode approval flag would imply an authorization workflow that does not exist. Synthetic fixtures suffice for this item. | Private CLI manifest with a nonexistent XML path produces exit 1 / `private_collection_disabled` and no output; programmatic rejection and sanitized errors tested. Revisit only after CONTACTS-010/source/raw-content approvals and a reviewed bounded real-run design. |
 | Use a small dependency-free, fail-closed XML subset; require the producer comment plus acquisition pin. | General XML libraries add dependencies; permissive parsing broadens the selected profile. No actual producer output is assumed tested. | Malformed XML/counts, entities/DTD/instructions, unsupported producer/layout tested. Revisit if separately reviewed synthetic examples require additional XML syntax. |
 | Cap input at 32 MiB, 100,000 elements and nesting depth 16; reject rather than truncate. | Streaming large archives is a separate complexity. Small synthetic full backups are sufficient. | Parser enforces all three limits before output; size-limit fixture tested. Revisit for an explicitly authorized larger full archive, not silent partial parsing. |
 | Bind exact archive bytes and reviewed mappings in the existing store transaction. | Separate mutable registry or time/body hashes risk races, overlap or message collapse. Same bytes and mappings define replay. | Replay, duplicate-looking rows, changed bytes/ledger/connector and failed-page rollback tested. Revisit with CONTACTS-021 reconciliation. |

@@ -135,7 +135,7 @@ test('ambiguous direction, roles, protocol, layout and producer fail visibly wit
   f.manifest.rows = [{ ordinal: 1, transport: 'rcs' }];
   rejects(f, 'unsupported_transport', 'unsupported');
   f.manifest.dataClass = 'private';
-  rejects(f, 'private_conversion_not_authorized', 'requires_setup');
+  rejects(f, 'private_collection_disabled', 'failed');
 });
 
 test('malformed XML, entities, DTDs, instructions, duplicate attributes and invalid UTF-8 cannot be imported', () => {
@@ -247,4 +247,17 @@ test('CLI writes only private metadata bundle, reports partial, imports/replays,
   assert.equal(failure.status, 2);
   assert.equal(JSON.parse(failure.stderr).status, 'unsupported');
   assert.ok(!failure.stderr.includes(SECRET));
+});
+
+test('CLI rejects a private manifest before even inspecting the raw XML path', t => {
+  const folder = temporary(t), f = fixture();
+  f.manifest.dataClass = 'private';
+  const manifest = path.join(folder, 'private-manifest.json'), output = path.join(folder, 'must-not-exist');
+  fs.writeFileSync(manifest, JSON.stringify(f.manifest));
+  const result = spawnSync(process.execPath, [path.join(__dirname, 'text-xml.cjs'),
+    '--xml', path.join(folder, 'nonexistent.xml'), '--manifest', manifest, '--output', output], { encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.deepEqual(JSON.parse(result.stderr), { status: 'failed', code: 'private_collection_disabled' });
+  assert.equal(result.stdout, '');
+  assert.ok(!fs.existsSync(output));
 });
