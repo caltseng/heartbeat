@@ -19,8 +19,11 @@ credential loader ships; private acquisition is disabled with exit 1
 (`private_collection_disabled`) before any output access or artifact writes.
 Follow the contact-only fields, source IDs,
 snapshot/field limits, pagination and sync/deletion requirements; do not treat
-importer cursors as Google tokens. Real runs still require CONTACTS-010 and
-separate source authorization. Do not request credentials to close this gate.
+importer cursors as Google tokens. Real runs remain disabled: the approved
+CONTACTS-010 policy still requires exact source/account and each-run owner
+approval plus verified protection and retention/deletion controls.
+Ignored checkout storage is synthetic-only. Do not request credentials to close
+this gate.
 
 1. Establish the data class, reviewed upstream account namespace, private output
    location and snapshot scope. For synthetic work use invented pages; do not
@@ -44,7 +47,7 @@ separate source authorization. Do not request credentials to close this gate.
 
 If no suitable authorized tool exists, return `mode: unavailable`,
 `status: requires_setup`, and the missing capability. An existing normalized
-handoff can be imported now; native Google exports and live API fetches do not
+synthetic handoff can be imported now; native Google exports and live API fetches do not
 have a built-in parser/network transport. Changes, aliases and tombstones remain
 private pending reconciliation; inspect partial reports, never erase curated
 records or synthesize activity. Do not fabricate contacts, tokens or access.

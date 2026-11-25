@@ -7,8 +7,9 @@ Stable CONTACTS IDs, collection skill names and JSON schema are preserved.
 Remaining CONTACTS execution is blocked until this bootstrap is verified checked in.
 
 Status: architecture with a runnable metadata-handoff slice and synthetic-only
-Google acquisition adapter (CONTACTS-012). No accounts are connected, and no live
-network transport or native archive parser is implemented. See the [product specification](contacts-store-spec.md) and
+Google and Gmail acquisition adapters (CONTACTS-012/014). No accounts are
+connected, and no live network transport or native archive parser is implemented.
+See the [product specification](contacts-store-spec.md) and
 [work items](contacts-work-items.md).
 
 Confirmed execution boundary: **one user, local tool, local store in a private

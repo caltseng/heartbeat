@@ -16,8 +16,8 @@ npm run ci
 
 `test:contacts`/`npm test` run Node's built-in test runner, including
 `email.test.cjs` and `google.test.cjs`. `check` checks the collection/demo,
-email/Google adapter and test
-CommonJS files' syntax. `ci` runs both. Tests generate synthetic fixtures in
+email/Google adapter and test CommonJS files' syntax. `ci` runs both.
+Tests generate synthetic fixtures in
 temporary directories and clean them up; they include actual CLI 0/2/1 exits,
 all five families, replay, connector provenance, resume, rollback, record
 conflicts, direct/group roles, missing-versus-empty history, DST/custom intervals,
@@ -28,8 +28,8 @@ denial without account/manifest disclosure. No live endpoint is verified.
 The [CONTACTS-014 adapter](spec/contacts-email-adapter.md) adds native Gmail
 metadata fixtures, separate native/handoff cursors, page rollback, auth/expiry,
 classification and a synthetic-only CLI with immutable private output.
-Google tests cover the selected
-request parameters, duplicates, expiry/resync, quota/auth failure, conservative
+Google tests cover the selected request parameters, duplicates, expiry/resync,
+quota/auth failure, conservative
 revisions/deletions, checkpoint binding and failed atomic writes. No live endpoint
 is called or verified; Google acquisition has only a synthetic transport.
 

@@ -229,8 +229,10 @@ revision-aware reconciliation.
 
 Implemented on 2026-11-24 under the owner's delegation of ordinary engineering
 choices. These are **engineering decisions, not owner-approved privacy policy**.
-CONTACTS-010 and source authorization remain ungranted. No credentials, account,
-device, browser, remote AI, sending, source writes or schedules are used.
+The [CONTACTS-010 policy](../privacy.md) is owner-approved; exact source/account
+and each-run authorization remain ungranted, and local protection and
+retention/deletion controls remain unverified/unimplemented. No credentials,
+account, device, browser, remote AI, sending, source writes or schedules are used.
 
 ### Private configuration and executable synthetic route
 
@@ -242,7 +244,8 @@ Create that configuration and an invented fixture privately, never in tracked
 output. Configuration/fixture/output references resolve relative to the config.
 The CLI validates every location using the importer's existing private-output
 boundary: inside this checkout only `.private\contacts`, or an explicitly chosen
-external local directory. Reject unknown config fields, including credentials.
+external local directory. These locations permit synthetic artifacts only, not
+verified real-data storage. Reject unknown config fields, including credentials.
 
 ```json
 {
@@ -348,7 +351,7 @@ and empty threads/memberships/events. Source updates/deletions never create acti
 
 | Decision / rationale | Alternatives and assumptions | Synthetic validation / revisit condition |
 | --- | --- | --- |
-| Keep transport injection and CLI fixtures only; reject private collection before output access, including reports/manifests. | Shipping HTTP/OAuth loading or a private setup report now could imply access/protection authority. Protection is unverified; missing synthetic transport still gets an explicit setup report. | Parameter/auth/private-run no-artifact tests; revisit only after CONTACTS-010, explicit source authorization and verified protection plus reviewed credential/network design. |
+| Keep transport injection and CLI fixtures only; reject private collection before output access, including reports/manifests. | Shipping HTTP/OAuth loading or a private setup report now could imply access/protection authority. Protection is unverified; missing synthetic transport still gets an explicit setup report. | Parameter/auth/private-run no-artifact tests; revisit only after enforcing approved CONTACTS-010 policy, exact source/account and each-run authorization, verified protection and reviewed credential/network design. |
 | Atomic complete generations with immutable handoff-before-checkpoint; restart interrupted pagination instead of persisting provider page tokens. | Per-page crash resume adds mutable staging complexity. Small single-user contact snapshots and a 100-page default are assumed; maxPages is bounded to 1-10000. | Pagination/budget/replay and injected checkpoint-write failure; revisit if separately approved snapshot size requires durable page staging. |
 | Preserve original full-sync age; expire at seven days or recover once from incremental 410; bounded mock retries. | Renewing token age from incremental activity conflicts with 011; unlimited retries hide failure. Mock retry timing is not a production quota policy. | Fixed-token multi-page sync, staged-page expiry, seven-day resync and quota tests; revisit timing/Retry-After with an authorized production transport. |
 | Reserve conservative immutable identity baselines and stage revisions/deletions/aliases/absence privately, keeping coverage partial. | Destructive replacement or vendor tombstone events violate append-only ingestion/curated independence; 021 is not delivered. | Changed profile, alias, tombstone, full-resync absence and zero-change replay tests plus untouched curated bytes; revisit with explicit 021 revision/target reconciliation. |
@@ -356,13 +359,16 @@ and empty threads/memberships/events. Source updates/deletions never create acti
 
 ## Setup and approval gaps (no setup performed)
 
-Before any real run, CONTACTS-010 must separately approve account scope,
-metadata processing, private local location, Windows ACLs/encryption,
-retention/deletion, backups, credential/cursor handling and authority for that
-bounded run. Keep configuration references, OAuth material, source IDs, page/sync
-tokens, checkpoints, requests, normalized records, manifests and generated
-reports/graphs in ignored `.private/` or an approved external local directory,
-never tracked output, CI logs or PR descriptions.
+Before any future real run, enforce the [approved CONTACTS-010 policy](../privacy.md):
+obtain owner approval for the exact source/account and each bounded run, verify
+Windows-user restrictions, disk encryption and backup/sync exclusions, and
+implement operational 12-month retention and explicit deletion. All configuration
+references, OAuth material, source IDs, page/sync tokens, checkpoints, requests,
+normalized records, manifests and generated reports/graphs share that boundary:
+on this computer, outside Git worktrees and cloud-synced folders, never tracked
+output, CI logs or PR descriptions. Ignored `.private/` is for synthetic work,
+not approved real-data storage. The private guard remains enabled; policy
+approval alone neither verifies these controls nor authorizes acquisition.
 
 A future owner-controlled setup would need a Google Cloud project with People
 API enabled, a suitable local/installed-app OAuth client and consent configuration,
