@@ -18,9 +18,10 @@ CONTACTS-018, not an available parser or a verified Meta producer version.
 2. No live personal Messenger adapter or native export converter ships here.
    An earlier successful Muse browser query does not install a personal-agent API
    or establish full-history access. Do not inherit its private authenticated browser.
-   Any new browser/export acquisition needs separate authorization and verification.
-   Muse/UI-as-remote-acquisition is not a selected real-data route; never process
-   real collected data through remote AI.
+   The approved CONTACTS-010 policy prohibits Muse/remote-AI processing of real
+   collection data. No private browser acquisition is authorized. A proposed local
+   metadata route still needs separate source/account and each-run approval plus
+   verified local controls; the importer currently rejects all private requests.
 3. If an already authorized tool exposes structured metadata, preserve stable
    thread/message/sender IDs, actual event instants, participant membership,
    explicit self identities and direct/group distinctions in `source: messenger`,

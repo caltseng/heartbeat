@@ -229,7 +229,7 @@ Measure observed sent/received message counts, distinct active days, days when b
 
 Track the requested period, time zone, retrieval time, source, and history coverage per thread. Unavailable counts remain unknown rather than zero. Present partial counts as observed lower bounds, and do not compare unobserved weeks as if they were inactive.
 
-Build and display the communication map in the contacts product, not inside Muse. Email, text messages, Messenger, and WhatsApp are in scope; Google contacts provide identity information. Muse is a possible acquisition bridge for supported sources, not the destination for the visualization or the owner of the relationship model. Final connector selection remains open. Any assistant-provided narrative is not independently verified source data; require structured aggregates and reconcile totals before using numerical results in visualizations.
+Build and display the communication map in Heartbeat locally, not inside Muse. Email, text messages, Messenger, and WhatsApp are in scope; Google contacts provide identity information. Under the [approved CONTACTS-010 policy](../privacy.md), Muse/remote-AI must not acquire or process real collection data; separately approved source API retrieval is distinct from remote-AI processing. Final connector selection remains open. Any assistant-provided narrative is not independently verified source data; require structured aggregates and reconcile totals before using numerical results in visualizations.
 
 #### Unified ingestion and identity
 

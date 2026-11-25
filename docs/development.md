@@ -19,7 +19,10 @@ CommonJS files' syntax. `ci` runs both. Tests generate synthetic fixtures in
 temporary directories and clean them up; they include actual CLI 0/2/1 exits,
 all five families, replay, connector provenance, resume, rollback, record
 conflicts, direct/group roles, missing-versus-empty history, DST/custom intervals,
-lock conflicts and unsafe output rejection. No live endpoint is verified.
+lock conflicts and unsafe output rejection. CONTACTS-010 cases additionally
+exercise all-source private denial before handoff reads/output writes,
+unavailable-only private denial, snapshot preservation, rejected approval claims and fatal CLI
+denial without account/manifest disclosure. No live endpoint is verified.
 The [CONTACTS-014 adapter](spec/contacts-email-adapter.md) adds native Gmail
 metadata fixtures, separate native/handoff cursors, page rollback, auth/expiry,
 classification and a synthetic-only CLI with immutable private output.

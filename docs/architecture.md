@@ -22,6 +22,10 @@ Heartbeat local map / baseline signals [PLANNED: CONTACTS-025/026]
 
 Skills are instructions, not installed provider connectors. `collect.cjs` uses
 only Node's standard library; `demo.cjs` generates synthetic normalized input.
+The shared importer rejects private requests before reading handoffs or creating
+output; [CONTACTS-010](privacy.md) records approved policy, not source/run consent.
+No Windows protection verifier or operational retention/deletion route ships yet,
+so no private import is enabled.
 Acquisition and ingestion are separate. No stage requires a hosted service,
 server, dashboard, product login, multi-tenancy or deployment. Future generated
 HTML/SVG/JSON must remain private local files; no renderer exists yet.
@@ -47,9 +51,10 @@ terminal enumeration remains partial. No HTTP/OAuth or real-source access is add
   collection.lock                # only during an active write (or interrupted run)
 ```
 
-All of `.private/` is ignored. Real requests, exports and configuration belong in
-ignored private storage or an explicitly approved external local directory, never
-in tracked docs or fixtures. `output` and input paths resolve relative to the
+All of `.private/` is ignored and is for synthetic runs only. Future real requests,
+exports and configuration require verified private local storage outside Git and
+cloud-synced folders under the approved policy, never tracked docs or fixtures.
+`output` and input paths resolve relative to the
 request file. The collector permits output inside this checkout only under
 `.private/contacts/`; it checks resolved directories to reject redirects into
 tracked paths. External locations still require privacy approval.

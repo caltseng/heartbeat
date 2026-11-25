@@ -41,10 +41,12 @@ The smallest delivered slice is:
    manifest and normalized, namespaced records. Any missing source remains visible.
 
 Steps 3-4 are intentionally separate: the implemented adapter is a **local
-metadata-handoff reader**, not a fetcher for five remote APIs. It reads real
-contract-conforming input when separately authorized; it also runs without accounts
-using synthetic fixtures. Arbitrary vendor exports are not contract-conforming by
-default. A source skill describes acquisition/normalization and the setup gate; it
+metadata-handoff reader**, not a fetcher for five remote APIs. It currently reads
+only synthetic contract-conforming input. CONTACTS-010's
+[owner-approved policy](../privacy.md) does not authorize an account or run;
+private requests fail closed until local controls and approvals can be verified.
+Arbitrary vendor exports are not contract-conforming by default. A source skill
+describes acquisition/normalization and the setup gate; it
 does not manufacture endpoint access. Collection is separate from future identity
 review, deterministic aggregation, and rendering.
 
@@ -65,11 +67,12 @@ npm run contacts:collect -- --request .private\contacts\demo-001\request.synthet
 npm run test:contacts
 ```
 
-For separately authorized collection, prepare a request in a private folder and
-run the same `--request` command. Inputs/output resolve relative to the request
+For prepared synthetic collection, use the same `--request` command. Private
+requests are disabled, including unavailable-only manifests, and exit 1 without
+writing output. Inputs/output resolve relative to the request
 file. Every desired source must have an entry, even if it is unavailable.
 
-| Source skill | Implemented, callable now | Setup/access gate and limitations |
+| Source skill | Implemented, callable now (synthetic only) | Setup/access gate and limitations |
 | --- | --- | --- |
 | `contacts-google-identities` | Validate/import identity metadata handoffs | [CONTACTS-011 selects proposed `people.connections.list`](contacts-google-capability.md), with `contacts.readonly` and contact-only fields. No authorized Google tool is verified; no OAuth client or People API adapter ships here. Snapshot completeness is not historical contact completeness; sync/deletion reconciliation remains future work. |
 | `contacts-email-activity` | Validate/import email metadata handoffs; [014 synthetic native Gmail adapter/CLI](contacts-email-adapter.md) | [CONTACTS-013](contacts-email-access.md) selects Gmail API `gmail.metadata` enumeration (no search `q`), not connected access. 014 implements injected metadata transport, list-token paging and conservative role/class normalization; no HTTP/OAuth transport or private runs. Native cursors stay separate and coverage stays partial. |
@@ -77,11 +80,11 @@ file. Every desired source must have an entry, even if it is unavailable.
 | `contacts-messenger-activity` | Validate/import personal Messenger metadata handoffs | [CONTACTS-017 selects proposed local JSON snapshot conversion](contacts-messenger-capability.md) for 018; no native converter or structured personal reader is available. Export producer version and encrypted-backup layout remain unverified. Page/business APIs and Muse queries do not establish personal-inbox history; no private session reuse or real-data remote AI processing. |
 | `contacts-whatsapp-activity` | Validate/import WhatsApp metadata handoffs | No verified personal-inbox connector is configured here. Native exports need a separately validated converter. Business inbox access is not evidence of access to existing personal groups. |
 
-All five are **import-capable**, not live-connected. Native export conversion and
-live acquisition remain distinct work items. Beeper and direct API credentials
-are not installed or assumed. Muse UI evidence does not establish structured
-personal Messenger access or authorize real-data remote AI processing; the
-Heartbeat model and local visualization remain here.
+All five are **synthetic-import-capable**, not live-connected. Native export
+conversion and live acquisition remain distinct work items. Beeper and direct API credentials
+are not installed or assumed. Muse/remote-AI acquisition must not process real
+collection data under the approved policy. Separately approved source API
+retrieval is distinct from remote-AI processing.
 
 ## 3. Request contract
 
@@ -119,7 +122,10 @@ Example with one available synthetic input and one explicitly unavailable source
 }
 ```
 
-`dataClass` is `synthetic` or `private`; mixing classes in a store is rejected.
+`dataClass` distinguishes `synthetic` and `private`; mixing classes in a store is
+rejected. The schema preserves both labels for compatibility, but the current
+importer rejects ALL private requests with `private_collection_disabled` before
+handoff reads or output writes. Approval fields/flags are not part of this contract.
 Source families are `google-contacts`, `email`, `text-messages`, `messenger`, and
 `whatsapp`. Account values are reviewed, stable upstream account references, never
 tokens, passwords, or connector-specific aliases. Connector names identify the
@@ -267,9 +273,11 @@ source evidence.
 Use a private local JSON store for this single-user tool, not a database/server
 dependency. Prove acquisition, normalization, summaries and local graph files
 before choosing polished UI design; there is no hosted dashboard to deploy.
-Default operational location is a chosen subdirectory of ignored
+Default synthetic location is a chosen subdirectory of ignored
 `.private/contacts/`; an explicitly selected folder outside this checkout is also
-allowed. Outputs within any other checkout path, including `docs/`, `assets/`,
+allowed for synthetic runs. Real storage must instead be outside Git worktrees
+and cloud-synced folders and pass the approved policy's verification gates.
+Outputs within any other checkout path, including `docs/`, `assets/`,
 `data/`, and `dist/`, are rejected after resolving existing directory links.
 Inputs and manifests remain private even when they contain metadata only.
 
@@ -296,11 +304,12 @@ only that store's exact stale `collection.lock` and run the matching request wit
 single-host/local-filesystem assumption; network filesystems and full power-loss
 durability are not certified. Stale temporary files are not input snapshots.
 
-Node requests owner-only POSIX file/directory modes, but Windows ACLs, encryption,
-retention/deletion, backup behavior, account access, and processing consent still
-need explicit review before storing real sensitive information. Git ignore and
-build exclusion are not an access-control system. This change does not authorize
-a real data run.
+Node requests owner-only POSIX file/directory modes, not verified Windows ACLs
+or encryption. CONTACTS-010 records owner-approved policy for those protections,
+retention/deletion and backup behavior; it does not implement their verification
+or authorize a real account/run. The private-request guard stays closed until
+these controls are implemented and verified. Git ignore and build exclusion are
+not access control. See the policy's engineering decisions and revisit conditions.
 
 ## 6. Manifest and downstream handoff
 

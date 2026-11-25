@@ -18,6 +18,18 @@ source-access capability, not prohibited by the local-only execution boundary.
 
 ## Inputs and authorization
 
+Read the [owner-approved CONTACTS-010 policy](../../../docs/privacy.md).
+Only synthetic requests run today; `dataClass: private` fails closed before
+handoff reads/output writes because local protections and retention/deletion
+cannot yet be verified. No policy approval enables that path. Future real runs
+require exact private account selection, separate first-source approval and
+explicit owner approval for EACH run, plus verified Windows-user ACLs, disk
+encryption, non-synced storage outside Git, 12-month deletion and no backups.
+Only timestamps, sender/recipient identities, membership and counts are approved;
+no bodies, subjects, attachments, thread titles, notes or prayer content.
+No Muse/remote-AI processing or acquisition of real collection data is allowed.
+Authorized source API retrieval is not remote-AI processing.
+
 Establish requested source/account references, 7-day/30-day/custom period, IANA
 time zone, explicit as-of instant, private output directory, and checkpoint/resume
 choice. For a real run, confirm authorization for the selected accounts,
@@ -27,8 +39,9 @@ Never acquire credentials, pair a device, reuse a private browser session, insta
 a bridge, schedule jobs, or send messages under this skill's implicit authority.
 
 Do not put credentials, private records, request files, or account examples in
-tracked files. Use `.private/contacts/<chosen-folder>` or an explicitly approved
-location outside this checkout, never website folders or `data/sets/`.
+tracked files. Use `.private/contacts/<chosen-folder>` only for synthetic runs.
+Future real files require verified approved local storage outside Git and
+cloud-synced folders, never website folders or `data/sets/`.
 
 ## Compose the source skills
 
@@ -62,7 +75,7 @@ For an account-free demonstration only, choose a fresh folder and run:
 npm run contacts:collect -- --demo --output .private\contacts\demo-001
 ```
 
-For a prepared request:
+For a prepared synthetic request (private requests exit 1):
 
 ```powershell
 npm run contacts:collect -- --request .private\contacts\run-001\request.json

@@ -65,6 +65,60 @@ test('email gate approval and unsupported-source gaps remain unavailable rather 
   }
 });
 
+test('private requests fail closed for every source before reading handoffs or creating output', t => {
+  const f = fixture(t);
+  f.request.dataClass = 'private';
+  for (const source of ['google-contacts', 'email', 'text-messages', 'messenger', 'whatsapp']) {
+    f.request.sources[0].source = source;
+    f.request.sources[0].input = 'missing-private-input.json';
+    assert.throws(() => collect(f.request, f.folder), { code: 'private_collection_disabled' });
+    assert.equal(fs.existsSync(f.request.output), false);
+  }
+  f.request.sources = [{ source: 'email', account: 'fixture', connector: 'none',
+    mode: 'unavailable', status: 'requires_setup', reason: 'No source approval.' }];
+  assert.throws(() => collect(f.request, f.folder), { code: 'private_collection_disabled' });
+  assert.equal(fs.existsSync(f.request.output), false);
+});
+
+test('private denial preserves existing snapshots and cannot be bypassed by request approval claims', t => {
+  const f = fixture(t);
+  f.run();
+  const file = path.join(f.request.output, 'collection.json');
+  const before = fs.readFileSync(file, 'utf8');
+  f.request.dataClass = 'private';
+  assert.throws(() => collect(f.request, f.folder), { code: 'private_collection_disabled' });
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  assert.equal(fs.existsSync(path.join(f.request.output, 'collection.lock')), false);
+  f.request.approved = true;
+  assert.throws(() => collect(f.request, f.folder), /unsupported fields/);
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+});
+
+test('CLI private denial exits 1 without publishing a manifest or account references', t => {
+  const f = fixture(t);
+  f.request.dataClass = 'private';
+  const file = path.join(f.folder, 'request.json');
+  fs.writeFileSync(file, JSON.stringify(f.request));
+  const result = spawnSync(process.execPath, [path.join(__dirname, 'collect.cjs'), '--request', file], { encoding: 'utf8' });
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /\[private_collection_disabled\]/);
+  assert.ok(!result.stderr.includes(f.request.sources[0].account));
+  assert.ok(!result.stderr.includes(f.request.output));
+  assert.equal(fs.existsSync(f.request.output), false);
+});
+
+test('a private-labeled handoff cannot import records through a synthetic request', t => {
+  const f = fixture(t);
+  f.input.dataClass = 'private';
+  const result = f.run();
+  assert.equal(result.exitCode, 2);
+  assert.equal(result.manifest.sources[0].status, 'failed');
+  assert.match(result.manifest.sources[0].error.message, /data class does not match/);
+  assert.deepEqual(f.state().records, {});
+  assert.deepEqual(f.state().checkpoints, {});
+});
+
 test('all five synthetic sources persist metadata, not inferred cross-source people; repeated imports are idempotent', t => {
   const f = fixture(t);
   const demo = writeDemo(path.join(f.folder, 'demo'));
