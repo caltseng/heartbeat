@@ -26,6 +26,13 @@ Acquisition and ingestion are separate. No stage requires a hosted service,
 server, dashboard, product login, multi-tenancy or deployment. Future generated
 HTML/SVG/JSON must remain private local files; no renderer exists yet.
 
+[CONTACTS-014](spec/contacts-email-adapter.md) adds `email.cjs`: injected native
+Gmail metadata enumeration/conversion with a synthetic-only fixture CLI. A fresh
+private acquisition directory atomically publishes `handoff.json`,
+`checkpoint.json` (native list token and normalized accumulator) and `report.json`.
+Its handoff feeds the unchanged importer. Native tokens are never handoff cursors;
+terminal enumeration remains partial. No HTTP/OAuth or real-source access is added.
+
 ## Current local layout
 
 ```text

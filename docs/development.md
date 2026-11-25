@@ -14,12 +14,15 @@ npm run check
 npm run ci
 ```
 
-`test:contacts`/`npm test` run Node's built-in test runner. `check` checks the three
+`test:contacts`/`npm test` run Node's built-in test runner. `check` checks the
 CommonJS files' syntax. `ci` runs both. Tests generate synthetic fixtures in
 temporary directories and clean them up; they include actual CLI 0/2/1 exits,
 all five families, replay, connector provenance, resume, rollback, record
 conflicts, direct/group roles, missing-versus-empty history, DST/custom intervals,
 lock conflicts and unsafe output rejection. No live endpoint is verified.
+The [CONTACTS-014 adapter](spec/contacts-email-adapter.md) adds native Gmail
+metadata fixtures, separate native/handoff cursors, page rollback, auth/expiry,
+classification and a synthetic-only CLI with immutable private output.
 
 GitHub Actions runs `.github/workflows/ci.yml` for PRs targeting `main` and pushes
 to `main`, on Node 20.11.0. Its stable job/check name is

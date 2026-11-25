@@ -16,6 +16,9 @@ skills, a strict metadata-handoff importer, atomic JSON persistence, provenance,
 coverage, replay/resume, synthetic fixtures and tests. It imports normalized
 Google identity, email, text-message, personal Messenger and WhatsApp metadata.
 **It does not fetch live endpoints or parse native vendor archives.**
+The [CONTACTS-014 Gmail metadata adapter](docs/spec/contacts-email-adapter.md)
+also converts synthetic native pages with an injected transport, separate native
+cursors and explicit partial coverage. Its CLI cannot access real accounts.
 
 Canonical identity review, cross-source numerical aggregation, summaries,
 reconnection signals and Heartbeat's map are **not implemented**. Missing source

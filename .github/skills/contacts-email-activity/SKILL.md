@@ -9,6 +9,10 @@ Use independently or under [contacts-collect](../contacts-collect/SKILL.md).
 Follow its authorization boundary and the
 [shared contract](../../../docs/spec/contacts-technical-spec.md). No Gmail
 HTTP/OAuth adapter or raw mailbox parser ships with this skill.
+The [CONTACTS-014 adapter](../../../docs/spec/contacts-email-adapter.md) implements
+native Gmail metadata conversion/paging through a synthetic fixture transport.
+Run `npm run contacts:email -- --synthetic-request <private-synthetic-request.json>`
+for that account-free route; it rejects private runs and does not connect Gmail.
 The [CONTACTS-013 capability map](../../../docs/spec/contacts-email-access.md)
 selects a proposed Gmail API `gmail.metadata` route for CONTACTS-014, not a
 connected account. Its scope disallows search `q`; bounded enumeration is
@@ -28,8 +32,9 @@ partial, not complete account history. Do not widen to body-capable scopes.
    Keep multi-recipient/broadcast/group/unknown threads distinct from two-person
    direct threads. One email remains one event, not one event per recipient.
 4. Preserve explicit interpersonal/bulk/automated/unclassified classifications.
-   Collection does not implement a classifier; do not silently exclude uncertain
-   mail or invent classification evidence. A future reducer will disclose exclusions.
+   The synthetic adapter conservatively classifies metadata evidence; interpersonal
+   requires explicit reviewed evidence. Do not silently exclude uncertain mail or
+   invent classification evidence. A future reducer will disclose exclusions.
 5. Preserve source retrieval times, page cursors and upstream history bounds.
    Cursor exhaustion is not proof of complete history. Record source errors or
    partial coverage, including search/result limits.
