@@ -55,6 +55,11 @@ canonical reviewed households and never infers connections from message activity
 See the [local workflow and decision record](docs/spec/contacts-curated-records.md).
 Real note content remains unauthorized under the metadata-only privacy policy.
 
+CONTACTS-030 adds `contacts:audience` for editable synthetic household/member
+selections, explicit reasons and wording preferences, visible address issues and
+a separately reviewed recipient list. It never sends or records donations.
+See the [audience workflow and decisions](docs/spec/contacts-life-update-audience.md).
+
 CONTACTS-023 adds the independent `contacts-aggregate` skill and
 `contacts:aggregate` CLI: deterministic synthetic snapshot reduction with
 explicit mapping revision, per-person/thread/channel/day counts, coverage and

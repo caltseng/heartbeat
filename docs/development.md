@@ -123,3 +123,10 @@ synthetic-only. Its fixtures cover exact mapping/snapshot binding, half-open
 boundaries, DST date unions, source-ID deduplication, historical thread context,
 direct/group/To/CC/BCC semantics, coverage bounds and immutable CLI output.
 Renderers remain distinct work items.
+
+The [CONTACTS-030 audience CLI](spec/contacts-life-update-audience.md) adds
+`check:audience` and synthetic `audience.test.cjs` to `npm run ci`. Cases cover
+household-to-person editing, inclusion/exclusion reasons, explicit wording,
+missing/invalid/ambiguous/duplicate email addresses, stale exact-input review,
+unavailable sources, unchanged notes, atomic rollback and actual CLI 0/2/1 exits.
+No real contacts, beliefs inference, sending or donation records are introduced.

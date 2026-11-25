@@ -15,6 +15,8 @@ are implemented. CONTACTS-022 adds a separate synthetic-only
 [identity-review skill and overlay](contacts-identity-review.md).
 CONTACTS-027 adds [synthetic-only curated records and note capture](contacts-curated-records.md).
 CONTACTS-023 adds a synthetic-only [cross-source reducer and skill](contacts-aggregation.md).
+CONTACTS-030 adds [synthetic audience selection and reviewed lists](contacts-life-update-audience.md);
+real wording/preferences, private runs and sending remain unauthorized/disabled.
 Live acquisition, private note capture, summary presentation and the map are not implemented. Remaining CONTACTS
 execution is blocked until the Heartbeat bootstrap is verified checked in.
 
