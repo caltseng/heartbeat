@@ -1,8 +1,10 @@
 # Heartbeat local workflow (CONTACTS-031)
 
-Status: collection is runnable; identity review, aggregation, Heartbeat reports
-and graphs remain future implementations under CONTACTS-021 through 025/027.
-This workflow composes those stages; it does not mark them delivered. The
+Status: synthetic collection, source reconciliation and identity review are
+runnable, including the landed CONTACTS-021/022 contracts. Synthetic Google/email
+acquisition and text conversion have separate commands below. Aggregation,
+Heartbeat reports/graphs and note capture remain future CONTACTS-023 through
+027 work. This workflow composes those stages without claiming future delivery. The
 [technical contract](contacts-technical-spec.md), [product contract](contacts-store-spec.md)
 and [register](contacts-work-items.md) remain authoritative.
 
@@ -13,14 +15,17 @@ backend, product login, cloud processing, account connection or schedule is
 needed. Keep collection skill names and schema names unchanged. Heartbeat names
 the reports and relationship/interaction graph, not a bulk contacts rename.
 
-All examples below are synthetic. Store operational files under ignored
-`.private\contacts\` or an explicitly approved external local directory.
-Use separate synthetic and private stores; never relabel real data synthetic.
-CONTACTS-010 plus explicit bounded source authorization remain necessary for
-**any** real run, including processing an existing export. This document makes
-engineering decisions only: it does not approve ACLs, encryption, retention,
-backups, private-account/device/browser access, credentials, sending or schedules.
-Never upload real records to remote AI processing.
+All examples below are synthetic; their operational files may use ignored
+`.private\contacts\` or a local temporary directory. Never relabel real data
+synthetic. The [approved CONTACTS-010 policy](../privacy.md) requires real storage
+on this computer **outside Git worktrees and cloud-synced folders**, verified
+Windows-user restrictions/encryption, retention/deletion controls, no automatic
+backups, and separate exact-source/account and each-run owner approval.
+Current CLIs fail closed on private requests; no command or configuration bypass
+is provided. Approval alone cannot enable unimplemented protection/retention
+controls. This document makes engineering decisions only, not additional consent
+for source/device/browser access, credentials, content/notes, remote AI, sending
+or schedules. Ignored checkout storage is not approved real-data storage.
 
 ## Commands that exist today
 
@@ -63,16 +68,77 @@ storage or locking failure; exit 0 only describes supplied snapshots' declared
 coverage. Inspect every nonzero exit; do not chain later stages as if it were 0.
 An exhausted cursor never proves complete upstream history.
 
+### Synthetic identity-review handoff
+
+After that demo/replay, prepare
+`.private\contacts\demo-031\review.synthetic.json` (use a fresh `reviewed`
+directory for the initial revision):
+
+```json
+{
+  "schemaVersion": 1,
+  "dataClass": "synthetic",
+  "collection": "collection.json",
+  "output": "..\\reviewed",
+  "expectedRevision": 0,
+  "reason": "Register each synthetic identity separately; no matches approved.",
+  "operations": []
+}
+```
+
+```powershell
+npm run contacts:review -- --inspect .private\contacts\demo-031\review.synthetic.json
+```
+
+Inspection is read-only. Copy its `revision` into `expectedRevision` and add its
+exact `collectionDigest` to the request, then run:
+
+```powershell
+npm run contacts:review -- --request .private\contacts\demo-031\review.synthetic.json
+if ($LASTEXITCODE -eq 1) { throw 'Identity review failed; inspect before retrying.' }
+npm run check:private
+```
+
+Exit 2 can accompany a committed review of partial/unavailable/reconciliation-
+limited sources; retain that uncertainty, do not treat it as complete acquisition.
+The [identity-review contract](contacts-identity-review.md) defines reviewed
+matches, explicit refresh, split/undo and optional households. It consumes only
+CONTACTS-021's current reconciliation projection, not immutable first-observation
+addresses. Tombstone/collision/missing links remain inactive, changed metadata
+requires explicit refresh, and original canonical references survive.
+Reinspect before each mutation; no command silently matches names or addresses.
+
+### Other implemented synthetic entry points
+
+These are separate local producers, not live connectors or an all-in-one job.
+Keep configuration and outputs private; follow each linked contract's fixture
+shape and prerequisites rather than constructing requests from real accounts.
+
+| Command | Synthetic input and local handoff |
+| --- | --- |
+| `npm run contacts:google -- --config <local-config.json>` | [Google fixture transport](contacts-google-capability.md#contacts-012-local-adapter-and-delegated-decisions); private `google-acquisition.json` plus named `google-handoff-<uuid>.json`. |
+| `npm run contacts:email -- --synthetic-request <request.json>` | [Email fixture transport](contacts-email-adapter.md); fresh-directory `handoff.json`, native `checkpoint.json` and acquisition `report.json`. |
+| `npm run contacts:text-xml -- --xml <fixture.xml> --manifest <manifest.json> --output <fresh-directory>` | [Selected synthetic XML profile](contacts-text-converter.md); `text.synthetic.json` and a collection request. |
+
+Feed successful/explicitly partial normalized handoffs into `contacts:collect`
+with their exact source/account/connector and coverage. Native acquisition
+checkpoints are not collector cursors; use each producer's recovery contract.
+There is no Messenger/WhatsApp converter command or live-source access implied.
+
 ## Local configuration and versioned file handoffs
 
-The implemented configuration is the version-1 collection request itself:
+Collection configuration is its existing version-1 request:
 period/as-of/time zone, output, source/account/connector references, input paths,
 resume and optional page budget. Paths resolve relative to the request file,
 not the shell. Do not put real account IDs, local paths, self identities or configuration in
 package scripts, tracked fixtures, environment examples or skills. There is no
 additional config loader, credential store or product account system.
 
-Example reserved layout; only the collection files are generated today:
+Identity review uses its own version-1 request, with the exact collection digest,
+expected mapping revision, reason and explicit operations. There is no shared
+global configuration; source adapters own their documented local requests.
+
+Example layout; `reports` entries alone are reserved for later implementations:
 
 ```text
 .private/contacts/
@@ -95,7 +161,7 @@ Example reserved layout; only the collection files are generated today:
 | --- | --- | --- |
 | Acquisition/demo -> collector | Existing `schemaVersion:1` request and source envelopes | Same data class; explicit source/account/connector, self IDs, roles, period, coverage and provenance. All desired unavailable sources are entries, not omissions. |
 | Collector -> identity review | Existing `schemaVersion:1` `collection.json` | Read records, checkpoints, manifest and history as one atomic generation; retain source keys and unknown coverage. Do not edit source evidence to resolve a person. |
-| Identity review -> reducer | `identity-review.json`; schema defined by 022 | Explicit mapping revision, reviewed namespaces, reversible decisions and unresolved people. Names/group membership cannot imply merges or households. |
+| Identity review -> reducer | Implemented `schemaVersion:1` `identity-review.json`, defined by 022 | Monotonic `revision`, exact `collectionDigest`, current `view`, `identityDigests`, inactive links and append-only history. Read an explicitly pinned revision/digest; preserve aliases and unresolved/inactive people. Names/group membership cannot imply merges or households. |
 | Collection + mapping -> reducer | Reserved `aggregates.json`; schema defined by 023 | Pin exact collection bytes (SHA-256), data class, mapping revision and resolved half-open period/time zone/as-of. Reconcile source IDs, direct/group roles, exclusions and unknown/lower-bound coverage. |
 | Reducer -> Heartbeat summary | Reserved `report.json`; schema defined by 024 | Versioned shared dataset with the same input references, filters, source freshness/coverage, exclusions, counts and daily timeline. Narrative must not invent numbers. |
 | Shared report -> Heartbeat graph | Reserved private `graph.html` / `graph.svg`; renderer defined by 025 | Same report revision/digest, period and filters in all views; explain group-only/inactive/unknown categories. Offline files, no remote assets, telemetry or hosted service. |
@@ -104,20 +170,26 @@ Reserved filenames are **not implemented schemas or CLI commands**. Each future
 JSON producer must declare `schemaVersion`, preserve `dataClass` and pin input
 revisions/digests; consumers must reject unsupported versions, mismatched data
 classes/periods/revisions and missing inputs, never substitute empty/stale data.
-CONTACTS-022/023/024 own exact schemas, version migration and validators.
+CONTACTS-023/024 own their future exact schemas, version migration and validators;
+CONTACTS-022's implemented overlay contract remains unchanged.
 CONTACTS-025 depends on this workflow, not on this item shipping its renderer.
 Do not pass the raw collection directly to a graph or derive totals in a renderer.
 
 Source-acquisition artifacts `handoff.json`, `checkpoint.json`, `report.json`
-and `.email-staging-*` directories are private too. Each source adapter owns its
-format and recovery contract; reserving these names does not authorize acquisition.
+and `.email-staging-*` directories, plus Google's acquisition snapshot/lock/temp
+and named handoff/temp files, are private too. Each source adapter owns its
+format and recovery contract; reserving names does not authorize acquisition.
+The guard also reserves `identity-review.json.lock` and
+`identity-review.json.tmp` as private aliases, in addition to the actual landed
+writer's `identity-review.lock` and `identity-review.json.<pid>.tmp`; this does
+not rename upstream persistence.
 
 Persist derived generations separately from collection. Future producers must
 validate first, write atomically inside the same private boundary (reuse the
 collector's output-location checks), and leave prior valid output intact on
 failure. Explicitly label partial datasets as observed/lower-bound; interrupted
 or invalid inputs block downstream work. Until those consumers exist, stop at
-collection: there is no report, graph or all-in-one command to invoke.
+the reviewed overlay: there is no numerical report, graph or all-in-one command.
 
 ## Recovery without losing source evidence
 
@@ -132,12 +204,19 @@ For a changed period/as-of use `resume:false`; do not clear checkpoints manually
 Finished-source replay deduplicates but is not a new upstream refresh.
 
 On conflicts, unsupported versions or data-class mismatch, stop and retain the
-evidence; do not overwrite records or relabel data. Restore a known-good coherent
-snapshot and matching requests/handoffs from an approved local backup, with no
-active writer, or replay into a fresh private directory. Temporary
-`collection.json.<pid>.tmp` files are not recovery inputs. No automated backup,
-retention or secure deletion policy is selected here. Atomicity assumes a local
+evidence; do not overwrite records or relabel data. For synthetic recovery, replay
+retained handoffs into a fresh local directory or use a retained coherent
+synthetic snapshot/request set with no active writer. Temporary
+`collection.json.<pid>.tmp` files are not recovery inputs. The approved policy
+prohibits automatic backups of real data; this workflow adds no backup or
+retention automation and does not change that policy. Atomicity assumes a local
 filesystem, not a network share or certified power-loss recovery.
+
+For identity review, inspect the saved revision/digest after an uncertain write;
+only remove its exact stale `identity-review.lock` after verifying that writer
+stopped. Reinspect and explicitly review a new collection digest; refresh changed
+current identities, retaining inactive links. Never hand-edit history, reuse
+stale revision/digest preconditions, or use transient `.tmp` files as overlays.
 
 Future derived outputs are reproducible from pinned inputs: retain reviewed
 mappings, regenerate a new output generation after recovery, and never describe
@@ -184,3 +263,4 @@ inputs only, existing collection v1 remains compatible.
 | Reserve separate reviewed/derived files and require version/data-class/input pins; future owning items define exact schemas. Avoid fake report commands or coupling rendering to collection internals. | Invent full schemas/renderers now or mutate the collection store. | Contract table follows 021-025 dependencies; no numerical output is claimed. Revisit with those implementations and their synthetic cross-view tests. |
 | With no public product, require empty/absent public output instead of building a sanitizer or website. Inspect Git candidates for reserved private artifacts too. | Public asset packaging/redaction pipeline. | CI negative tests seed docs, tooling, renamed data, locks and graphs in every guarded root and force-add ignored private files. Revisit only after an explicitly changed product/publication boundary; never silently permit private files. |
 | Manual replay/resume and regeneration, no backup/scheduling automation. Preserve explicit nonzero errors. | Managed refresh, automatic lock breaking or retention jobs. | Existing rollback, cursor, lock and CLI-exit tests; source operations belong to 032. Revisit after its real-adapter and separately approved privacy/operations contracts. |
+| Integration (2026-11-25): compose actual owner-merged main `68fe4157360abf2d9e50f7ca642ad74649ac974a`, preserving collector reconciliation, identity matching/refresh and all source/test entry points. Cover actual private producer filenames plus reserved review lock/temp aliases, without changing upstream writers. | Rejected reimplementing matching or replacing landed scripts; no blanket private-store approval is inferred from integration. The approved CONTACTS-010 policy remains authoritative. | Full configured CI plus a synthetic demo/replay/inspect/review handoff proves the overlay pins the unchanged collection and stays outside public/Git delivery. Revisit when another producer adds operational filenames or a downstream schema becomes runnable. |

@@ -60,6 +60,9 @@ checkpoints and graphs into every guarded output root. No public build/deploymen
 pipeline is added. Audit any additional public export path explicitly with
 `npm run check:private -- --output <directory>`; new output locations/artifact
 names must extend the guard. This check is not payload scanning or access control.
+A synthetic demo/replay/inspect/review CLI integration case additionally verifies
+the versioned overlay pins an unchanged collection and remains ignored locally;
+force-adding its generated mapping fails the Git delivery guard.
 
 GitHub Actions runs `.github/workflows/ci.yml` for PRs targeting `main` and pushes
 to `main`, on Node 20.11.0. Its stable job/check name is
