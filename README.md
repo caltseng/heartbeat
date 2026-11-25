@@ -85,6 +85,7 @@ hide them. A successful import does not independently certify upstream history.
 ## Documentation and delivery
 
 - [Architecture, data flow and local JSON layout](docs/architecture.md)
+- [Local workflow, versioned handoffs and recovery](docs/spec/contacts-local-workflow.md)
 - [Privacy, local data and source approval gates](docs/privacy.md)
 - [Development, CI and adding a collector](docs/development.md)
 - [Product specification](docs/spec/contacts-store-spec.md)
