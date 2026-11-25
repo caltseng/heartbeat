@@ -12,7 +12,7 @@ Six collection skills -> collect.cjs validation/import [IMPLEMENTED]
                          |
 Private collection.json: records + checkpoints + manifest + history [IMPLEMENTED]
                          |
-Reviewed canonical people/households [PLANNED: CONTACTS-021/022/027]
+Reviewed canonical people/optional household links [IMPLEMENTED: CONTACTS-022, SYNTHETIC ONLY]
                          |
 Deterministic cross-source aggregation [PLANNED: CONTACTS-023]
                          |
@@ -50,6 +50,9 @@ terminal enumeration remains partial. No HTTP/OAuth or real-source access is add
   whatsapp.synthetic.json
   collection.json                # durable snapshot
   collection.lock                # only during an active write (or interrupted run)
+  review.synthetic.json          # explicit identity-review request, when prepared
+  identity-review.json           # separate canonical mapping + revision history
+  identity-review.lock           # only during an active identity-review write
 ```
 
 All of `.private/` is ignored and is for synthetic runs only. Future real requests,
@@ -71,7 +74,10 @@ tracked paths. External locations still require privacy approval.
 | `manifest` | Current collection time/period, per-source status/coverage/freshness/errors, unresolved identities and explicit implementation limits. |
 | `history` | Prior manifests' period/status/source coverage; not a claim that old data is fresh. |
 
-No canonical-person mapping is implemented: `identityMappingRevision` stays null.
+Canonical-person mappings now live in a separate
+[identity-review overlay](spec/contacts-identity-review.md) with an exact
+collection digest and explicit revision. The collector's
+`identityMappingRevision` stays null because review never mutates its manifest.
 Record conflicts fail visibly rather than overwriting evidence. Group membership
 does not manufacture direct interactions; Google contact presence creates none.
 

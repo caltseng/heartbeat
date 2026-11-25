@@ -43,6 +43,14 @@ and reviewed different-ID connector translations with retained source evidence.
 Text archive binding tests also reject unbound pre-existing text events after
 explicit revisions, without changing their records or reserving an archive.
 See the [revision contract and decision record](spec/contacts-source-revisions.md).
+Identity-review cases additionally exercise conservative reviewed matches,
+same-name separation, cross-namespace identity links, split/undo, stable note
+references, curated household conflicts, revision/digest preconditions, private
+input rejection and transactional rollback. No private notes are read.
+CONTACTS-022 reads current reconciled identities, preserves inactive
+tombstone/collision/missing links, and requires explicit metadata refresh. Its
+integration cases exercise the actual collector's revision/target semantics,
+including informational historical pending targets.
 
 GitHub Actions runs `.github/workflows/ci.yml` for PRs targeting `main` and pushes
 to `main`, on Node 20.11.0. Its stable job/check name is
@@ -76,4 +84,6 @@ not be bypassed. Green checks are not independent review or permission to merge.
 Preserve `contacts-*` skill names, `scripts/contacts/`, schema version and store
 names unless a separately specified compatibility change requires otherwise.
 Heartbeat names the product and future local reports/maps, not a bulk schema
-rename. Future identity review, reducers and renderers are distinct work items.
+rename. Identity review is a separate synthetic-only overlay; see its
+[contract and engineering decisions](spec/contacts-identity-review.md). Future
+reducers, note capture and renderers remain distinct work items.

@@ -283,9 +283,12 @@ Source-opening URLs and provider-native payload archives are intentionally defer
 
 No automatic person merge or household inference runs during collection.
 `identityMappingRevision:null` and all non-self `unresolvedIdentityKeys` are explicit.
-The next identity-review stage will persist user-reviewed links to canonical people,
-with reversible splits and separately curated households, without rewriting the
-source evidence.
+CONTACTS-022 now persists user-reviewed links in a separate synthetic-only
+[identity-review overlay](contacts-identity-review.md), with an exact collection
+digest, explicit mapping revision, reversible splits/undo and optional curated
+households. It never rewrites source evidence or source availability. Real runs
+remain blocked pending the separate privacy/source approvals and implementation
+of an approved private-run boundary.
 
 ## 5. Storage, atomicity, and recovery
 
