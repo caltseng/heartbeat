@@ -7,6 +7,9 @@ synthetic fixtures have been exercised. CONTACTS-010 and separate source/run
 authorization still gate real data. There is no network acquisition, source
 write, sending, scheduling, canonical person merge, numerical reducer or renderer.
 Requests, reviews, handoffs, snapshots and generated outputs remain private.
+The [owner-approved CONTACTS-010 policy](../privacy.md) remains authoritative:
+private collection is disabled before handoff/output access, and synthetic
+display/title fields here do not expand the approved real-data metadata set.
 
 ## Revisions and immutable evidence
 
@@ -163,6 +166,16 @@ authorized handoffs into a fresh private store with the corrected review.
 Different unreviewed IDs remain distinct observations, not proof of distinct
 messages; see the manifest limitation. No cross-connector total is certified
 until the relevant overlap review is complete.
+
+The [synthetic text converter's archive binding](contacts-text-converter.md)
+remains an independent gate. A review does not permit a changed/overlapping
+archive, ledger replacement, or connector switch on a bound text account.
+Pre-existing unbound text event keys still prevent initial archive binding,
+including events with explicit revisions. Binding is persisted only after a
+valid page commits; rejected pages cannot reserve an archive. This integration
+preserves the Google/Gmail adapters, source-specific Messenger/WhatsApp gates,
+and synthetic-only acquisition policy; it does not automatically connect their
+staged revision/deletion formats to this shared revision contract.
 
 ## Delegated decision record
 
