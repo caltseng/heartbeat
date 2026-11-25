@@ -1,5 +1,11 @@
 # Heartbeat: email access gate (CONTACTS-013)
 
+Implementation follow-up: [CONTACTS-014](contacts-email-adapter.md) now implements
+this selected route with an injected synthetic metadata transport, native list
+checkpoint and a synthetic-only CLI. It does not add HTTP/OAuth, connected access,
+history synchronization or private-run permission. The gate findings below
+describe the original selection and continue to constrain future real access.
+
 ## Selected route and actual availability
 
 Select **Gmail API v1, read-only `gmail.metadata`**, for the proposed
