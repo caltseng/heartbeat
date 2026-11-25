@@ -116,13 +116,13 @@ test('changed or overlapping snapshots and other routes cannot be added to the s
   mutateShard(fixture, 2, native => { native.messages.push(structuredClone(native.messages[0])); });
   const changed = convertSnapshot(fixture.manifest, fixture.read);
   assert.notEqual(changed.report.snapshot, first.report.snapshot);
-  assert.equal(importResult(dir, changed.handoff).manifest.sources[0].error.code, 'snapshot_overlap');
+  assert.equal(importResult(dir, changed.handoff).manifest.sources[0].error.code, 'snapshot_conflict');
   assert.deepEqual(stored(dir).records, before);
   assert.deepEqual(stored(dir).checkpoints, checkpoints);
-  assert.equal(importResult(dir, first.handoff, 'other-route').manifest.sources[0].error.code, 'snapshot_overlap');
+  assert.equal(importResult(dir, first.handoff, 'other-route').manifest.sources[0].error.code, 'snapshot_conflict');
   const reverse = temp(t);
   importResult(reverse, first.handoff, 'other-route');
-  assert.equal(importResult(reverse, first.handoff).manifest.sources[0].error.code, 'snapshot_overlap');
+  assert.equal(importResult(reverse, first.handoff).manifest.sources[0].error.code, 'snapshot_conflict');
 });
 test('interruption, digest mismatch, missing shard numbers and truncated/encrypted history stay visibly partial', () => {
   const fixture = scenario();
@@ -158,7 +158,7 @@ test('shared overlap reviews do not bypass the Messenger immutable snapshot gate
     mappings: [{ source: 'messenger', account: first.handoff.account, connector: first.handoff.connector,
       type: 'event', id: changed.handoff.pages[0].events[0].id, targetId: first.handoff.pages[0].events[0].id }] };
   const result = importResult(dir, changed.handoff, changed.handoff.connector, review);
-  assert.equal(result.manifest.sources[0].error.code, 'snapshot_overlap');
+  assert.equal(result.manifest.sources[0].error.code, 'snapshot_conflict');
   assert.deepEqual(stored(dir).records, before);
 });
 test('retrying interrupted conversion into the same store adds only missing events, not duplicate messages', t => {

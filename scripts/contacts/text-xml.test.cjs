@@ -192,14 +192,14 @@ test('imported archive replay is idempotent and changed exports or ledgers canno
   assert.equal(events().length, 2);
   changed(f, xml => xml + '\n');
   handoff = f.run();
-  assert.equal(run().manifest.sources[0].error.code, 'text_archive_conflict');
+  assert.equal(run().manifest.sources[0].error.code, 'snapshot_conflict');
   assert.equal(events().length, 2);
   handoff = fixture().run();
   handoff.textArchive.ledgerDigest = 'a'.repeat(64);
-  assert.equal(run().manifest.sources[0].error.code, 'text_archive_conflict');
+  assert.equal(run().manifest.sources[0].error.code, 'snapshot_conflict');
   delete handoff.textArchive;
   handoff.connector = request.sources[0].connector = 'another-connector';
-  assert.equal(run().manifest.sources[0].error.code, 'text_archive_conflict');
+  assert.equal(run().manifest.sources[0].error.code, 'snapshot_conflict');
 });
 
 test('failed first page does not reserve archive, and existing unbound text events block conversion', t => {
@@ -228,7 +228,7 @@ test('failed first page does not reserve archive, and existing unbound text even
   assert.equal(beforeBinding.records[eventKey].revisions.length, 2);
   handoff.textArchive = binding;
   handoff.connector = request.sources[0].connector = binding.profile;
-  assert.equal(run().manifest.sources[0].error.code, 'text_archive_conflict');
+  assert.equal(run().manifest.sources[0].error.code, 'snapshot_conflict');
   const afterBinding = JSON.parse(fs.readFileSync(path.join(folder, 'collection.json')));
   assert.equal(afterBinding.textArchives, undefined);
   assert.deepEqual(afterBinding.records, beforeBinding.records);

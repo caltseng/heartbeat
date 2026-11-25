@@ -216,12 +216,12 @@ test('shared importer replays idempotently, preserves unknown history and preven
   const reexport = fixture();
   reexport.manifest.archive.ref = 'another-archive';
   importerState.set(reexport.run());
-  assert.equal(importerState.run().manifest.sources[0].error.code, 'whatsapp_archive_conflict');
+  assert.equal(importerState.run().manifest.sources[0].error.code, 'snapshot_conflict');
   const unbound = f.run();
   delete unbound.whatsappArchive;
   unbound.connector = importerState.request.sources[0].connector = 'other-connector';
   importerState.set(unbound);
-  assert.equal(importerState.run().manifest.sources[0].error.code, 'whatsapp_archive_conflict');
+  assert.equal(importerState.run().manifest.sources[0].error.code, 'snapshot_conflict');
   assert.equal(events().length, 1);
   assert.ok(!JSON.stringify(importerState.state()).includes(SECRET));
 });
@@ -242,7 +242,7 @@ test('failed pages do not reserve importer bindings; pre-existing unbound histor
   assert.equal(state.run().manifest.sources[0].status, 'partial');
   state.request.sources[0].connector = f.run().connector;
   state.set(f.run());
-  assert.equal(state.run().manifest.sources[0].error.code, 'whatsapp_archive_conflict');
+  assert.equal(state.run().manifest.sources[0].error.code, 'snapshot_conflict');
   assert.equal(state.state().whatsappArchives, undefined);
 });
 

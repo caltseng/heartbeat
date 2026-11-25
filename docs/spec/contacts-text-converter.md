@@ -139,7 +139,7 @@ SHA-256 and reviewed-ledger SHA-256. The importer atomically binds these to
 `[source, account]` in private `collection.json.textArchives` with the first valid
 page, using its existing store lock and snapshot transaction. Exact replay
 deduplicates. A changed/reformatted export, archive alias or changed identity/
-SIM/thread/row ledger is rejected as `text_archive_conflict`, even under another
+SIM/thread/row ledger is rejected as `snapshot_conflict`, even under another
 connector. Reporting-zone changes do not change that binding. A failed first
 page does not reserve it. Existing unbound text events also prevent adding an
 archive: there is no invented overlap reconciliation or automatic second export
