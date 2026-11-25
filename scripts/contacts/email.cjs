@@ -13,6 +13,9 @@ class EmailError extends Error {
 function requireValue(value, code = 'metadata_incomplete') {
   if (!value) throw new EmailError(code);
 }
+function requireSynthetic(dataClass) {
+  requireValue(dataClass === 'synthetic', dataClass === 'private' ? 'private_collection_disabled' : 'synthetic_only');
+}
 function object(value, keys) {
   requireValue(value && typeof value === 'object' && !Array.isArray(value) &&
     Object.keys(value).every(key => keys.includes(key)));
@@ -131,7 +134,8 @@ function normalize(message, listed, retrievedAt, config) {
 function validateConfig(config) {
   object(config, ['schemaVersion', 'dataClass', 'provider', 'account', 'selfAddresses', 'period',
     'maxPages', 'pageSize', 'reviewedThreads', 'interpersonalIds']);
-  requireValue(config.schemaVersion === 1 && config.dataClass === 'synthetic', 'synthetic_only');
+  requireSynthetic(config.dataClass);
+  requireValue(config.schemaVersion === 1, 'synthetic_only');
   requireValue(config.provider === 'gmail', 'unsupported_provider');
   requireValue(text(config.account) && Array.isArray(config.selfAddresses) && config.selfAddresses.length > 0);
   requireValue(config.selfAddresses.every(value => address(value) === value));
@@ -288,7 +292,8 @@ async function acquireEmail(config, transport, previous = null) {
 }
 function fixtureTransport(fixture) {
   object(fixture, ['schemaVersion', 'dataClass', 'retrievedAt', 'pages', 'details']);
-  requireValue(fixture.schemaVersion === 1 && fixture.dataClass === 'synthetic', 'synthetic_only');
+  requireSynthetic(fixture.dataClass);
+  requireValue(fixture.schemaVersion === 1, 'synthetic_only');
   requireValue(Array.isArray(fixture.pages) && fixture.details && typeof fixture.details === 'object');
   const unwrap = value => {
     requireValue(value);
@@ -311,6 +316,7 @@ function fixtureTransport(fixture) {
 }
 async function runFixture(request, folder) {
   object(request, ['config', 'fixture', 'previous', 'output']);
+  requireSynthetic(request.config?.dataClass);
   requireValue(text(request.fixture) && text(request.output));
   requireValue(request.previous === undefined || text(request.previous));
   const read = file => JSON.parse(fs.readFileSync(path.resolve(folder, file), 'utf8').replace(/^\uFEFF/, ''));

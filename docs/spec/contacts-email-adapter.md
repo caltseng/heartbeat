@@ -7,8 +7,10 @@ route selected by [CONTACTS-013](contacts-email-access.md), through an injected
 `list/get/now` transport. The callable CLI supplies **only a local synthetic
 fixture transport**. There is no HTTP transport, OAuth setup, credential loading,
 profile/account lookup, history sync, sending or schedule. `dataClass: private`
-is rejected before transport calls. This implements the selected adapter with
-synthetic native payloads, not an authorized or connected Gmail account.
+is rejected with `private_collection_disabled` before any fixture/checkpoint file
+read or output resolution (after reading the CLI request manifest). The same
+guard applies to direct adapter/fixture-transport calls. This implements the
+selected adapter with synthetic native payloads, not an authorized or connected Gmail account.
 CONTACTS-010 and separate source authorization remain mandatory for future real
 access; adding an HTTP transport requires a separately reviewed boundary.
 
@@ -146,6 +148,13 @@ importer ID dedup preserves already collected events.
 checkpoint domain. There is no incremental-history claim, deletion reconciliation
 or history-404 fallback in this adapter. Those need CONTACTS-021/032 and their
 separate tests; list-token expiry is covered here.
+
+The strict Date/address profile also rejects common real headers such as a
+trailing `+0000 (UTC)` comment. One rejected message keeps its entire source page
+pending on every retry until the synthetic input is repaired or a reviewed parser
+extension is implemented. Before any separately authorized real run, revisit
+comment parsing and/or explicit counted exclusions; do not silently skip messages
+or declare their history complete.
 
 ## Delegated engineering decisions for owner review
 

@@ -242,7 +242,8 @@ test('cycles, conflicting duplicate messages and unrecognized transports fail ex
 });
 test('synthetic-only boundary and saved-record allowlist cannot be bypassed through checkpoint input', async () => {
   const { config, fixture } = scenario();
-  await assert.rejects(acquireEmail({ ...config, dataClass: 'private' }, fixtureTransport(fixture)), { code: 'synthetic_only' });
+  await assert.rejects(acquireEmail({ ...config, dataClass: 'private' }, fixtureTransport(fixture)), { code: 'private_collection_disabled' });
+  assert.throws(() => fixtureTransport({ ...fixture, dataClass: 'private' }), { code: 'private_collection_disabled' });
   await assert.rejects(acquireEmail({ ...config, provider: 'other' }, fixtureTransport(fixture)), { code: 'unsupported_provider' });
   const first = await acquireEmail(config, fixtureTransport(fixture));
   first.checkpoint.messages[0].body = 'rejected private field';
@@ -277,10 +278,14 @@ test('CLI publishes an immutable handoff/checkpoint pair, resumes to a fresh dir
   assert.equal(importResult(dir, JSON.parse(fs.readFileSync(path.join(dir, 'second', 'handoff.json'), 'utf8'))).exitCode, 2);
   request.output = path.join(__dirname, 'unsafe-synthetic-output');
   await assert.rejects(runFixture(request, dir), { code: 'unsafe_output' });
-  write(dir, 'request.json', { ...request, config: { ...config, dataClass: 'private' } });
+  const privateRequest = { config: { ...config, dataClass: 'private' },
+    fixture: 'nonexistent-fixture.json', previous: 'nonexistent-checkpoint.json', output: 'private-output-must-not-exist' };
+  await assert.rejects(runFixture(privateRequest, dir), { code: 'private_collection_disabled' });
+  write(dir, 'request.json', privateRequest);
   const invalid = spawnSync(process.execPath, [path.join(__dirname, 'email.cjs'), '--synthetic-request', path.join(dir, 'request.json')], { encoding: 'utf8' });
   assert.equal(invalid.status, 1);
-  assert.match(invalid.stderr, /synthetic_only/);
+  assert.match(invalid.stderr, /private_collection_disabled/);
+  assert.equal(fs.existsSync(path.join(dir, privateRequest.output)), false);
 });
 test('failed filesystem publication leaves neither an advanced output checkpoint nor a partial handoff', async t => {
   const dir = folder(t), { config, fixture } = scenario();
