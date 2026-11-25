@@ -11,6 +11,13 @@ storage boundary and the [handoff contract](../../../docs/spec/contacts-technica
 This is a callable skill and normalized-input workflow, not an installed Google
 People API or OAuth connector.
 
+The [CONTACTS-011 capability record](../../../docs/spec/contacts-google-capability.md)
+selects a **proposed**, read-only `people.connections.list` adapter for CONTACTS-012.
+It is not installed or authorized. Follow its contact-only fields, source IDs,
+snapshot/field limits, pagination and sync/deletion requirements; do not treat
+importer cursors as Google tokens. Real runs still require CONTACTS-010 and
+separate source authorization. Do not request credentials to close this gate.
+
 1. Establish the authorized account, reviewed upstream account namespace, output
    location and snapshot scope. Discover an already available, authorized contacts
    tool and inspect its actual fields/pagination; do not connect an account.

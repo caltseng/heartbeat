@@ -71,7 +71,7 @@ file. Every desired source must have an entry, even if it is unavailable.
 
 | Source skill | Implemented, callable now | Setup/access gate and limitations |
 | --- | --- | --- |
-| `contacts-google-identities` | Validate/import identity metadata handoffs | A verified authorized Google contacts tool is required for acquisition. No OAuth client or People API adapter ships here. Snapshot completeness is not historical contact completeness. |
+| `contacts-google-identities` | Validate/import identity metadata handoffs | [CONTACTS-011 selects proposed `people.connections.list`](contacts-google-capability.md), with `contacts.readonly` and contact-only fields. No authorized Google tool is verified; no OAuth client or People API adapter ships here. Snapshot completeness is not historical contact completeness; sync/deletion reconciliation remains future work. |
 | `contacts-email-activity` | Validate/import email metadata handoffs | A verified authorized email tool must expose stable message/thread IDs, timestamps, roles and pagination. No Gmail HTTP adapter ships here. Bulk classifications remain explicit. |
 | `contacts-text-activity` | Validate/import SMS/MMS/RCS/iMessage metadata handoffs | Device and export/reader selection remain open. No native XML, Apple database, backup or RCS parser is implemented. |
 | `contacts-messenger-activity` | Validate/import personal Messenger metadata handoffs | No verified personal-inbox API is configured here. A reported successful Muse browser query is UI-assisted acquisition evidence only, not a callable API, metadata contract, or history guarantee. Do not inherit that private session. |
