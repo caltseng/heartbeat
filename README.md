@@ -24,7 +24,11 @@ projects declared synthetic JSON snapshot shards into metadata-only handoffs,
 with stable local IDs, overlap rejection and explicit unknown history. It rejects
 private runs and does not support encrypted backups or arbitrary archive layouts.
 It also provides a [synthetic-only text XML converter](docs/spec/contacts-text-converter.md)
-for the one profile selected by CONTACTS-015.
+for the one profile selected by CONTACTS-015. **It does not fetch live endpoints
+or authorize processing real vendor archives.**
+The [CONTACTS-020 WhatsApp converter](docs/spec/contacts-whatsapp-format-gate.md#contacts-020-operation-and-delegated-decisions)
+adds only synthetic iOS Without Media TXT snapshots with reviewed ledgers and
+strict replay/overlap protection (`contacts:whatsapp`), not live WhatsApp access.
 
 CONTACTS-010 records the [owner-approved metadata policy](docs/privacy.md).
 The importer currently accepts **synthetic requests only**: private imports fail

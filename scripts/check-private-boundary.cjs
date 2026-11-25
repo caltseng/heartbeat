@@ -5,6 +5,7 @@ const { execFileSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '..');
 const OUTPUT_ROOTS = ['public', 'dist', 'build', 'out', '_site', '.output'];
 const PRIVATE_FILE = /^(?:(?:collection|identity-review|google-acquisition)\.(?:json(?:\.\d+\.tmp)?|lock)|identity-review\.json\.(?:lock|tmp)|google-handoff-.+\.json(?:\.\d+\.tmp)?|(?:request|operation)(?:\.synthetic)?\.json|config\.local\.json|(?:handoff|checkpoint|aggregates|report)\.json|graph\.(?:html|svg))$/i;
+const WHATSAPP_FILE = /^(?:(?:whatsapp-registry\.synthetic|whatsapp\.synthetic|request\.synthetic)\.json(?:\.[a-f0-9-]+\.tmp)?|whatsapp-conversion\.lock)$/i;
 
 function checkBoundary(root = ROOT, extraOutputs = []) {
   for (const output of [...OUTPUT_ROOTS.map(name => path.join(root, name)), ...extraOutputs]) {
@@ -24,7 +25,8 @@ function checkBoundary(root = ROOT, extraOutputs = []) {
   for (const file of files) {
     const parts = file.split('/');
     const name = parts[parts.length - 1];
-    if (parts.some(part => part.toLowerCase() === '.private' || /^\.email-staging-/i.test(part)) || PRIVATE_FILE.test(name) ||
+    if (parts.some(part => part.toLowerCase() === '.private' || /^\.email-staging-/i.test(part) ||
+        /^acquisition-[a-f0-9]{64}$/i.test(part)) || PRIVATE_FILE.test(name) || WHATSAPP_FILE.test(name) ||
         /^\.env(?:\.|$)/i.test(name) || /\.(?:pem|key|pfx|p12)$/i.test(name)) {
       throw new Error('Private operational artifact is a Git delivery candidate; move it outside tracked paths.');
     }

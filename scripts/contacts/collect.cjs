@@ -379,9 +379,55 @@ function guardMessengerSnapshot(source, pages, state) {
     (row.record.type === 'membership' || binding(JSON.parse(id)[3]) === snapshot)),
   'Changed or overlapping Messenger snapshots require reviewed translation; use the same account, not an alias.', 'snapshot_overlap');
 }
+
+function whatsappBinding(handoff, source, state) {
+  const pages = array(handoff.pages, 'handoff.pages');
+  for (const page of pages) {
+    object(page, ['cursor', 'nextCursor', 'retrievedAt', 'identities', 'threads', 'memberships', 'events',
+      'threadCoverage'], 'page');
+    array(page.threads, 'page.threads');
+    array(page.events, 'page.events');
+  }
+  const bindings = Object.entries(state.whatsappArchives || {}).filter(([id]) => JSON.parse(id)[0] === source.account);
+  const archive = handoff.whatsappArchive;
+  const profile = 'whatsapp-ios-txt-metadata-v1';
+  if (archive === undefined) {
+    requireValue(source.connector !== profile && !handoff.pages.some(page =>
+      bindings.some(([, binding]) => page.threads.some(row => row?.id === binding.threadId) ||
+        page.events.some(row => row?.threadId === binding.threadId ||
+          (typeof row?.id === 'string' && row.id.startsWith(`${binding.archiveRef}:record:`))))),
+    'This WhatsApp thread requires its original archive binding.', 'whatsapp_archive_conflict');
+    return null;
+  }
+  object(archive, ['profile', 'threadId', 'archiveRef', 'sha256', 'ledgerDigest', 'metadataDigest'], 'whatsappArchive');
+  const { whatsappArchive, ...metadata } = handoff;
+  requireValue(source.source === 'whatsapp' && source.connector === profile && archive.profile === profile &&
+    [archive.threadId, archive.archiveRef].every(value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(value)) &&
+    [archive.sha256, archive.ledgerDigest, archive.metadataDigest].every(value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)) &&
+    archive.metadataDigest === hash(JSON.stringify(metadata)), 'Invalid synthetic WhatsApp archive binding.');
+  requireValue(handoff.pages.length === 1 && handoff.pages[0].cursor === null && handoff.pages[0].nextCursor === null &&
+    handoff.pages[0].threads.length === 1 && handoff.pages[0].threads[0]?.id === archive.threadId &&
+    handoff.pages[0].events.every(row => row?.threadId === archive.threadId && row.idKind === 'local' &&
+      typeof row.id === 'string' && row.id.startsWith(`${archive.archiveRef}:record:`)) &&
+    handoff.coverage.completeness === 'unknown', 'Invalid WhatsApp snapshot scope.');
+  const bindingKey = JSON.stringify([source.account, archive.threadId]);
+  const previous = state.whatsappArchives?.[bindingKey];
+  requireValue(previous ? isDeepStrictEqual(previous, archive) :
+    !Object.entries(state.records).some(([recordKey, entry]) => {
+      const [family, account, type, recordId] = JSON.parse(recordKey);
+      return family === 'whatsapp' && account === source.account && versions(entry).some(({ record }) =>
+        type === 'event' && (record.threadKey === key('whatsapp', source.account, 'thread', archive.threadId) ||
+          recordId.startsWith(`${archive.archiveRef}:record:`)));
+    }), 'Changed, overlapping or unbound WhatsApp history requires reconciliation.', 'whatsapp_archive_conflict');
+  requireValue(bindings.every(([id, binding]) => id === bindingKey ||
+    (binding.archiveRef !== archive.archiveRef && binding.sha256 !== archive.sha256)),
+  'An archive cannot be rebound to another WhatsApp thread.', 'whatsapp_archive_conflict');
+  return bindingKey;
+}
+
 function importSource(source, requestFolder, request, period, state, file, report) {
   const input = readJSON(path.resolve(requestFolder, source.input));
-  object(input.value, ['schemaVersion', 'dataClass', 'source', 'account', 'connector', 'coverage', 'pages', 'errors', 'textArchive'], 'handoff');
+  object(input.value, ['schemaVersion', 'dataClass', 'source', 'account', 'connector', 'coverage', 'pages', 'errors', 'textArchive', 'whatsappArchive'], 'handoff');
   const handoff = input.value;
   requireValue(handoff.schemaVersion === 1 && handoff.dataClass === request.dataClass, 'Handoff version/data class does not match the request.');
   requireValue(['source', 'account', 'connector'].every(field => handoff[field] === source[field]), 'Handoff source/account/connector does not match the request.');
@@ -403,6 +449,8 @@ function importSource(source, requestFolder, request, period, state, file, repor
   } else requireValue(!previousArchive && source.connector !== 'synctech-xml-metadata-v1',
     'This text source/account requires its original archive binding.', 'text_archive_conflict');
   const declaredCoverage = coverage(handoff.coverage, source.source);
+  const whatsappKey = source.source === 'whatsapp' ? whatsappBinding(handoff, source, state) : null;
+  requireValue(source.source === 'whatsapp' || handoff.whatsappArchive === undefined, 'WhatsApp binding requires WhatsApp source.');
   report.upstreamErrors = array(handoff.errors === undefined ? [] : handoff.errors, 'handoff.errors').map(error => {
     object(error, ['code', 'retryable'], 'upstream error');
     requireValue(typeof error.retryable === 'boolean', 'Upstream errors need explicit retryability.');
@@ -446,6 +494,10 @@ function importSource(source, requestFolder, request, period, state, file, repor
     if (handoff.textArchive) {
       state.textArchives ||= {};
       state.textArchives[archiveKey] = handoff.textArchive;
+    }
+    if (whatsappKey) {
+      state.whatsappArchives ||= {};
+      state.whatsappArchives[whatsappKey] = handoff.whatsappArchive;
     }
     processed++;
     report.persistedPages = processed;
