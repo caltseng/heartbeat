@@ -55,8 +55,14 @@ canonical reviewed households and never infers connections from message activity
 See the [local workflow and decision record](docs/spec/contacts-curated-records.md).
 Real note content remains unauthorized under the metadata-only privacy policy.
 
-Cross-source numerical aggregation, summaries,
-reconnection signals and Heartbeat's map are **not implemented**. Missing source
+CONTACTS-023 adds the independent `contacts-aggregate` skill and
+`contacts:aggregate` CLI: deterministic synthetic snapshot reduction with
+explicit mapping revision, per-person/thread/channel/day counts, coverage and
+an auditable source-event ledger. Follow the
+[aggregation contract and decisions](docs/spec/contacts-aggregation.md).
+
+Period-summary presentation, reconnection signals and Heartbeat's map are
+**not implemented**. Missing source
 data means unknown, not zero. No private accounts, devices, browser sessions,
 credentials or real data are included or authorized by this repository.
 

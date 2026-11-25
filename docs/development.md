@@ -118,4 +118,8 @@ The [CONTACTS-027 curated store](spec/contacts-curated-records.md) adds
 `contacts:curate` and `curated.test.cjs`: exact original notes, explicit connections,
 groups, per-household rhythms, reference preservation, atomic rollback and CLI
 0/2/1 exits. It reuses canonical reviewed households; no real notes are authorized.
-Reducers and renderers remain distinct work items.
+The independent [CONTACTS-023 reducer](spec/contacts-aggregation.md) is also
+synthetic-only. Its fixtures cover exact mapping/snapshot binding, half-open
+boundaries, DST date unions, source-ID deduplication, historical thread context,
+direct/group/To/CC/BCC semantics, coverage bounds and immutable CLI output.
+Renderers remain distinct work items.

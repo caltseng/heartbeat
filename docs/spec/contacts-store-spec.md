@@ -14,8 +14,8 @@ synthetic tests and [CONTACTS-021 source reconciliation](contacts-source-revisio
 are implemented. CONTACTS-022 adds a separate synthetic-only
 [identity-review skill and overlay](contacts-identity-review.md).
 CONTACTS-027 adds [synthetic-only curated records and note capture](contacts-curated-records.md).
-Live acquisition, private note capture, numerical
-aggregation, summaries and the map are not implemented. Remaining CONTACTS
+CONTACTS-023 adds a synthetic-only [cross-source reducer and skill](contacts-aggregation.md).
+Live acquisition, private note capture, summary presentation and the map are not implemented. Remaining CONTACTS
 execution is blocked until the Heartbeat bootstrap is verified checked in.
 
 ## 1. Purpose
@@ -272,7 +272,7 @@ Retain timestamped metadata sufficient to recalculate periods; daily counts alon
 
 The aggregation output contract includes the resolved interval/time zone/as-of instant, applied filters and identity-mapping revision, per-source freshness and coverage, unresolved identities, deduplication/exclusion counts, and the aggregates consumed by every view. Unknown values remain null/unknown, and source-limited totals are labeled observed lower bounds.
 
-This document specifies the full roadmap. Six collection skills and the normalized handoff importer now exist; identity reconciliation, aggregation, presentation and live endpoint access do not. Checking it in does not authorize connecting accounts, collecting private data, or scheduling collection.
+This document specifies the full roadmap. Six collection skills, the normalized handoff importer, synthetic identity review and cross-source aggregation now exist; presentation and live endpoint access do not. Checking it in does not authorize connecting accounts, collecting private data, or scheduling collection.
 
 #### Graph model
 

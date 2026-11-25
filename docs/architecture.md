@@ -14,7 +14,7 @@ Private collection.json: records + checkpoints + manifest + history [IMPLEMENTED
                          |
 Reviewed canonical people/optional household links [IMPLEMENTED: CONTACTS-022, SYNTHETIC ONLY]
                          |
-Deterministic cross-source aggregation [PLANNED: CONTACTS-023]
+Deterministic cross-source aggregation [IMPLEMENTED: CONTACTS-023, SYNTHETIC ONLY]
                          |
 Heartbeat period summaries [PLANNED: CONTACTS-024]
                          |
@@ -56,6 +56,8 @@ terminal enumeration remains partial. No HTTP/OAuth or real-source access is add
   review.synthetic.json          # explicit identity-review request, when prepared
   identity-review.json           # separate canonical mapping + revision history
   identity-review.lock           # only during an active identity-review write
+  aggregate.synthetic.json       # explicit aggregation request, when prepared
+  aggregation-001/aggregates.json # immutable structured output; no renderer
 ```
 
 All of `.private/` is ignored and is for synthetic runs only. Future real requests,
@@ -107,9 +109,10 @@ commands/configuration/recovery to reserved versioned handoffs for later stages.
 It also specifies the automated no-public-output guard; no renderer or reporting
 command is implemented by that integration.
 
-Later reducers must reconcile source IDs and reviewed identity mappings before
-counting. They must preserve half-open time intervals, time-zone-aware active-day
-unions, direct/group distinctions, exclusions, uncertainty and provenance.
+The [CONTACTS-023 reducer](spec/contacts-aggregation.md) now reconciles source IDs
+and explicit reviewed mapping revisions before counting. Its immutable structured
+output preserves half-open intervals, time-zone-aware active-day unions,
+direct/group distinctions, exclusions, uncertainty and provenance.
 Every summary and map must use the same structured aggregate dataset.
 Unknown/unavailable coverage cannot become zero or a reconnection decline.
-No numerical person-level summary or map command exists in this baseline.
+No rendered summary or map command exists in this baseline.

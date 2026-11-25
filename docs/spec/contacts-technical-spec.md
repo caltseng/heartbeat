@@ -380,7 +380,9 @@ No stale previous source status is reused as current evidence.
 A terminal cursor proves only completion of supplied pages, not complete upstream
 history. Declared coverage must contain the requested activity interval and must
 not extend beyond retrieval to get `collected`; contact snapshots are separate.
-No numerical person-level interaction summaries are computed yet. Downstream
+The [CONTACTS-023 reducer](contacts-aggregation.md) now computes synthetic-only
+person/thread/channel/day aggregates using explicit reviewed mapping revisions.
+It preserves this collection contract and never renders UI. Downstream
 consumers must treat unobserved values as unknown, source-limited counts as lower
 bounds, and interrupted manifests as incomplete.
 
@@ -389,7 +391,7 @@ bounds, and interrupted manifests as incomplete.
 1. **Collection first:** run synthetic five-source imports, replay and resume
    safely; disclose missing tools/formats. Add each real acquisition route only
    after its separate access gate and privacy approval.
-2. **Identity and aggregation:** review canonical people mappings; build a pure,
+2. **Identity and aggregation (synthetic implementation):** review canonical people mappings; run a pure,
    deterministic reducer over message events and manifest coverage. Preserve
    To/CC roles, group-only participation, direct activity, channel breakdowns,
    active-day unions, exclusions and unresolved records. Reconcile all totals
