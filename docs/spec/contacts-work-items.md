@@ -40,7 +40,9 @@ and normalized record store. Replaying its request deduplicates; missing real
 endpoints must instead appear as unavailable. No account authorization is needed
 for this synthetic slice.
 
-**First real-data slice (not delivered):** obtain CONTACTS-010 decisions, complete
+**First real-data slice (not delivered):** enforce the approved CONTACTS-010 policy
+with verified local protection and retention/deletion controls, obtain private
+source/account and each-run approvals, complete
 the Google/email access gates (011, 013), implement their selected adapters (012,
 014), then run an explicitly authorized metadata-only collection. Record text,
 Messenger and WhatsApp as unavailable until their own gates pass. This does not
@@ -75,7 +77,7 @@ account/device setup can lift a real-data execution block.
 
 | ID / title / state | Bounded scope and deliverable | Explicit prerequisites | Acceptance |
 | --- | --- | --- | --- |
-| CONTACTS-010 / Private data boundary / Blocked: owner decisions | Record account scope, metadata permissions, processing/storage location, ACL/encryption, retention/deletion and backup policy before real data is stored. No credential acquisition. | CONTACTS-001 | Written approved boundary distinguishes metadata from note/content workflows, prevents publication, names deletion/access controls, and identifies who authorizes each real source run. Synthetic work can proceed without this. |
+| CONTACTS-010 / Private data boundary / Policy documented; synthetic-only guard implemented | [Owner-approved policy and engineering decisions](../privacy.md): own source categories, metadata only, this computer outside Git/sync, Windows-user restriction and verified encryption, 12-month deletion, no automatic backups/remote AI, owner approval per source/account and per run. No credential acquisition or real-run authorization. | CONTACTS-001 | Shared importer fails closed on every private request before handoff reads/output writes, including unavailable-only requests; synthetic CLI tests prove exit 1 without manifest disclosure and unchanged stores. Content/notes remain outside this policy. Local protection verification and operational retention/deletion must exist before enabling real data; synthetic work on other items is not gated by 010 unless explicitly listed. |
 | CONTACTS-011 / Google identity access gate / Capability documented; no live access | [Capability record](contacts-google-capability.md) selects proposed read-only `people.connections.list`; documents fields, source IDs, pagination, deletion/sync-token behavior and setup requirements. | CONTACTS-001, CONTACTS-003 | Exact import-only versus proposed API routes, snapshot/field limits, approval gaps and synthetic page shapes are documented. No authorized tool, adapter or connected access is claimed; CONTACTS-012 and real-run CONTACTS-010/source authorization remain separate. |
 | CONTACTS-012 / Google identity acquisition adapter / Blocked: selected route | Implement only the route selected by 011, with private configuration references and identity-only handoffs. | CONTACTS-002, CONTACTS-011; CONTACTS-010 additionally for real runs | Mocked pages exercise pagination, token expiry/resync, duplicate contacts and deletions without erasing curated records; no contact generates activity; unavailable auth produces an explicit report, not an empty success. |
 | CONTACTS-013 / Email access gate / Documented, synthetic only | [Capability map and synthetic payload](contacts-email-access.md) select proposed Gmail API v1 `gmail.metadata`; no connected account/tool or adapter is claimed. | CONTACTS-001, CONTACTS-003 | Message/thread IDs, metadata allowlist, To/CC/hidden-BCC limits, unavailable search `q`, pagination versus history, classifications and explicit failure outcomes are documented. CONTACTS-010 and source authorization remain open. |

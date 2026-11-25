@@ -295,6 +295,9 @@ function collect(request, requestFolder = process.cwd()) {
   object(request, ['schemaVersion', 'dataClass', 'period', 'output', 'sources', 'resume', 'maxPages'], 'request');
   requireValue(request.schemaVersion === 1, 'Only schemaVersion 1 is supported.');
   requireValue(['synthetic', 'private'].includes(request.dataClass), 'dataClass must be synthetic or private.');
+  requireValue(request.dataClass === 'synthetic',
+    'Private collection is disabled: CONTACTS-010 policy approval is not source/account or per-run authorization. Local ACL, disk encryption, storage location and retention/deletion controls are not verified by this importer.',
+    'private_collection_disabled');
   requireValue(request.resume === undefined || typeof request.resume === 'boolean', 'resume must be boolean.');
   requireValue(request.maxPages === undefined || (Number.isSafeInteger(request.maxPages) && request.maxPages > 0), 'maxPages must be a positive integer.');
   const period = resolvePeriod(request.period);
