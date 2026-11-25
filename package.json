@@ -9,9 +9,10 @@
   "scripts": {
     "contacts:collect": "node scripts/contacts/collect.cjs",
     "contacts:email": "node scripts/contacts/email.cjs",
-    "test:contacts": "node --test scripts/contacts/collect.test.cjs scripts/contacts/email.test.cjs",
+    "contacts:google": "node scripts/contacts/google.cjs",
+    "test:contacts": "node --test scripts/contacts/collect.test.cjs scripts/contacts/email.test.cjs scripts/contacts/google.test.cjs",
     "test": "npm run test:contacts",
-    "check": "node --check scripts/contacts/collect.cjs && node --check scripts/contacts/demo.cjs && node --check scripts/contacts/collect.test.cjs && node --check scripts/contacts/email.cjs && node --check scripts/contacts/email.test.cjs",
+    "check": "node --check scripts/contacts/collect.cjs && node --check scripts/contacts/demo.cjs && node --check scripts/contacts/collect.test.cjs && node --check scripts/contacts/email.cjs && node --check scripts/contacts/email.test.cjs && node --check scripts/contacts/google.cjs && node --check scripts/contacts/google.test.cjs",
     "ci": "npm run check && npm test"
   }
 }
