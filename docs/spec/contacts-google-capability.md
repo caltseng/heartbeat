@@ -1,6 +1,7 @@
 # Heartbeat: Google identity access gate (CONTACTS-011)
 
-Status: **PROPOSED API-first acquisition route; not implemented or connected**.
+Status: **Selected API-first route implemented for synthetic pages (CONTACTS-012);
+not connected or authorized for private execution**.
 This capability decision targets `caltseng/heartbeat` (Phalanx repository ID
 `heartbeat`). Bootstrap is checked in at
 `6b6299475b0d1dbcf2bd005c87d383ee97537e2b`. This document selects the bounded
@@ -11,7 +12,7 @@ route for CONTACTS-012, not permission to read an account.
 | Route | Actual capability and boundary |
 | --- | --- |
 | Available local route | `contacts-google-identities` skill plus `npm run contacts:collect -- --request <private-request>` imports schemaVersion 1 normalized identity handoffs. It does not call Google. Synthetic demo/test inputs work without authorization. |
-| Selected PROPOSED route | A local CONTACTS-012 adapter, proposed connector name `google-people-connections-v1`, calling `people.connections.list`: `GET https://people.googleapis.com/v1/people/me/connections`. No adapter, OAuth client, consent, credential or authorized source account is established by this gate. |
+| Selected route / synthetic implementation | Local CONTACTS-012 adapter `scripts/contacts/google.cjs`, connector `google-people-connections-v1`, constructs `people.connections.list`: `GET https://people.googleapis.com/v1/people/me/connections`. Its transport is mock-only; no network, OAuth client, consent, credential or authorized source account is established. |
 | Existing authorized Google tool | None verified in this work item's available tools or repository. Public API documentation is design evidence only, not a successful tool invocation or connected access. MCP is optional, not a required backend; do not install/discover an integration or connect an account to close this gate. |
 | Snapshot/export alternative | An already authorized normalized handoff can be imported. Native Google CSV/vCard/Takeout exports have no built-in parser here; format/version, stable-ID evidence and conversion need a separate validated route. They cannot establish sync-token/deletion history or historical completeness. Search results are not a full snapshot. |
 
@@ -131,9 +132,11 @@ limits disclosed can claim complete identity-snapshot coverage with null tempora
 bounds. A verified empty terminal full snapshot differs from a zero-change
 incremental response; the latter does not mean an empty address book.
 
-Without an implemented authorized adapter, requests must use
+Without an authorized network transport, collection requests must use
 `mode: unavailable`, `status: requires_setup`, a reviewed account placeholder and
-an explicit reason naming the missing adapter/authorization. No synthetic data
+an explicit reason naming the missing transport/authorization. The acquisition
+CLI writes an explicit `requires_setup` report for missing synthetic transport.
+Private acquisition is disabled before output access (exit 1, no artifacts). No synthetic data
 may masquerade as real output. Unapproved scopes/auth gaps remain `requires_setup`;
 unsupported native formats remain `unsupported`; runtime adapter HTTP 401/403,
 429/5xx, invalid pages or expired checkpoints must report sanitized failures or
@@ -218,18 +221,154 @@ of the following executable synthetic normalized handoff:
 For CONTACTS-012, mocked HTTP tests must additionally cover duplicate IDs,
 page interruption/replay, auth/quota failures, expired-token full resync, field
 limits, changed profiles/resource aliases and tombstones without curated deletion.
-The example proves only the existing normalized import shape; it implements none
-of that acquisition/reconciliation behavior.
+The example proves the normalized import shape. The CONTACTS-012 synthetic
+adapter and tests now exercise acquisition/recovery, not live API access or
+revision-aware reconciliation.
+
+## CONTACTS-012 local adapter and delegated decisions
+
+Implemented on 2026-11-24 under the owner's delegation of ordinary engineering
+choices. These are **engineering decisions, not owner-approved privacy policy**.
+The [CONTACTS-010 policy](../privacy.md) is owner-approved; exact source/account
+and each-run authorization remain ungranted, and local protection and
+retention/deletion controls remain unverified/unimplemented. No credentials,
+account, device, browser, remote AI, sending, source writes or schedules are used.
+
+### Private configuration and executable synthetic route
+
+```powershell
+npm run contacts:google -- --config .private\contacts\google-fixture\config.json
+```
+
+Create that configuration and an invented fixture privately, never in tracked
+output. Configuration/fixture/output references resolve relative to the config.
+The CLI validates every location using the importer's existing private-output
+boundary: inside this checkout only `.private\contacts`, or an explicitly chosen
+external local directory. These locations permit synthetic artifacts only, not
+verified real-data storage. Reject unknown config fields, including credentials.
+
+```json
+{
+  "schemaVersion": 1,
+  "dataClass": "synthetic",
+  "account": "fixture-google-account",
+  "output": "acquisition",
+  "fixture": "pages.synthetic.json",
+  "selfIds": [],
+  "maxPages": 100
+}
+```
+
+The fixture file is `{"dataClass":"synthetic","responses":[...]}`; each response
+is `{"status":200,"body":{...}}` using the invented native shapes above. Include a
+terminal `nextSyncToken` even for a verified empty full snapshot. Responses are
+consumed in order, including retry/410 responses; exhaustion fails explicitly.
+Do not label a real export synthetic. The test module demonstrates all cases
+without checked-in exports. `selfIds` contains only separately verified provider
+resource IDs; default `[]` makes every invented contact explicitly non-self.
+
+The CLI has **no HTTP or credential loader**. `acquire` accepts an injected
+synthetic transport receiving the fixed URL and parameters; `run` only supplies a
+local synthetic fixture transport. A synthetic config with no fixture/transport
+returns `requires_setup/authorized_transport_unavailable`; `dataClass: private`
+fails closed with exit 1 / `private_collection_disabled` before resolving output,
+creating directories/locks, reading checkpoints/fixtures or writing any report.
+The pure acquisition entry point rejects private data with the same code.
+Missing/invalid local files are fatal failures, not empty results.
+OAuth acquisition and real execution are deliberately unavailable even if a
+caller happens to possess credentials.
+
+### Checkpoints, handoff and recovery
+
+One exclusive `google-acquisition.lock` prevents concurrent adapter writers in
+an output directory. Owner-only POSIX file/directory modes are requested; this
+does not certify Windows ACLs/encryption. `google-acquisition.json` atomically
+persists the report, bound state and `handoffFile` reference. All identifiers,
+revision evidence, baselines, tokens, reports and generations remain private.
+Stdout includes only the Heartbeat title, status and fixed error codes.
+
+A successful traversal produces an immutable `google-handoff-<uuid>.json` first,
+then atomically records its reference and checkpoint. Supply **that handoff** as
+the existing importer's `source.input`; never supply the acquisition bundle.
+No collection store or curated file is opened by the adapter. A crash before
+checkpoint replacement leaves the prior generation authoritative; an orphaned
+handoff can be ignored (no automatic deletion). An ordinary failed/auth-limited
+synthetic cycle writes a failure report while preserving both the last-good
+state and its `handoffFile` reference (null only if none ever succeeded).
+Inspect the report: a retained handoff is explicitly stale, not current success.
+Rerun the same
+config after correcting the synthetic input; traversal restarts from the last
+complete sync generation, not a partially fetched page.
+
+After a hard kill, a stale lock may remain. Confirm no adapter is running before
+removing only the exact `google-acquisition.lock` in the selected private output
+directory, then rerun; never delete the directory or a live writer's lock.
+Immutable handoffs accumulate intentionally. CONTACTS-032 retention/deletion
+must inventory these files as well as checkpoints and reports; no automatic
+private-data deletion policy is invented here.
+
+State binds account, data class, connector, exact parameters and verified self
+IDs. Mismatch fails before acquisition; select a fresh private output directory
+for an intentional binding change, preserving the old one for review. Full-sync
+age is not renewed by incremental calls. Seven-day age or HTTP 410 triggers a
+new full sync; 410 recovery discards only in-memory staged pages, never the prior
+generation. The page budget includes responses discarded during resync.
+429/5xx has at most three attempts per page, with 50/100 ms mock backoff.
+401/403 is explicit `requires_setup`; other HTTP, malformed response, cycle,
+conflicting duplicate or budget failures preserve the prior state. Tokens and
+upstream bodies never appear in error messages or normalized handoffs.
+
+Full snapshots replace only the adapter's source view; incremental pages update
+that view and a zero-change incremental handoff still includes its retained
+identities. Same-ID identical observations deduplicate; same-name/different-ID
+contacts stay separate. Conflicting same-cycle observations fail atomically.
+Primary names are preferred; multiple names without a primary remain unknown
+rather than picking by array order. Address values are preserved without country
+inference; exact duplicates sort/deduplicate. Unneeded native fields are discarded.
+
+Until CONTACTS-021, the first safely emitted identity per provider ID reserves an
+append-only baseline. Changed identities, aliases/links, tombstones and complete
+full-snapshot absences are privately staged with explicit reconciliation reasons.
+Projected disputed observations and reasons remain in a private pending ledger
+across resyncs and later payloads that omit earlier alias/tombstone evidence.
+There is deliberately no automatic clearing operation before 021 review.
+They never overwrite normalized or curated records. Only unchanged/new safe
+identities enter handoffs; **pending reconciliation remains partial on later
+zero-change syncs**. Address limits also force partial coverage. A successful
+acquisition checkpoint means staged source evidence is durable, not that changes
+were applied to the collection model. A baseline reservation does not prove an
+import occurred. Other connectors' conflicting observations still fail visibly
+in the shared importer rather than being reconciled by this adapter.
+
+Exit 0 means a synthetic selected-scope identity snapshot is available, not live
+access or historical completeness. Exit 2 means persisted partial, failed or
+requires-setup reporting for synthetic runs; exit 1 includes disabled private
+collection (no artifacts), or fatal arguments/config/storage/locking
+failure. Handoffs have null temporal bounds, no provider tokens/vendor fields,
+and empty threads/memberships/events. Source updates/deletions never create activity.
+
+### Material decisions for owner review
+
+| Decision / rationale | Alternatives and assumptions | Synthetic validation / revisit condition |
+| --- | --- | --- |
+| Keep transport injection and CLI fixtures only; reject private collection before output access, including reports/manifests. | Shipping HTTP/OAuth loading or a private setup report now could imply access/protection authority. Protection is unverified; missing synthetic transport still gets an explicit setup report. | Parameter/auth/private-run no-artifact tests; revisit only after enforcing approved CONTACTS-010 policy, exact source/account and each-run authorization, verified protection and reviewed credential/network design. |
+| Atomic complete generations with immutable handoff-before-checkpoint; restart interrupted pagination instead of persisting provider page tokens. | Per-page crash resume adds mutable staging complexity. Small single-user contact snapshots and a 100-page default are assumed; maxPages is bounded to 1-10000. | Pagination/budget/replay and injected checkpoint-write failure; revisit if separately approved snapshot size requires durable page staging. |
+| Preserve original full-sync age; expire at seven days or recover once from incremental 410; bounded mock retries. | Renewing token age from incremental activity conflicts with 011; unlimited retries hide failure. Mock retry timing is not a production quota policy. | Fixed-token multi-page sync, staged-page expiry, seven-day resync and quota tests; revisit timing/Retry-After with an authorized production transport. |
+| Reserve conservative immutable identity baselines and stage revisions/deletions/aliases/absence privately, keeping coverage partial. | Destructive replacement or vendor tombstone events violate append-only ingestion/curated independence; 021 is not delivered. | Changed profile, alias, tombstone, full-resync absence and zero-change replay tests plus untouched curated bytes; revisit with explicit 021 revision/target reconciliation. |
+| Retain only projected source evidence; primary-only disambiguation, no inferred self/person matches, partial at field limits. | Native payload retention, display-name merging or extra lookup endpoints exceed 011. Self evidence is external to this route. | Projection, same-name IDs, self binding, field limits and identity-only importer tests; revisit field/scope expansion only through a separately reviewed gate. |
 
 ## Setup and approval gaps (no setup performed)
 
-Before any real run, CONTACTS-010 must separately approve account scope,
-metadata processing, private local location, Windows ACLs/encryption,
-retention/deletion, backups, credential/cursor handling and authority for that
-bounded run. Keep configuration references, OAuth material, source IDs, page/sync
-tokens, checkpoints, requests, normalized records, manifests and generated
-reports/graphs in ignored `.private/` or an approved external local directory,
-never tracked output, CI logs or PR descriptions.
+Before any future real run, enforce the [approved CONTACTS-010 policy](../privacy.md):
+obtain owner approval for the exact source/account and each bounded run, verify
+Windows-user restrictions, disk encryption and backup/sync exclusions, and
+implement operational 12-month retention and explicit deletion. All configuration
+references, OAuth material, source IDs, page/sync tokens, checkpoints, requests,
+normalized records, manifests and generated reports/graphs share that boundary:
+on this computer, outside Git worktrees and cloud-synced folders, never tracked
+output, CI logs or PR descriptions. Ignored `.private/` is for synthetic work,
+not approved real-data storage. The private guard remains enabled; policy
+approval alone neither verifies these controls nor authorizes acquisition.
 
 A future owner-controlled setup would need a Google Cloud project with People
 API enabled, a suitable local/installed-app OAuth client and consent configuration,

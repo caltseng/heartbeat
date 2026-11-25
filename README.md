@@ -29,6 +29,14 @@ The importer currently accepts **synthetic requests only**: private imports fail
 closed until source/account and each-run approvals plus local protection and
 retention/deletion controls can be verified.
 
+CONTACTS-012 adds a synthetic-only Google People acquisition adapter with mocked
+pagination, sync/resync, private checkpoints and identity-only importable handoffs:
+`npm run contacts:google -- --config <private-config.json>`. See the
+[configuration, recovery and decision record](docs/spec/contacts-google-capability.md#contacts-012-local-adapter-and-delegated-decisions).
+It ships no network transport, credential loader or OAuth flow. Private runs
+fail closed with exit 1 (`private_collection_disabled`) before output access,
+without creating directories, locks, reports or manifests.
+
 Canonical identity review, cross-source numerical aggregation, summaries,
 reconnection signals and Heartbeat's map are **not implemented**. Missing source
 data means unknown, not zero. No private accounts, devices, browser sessions,
@@ -79,7 +87,7 @@ hide them. A successful import does not independently certify upstream history.
 - [Technical contracts and source capability matrix](docs/spec/contacts-technical-spec.md)
 - [Personal Messenger access gate and proposed export profile](docs/spec/contacts-messenger-capability.md)
 - [Messenger synthetic snapshot converter and engineering decisions](docs/spec/contacts-messenger-converter.md)
-- [Google identity access gate: proposed read-only route, no live access](docs/spec/contacts-google-capability.md)
+- [Google identity route and synthetic acquisition adapter; no live access](docs/spec/contacts-google-capability.md)
 - [Selected text export format and device/access limits](docs/spec/contacts-text-format-gate.md)
 - [Email access gate: proposed Gmail metadata route and synthetic payload](docs/spec/contacts-email-access.md)
 - [Stable CONTACTS work-item register](docs/spec/contacts-work-items.md)

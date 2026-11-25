@@ -14,8 +14,10 @@ npm run check
 npm run ci
 ```
 
-`test:contacts`/`npm test` run Node's built-in test runner. `check` checks the
-CommonJS files' syntax. `ci` runs both. Tests generate synthetic fixtures in
+`test:contacts`/`npm test` run Node's built-in test runner, including
+`email.test.cjs`, `google.test.cjs` and `messenger.test.cjs`. `check` checks the collection/demo,
+email/Google adapters, Messenger converter and test CommonJS files' syntax. `ci` runs both.
+Tests generate synthetic fixtures in
 temporary directories and clean them up; they include actual CLI 0/2/1 exits,
 all five families, replay, connector provenance, resume, rollback, record
 conflicts, direct/group roles, missing-versus-empty history, DST/custom intervals,
@@ -30,6 +32,10 @@ The [CONTACTS-018 Messenger converter](spec/contacts-messenger-converter.md)
 adds synthetic direct/group JSON shards, stable snapshot-local IDs, conservative
 overlap rejection, interrupted conversion/retry and unsupported history/layout
 cases. Its CLI also rejects private conversion.
+Google tests cover the selected request parameters, duplicates, expiry/resync,
+quota/auth failure, conservative
+revisions/deletions, checkpoint binding and failed atomic writes. No live endpoint
+is called or verified; Google acquisition has only a synthetic transport.
 
 GitHub Actions runs `.github/workflows/ci.yml` for PRs targeting `main` and pushes
 to `main`, on Node 20.11.0. Its stable job/check name is
