@@ -14,10 +14,13 @@ synthetic tests and [CONTACTS-021 source reconciliation](contacts-source-revisio
 are implemented. CONTACTS-022 adds a separate synthetic-only
 [identity-review skill and overlay](contacts-identity-review.md).
 CONTACTS-027 adds [synthetic-only curated records and note capture](contacts-curated-records.md).
+CONTACTS-029 adds [synthetic-only prayer triage and editable plans](contacts-prayer-triage.md),
+not permission to process private notes.
 CONTACTS-023 adds a synthetic-only [cross-source reducer and skill](contacts-aggregation.md).
 CONTACTS-030 adds [synthetic audience selection and reviewed lists](contacts-life-update-audience.md);
 real wording/preferences, private runs and sending remain unauthorized/disabled.
-Live acquisition, private note capture, summary presentation and the map are not implemented. Remaining CONTACTS
+CONTACTS-024 adds a synthetic-only [shared period dataset and summary skill](contacts-period-summary.md).
+Live acquisition, private note capture and the map are not implemented. Remaining CONTACTS
 execution is blocked until the Heartbeat bootstrap is verified checked in.
 
 ## 1. Purpose

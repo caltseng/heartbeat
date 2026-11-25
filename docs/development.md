@@ -62,6 +62,12 @@ synthetic refresh/resync, stale/disconnected sources, calendar retention,
 inventoried cache deletion, replay fences and interrupted-purge recovery.
 All checks remain dependency-free, synthetic and account-free.
 
+CONTACTS-029 adds `prayer.test.cjs` and `check:prayer` to CI. The
+[prayer triage contract](spec/contacts-prayer-triage.md) covers original-note
+grounding, explicit confirmed/ambiguous status, editable ordered plans, atomic
+rollback, stale evidence/revision rejection, private denial and CLI 0/2/1 exits.
+Prayer artifacts extend the private Git boundary; no outreach exporter is added.
+
 The [local workflow](spec/contacts-local-workflow.md) defines current commands,
 future versioned handoffs and recovery. `npm run check:private` rejects nonempty
 public output roots and private operational Git candidates, including force-added
@@ -130,3 +136,11 @@ household-to-person editing, inclusion/exclusion reasons, explicit wording,
 missing/invalid/ambiguous/duplicate email addresses, stale exact-input review,
 unavailable sources, unchanged notes, atomic rollback and actual CLI 0/2/1 exits.
 No real contacts, beliefs inference, sending or donation records are introduced.
+
+The [CONTACTS-024 period report](spec/contacts-period-summary.md) adds
+`contacts:summary`, a focused presentation skill, `summary.test.cjs` and
+`check:summary` in CI. Synthetic cases reconcile summary/table/channel/timeline
+counts, preserve inactive peers, exact zeros versus unknown/lower bounds,
+cross-channel reviewed identities, DST/skipped-date calendars, 7d/30d/custom
+bounds, standalone view context, immutable CLI output and private-run denial.
+The workflow guard also exercises collection-to-summary without changed inputs.

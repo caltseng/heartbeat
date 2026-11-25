@@ -55,6 +55,12 @@ canonical reviewed households and never infers connections from message activity
 See the [local workflow and decision record](docs/spec/contacts-curated-records.md).
 Real note content remains unauthorized under the metadata-only privacy policy.
 
+CONTACTS-029 adds `contacts:prayer` for user-invoked synthetic prayer requests,
+explicit confirmed status updates and editable ordered plans grounded in unchanged
+original notes. Ambiguous status asks for confirmation; age never implies an
+answered/resolved request. All output is private-local-only, with no outreach
+export. See the [workflow and decisions](docs/spec/contacts-prayer-triage.md).
+
 CONTACTS-030 adds `contacts:audience` for editable synthetic household/member
 selections, explicit reasons and wording preferences, visible address issues and
 a separately reviewed recipient list. It never sends or records donations.
@@ -66,8 +72,13 @@ explicit mapping revision, per-person/thread/channel/day counts, coverage and
 an auditable source-event ledger. Follow the
 [aggregation contract and decisions](docs/spec/contacts-aggregation.md).
 
-Period-summary presentation, reconnection signals and Heartbeat's map are
-**not implemented**. Missing source
+CONTACTS-024 adds `contacts:summary` and the focused `contacts-summary` skill:
+one immutable synthetic `report.json` supplies deterministic summary statements,
+the complete reviewed people cohort, channel counts and coverage-aware daily
+timeline. All views share period/zone/as-of, mapping binding, source freshness,
+coverage and exclusions. See the [reporting contract and decisions](docs/spec/contacts-period-summary.md).
+
+Reconnection signals and Heartbeat's map are **not implemented**. Missing source
 data means unknown, not zero. No private accounts, devices, browser sessions,
 credentials or real data are included or authorized by this repository.
 

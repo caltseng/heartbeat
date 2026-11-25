@@ -111,6 +111,9 @@ two included people cannot select the same mailbox. Choose different current
 addresses or explicitly exclude a duplicate recipient; never silently merge
 people or discard reasons/preferences. No provider-specific plus/dot alias
 rewriting or mailbox ownership claim is made.
+Duplicate-recipient blocking compares selected mailboxes only, not every possible
+address or all identities of two people; shared unselected options remain visible
+as non-blocking `duplicate_address_option` issues.
 
 For final review, **remove `audience` from the request**, refresh
 `expectedRevision` and `inputsDigest` from the saved inspection, and provide a

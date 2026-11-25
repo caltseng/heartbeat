@@ -13,6 +13,10 @@ verified local protection and retention/deletion controls remain required.
 All requests and fixtures here must be synthetic. There is no account access,
 network transport, sending, remote-AI processing, scheduler, website or renderer.
 
+[CONTACTS-029 prayer triage](contacts-prayer-triage.md) references these original
+notes from a separate synthetic-only overlay. Curation never reads or includes
+prayer requests, updates or plans in its output; prayer output is not outreach-safe.
+
 ## Local workflow
 
 First collect synthetic handoffs and register people/households using

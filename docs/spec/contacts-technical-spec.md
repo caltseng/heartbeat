@@ -17,6 +17,9 @@ See the [product specification](contacts-store-spec.md) and
 CONTACTS-027 adds an independent [synthetic curated JSON store](contacts-curated-records.md)
 for original notes, groups, meaningful connections and rhythms, reusing canonical
 households from CONTACTS-022. Observation records and collection schemas are unchanged.
+CONTACTS-029 layers [synthetic-only prayer requests, explicit status updates and
+editable plans](contacts-prayer-triage.md) over original curated notes in a separate
+private-local-only JSON overlay. It neither changes collection nor exports outreach.
 CONTACTS-030 adds [synthetic local audience review](contacts-life-update-audience.md)
 over those canonical households, with separate exact-input finalization and no sending.
 
@@ -398,8 +401,9 @@ bounds, and interrupted manifests as incomplete.
    To/CC roles, group-only participation, direct activity, channel breakdowns,
    active-day unions, exclusions and unresolved records. Reconcile all totals
    before generating narrative or charts.
-3. **Future Heartbeat summary and map:** produce shared 7/30/custom datasets as local CLI/file output,
-   then a locally generated user-centered
+3. **Heartbeat summary and future map:** [CONTACTS-024](contacts-period-summary.md)
+   implements shared synthetic 7/30/custom datasets and the focused presentation
+   skill as local CLI/file output, with full coverage context. The next step is a locally generated user-centered
    hub-and-spoke map with labeled frequency bands, visible recency, known people
    without recent observations, and a supporting person-to-thread view. The
    initial proposed radius metric is distinct direct-communication days, not
