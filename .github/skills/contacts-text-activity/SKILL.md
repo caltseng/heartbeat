@@ -9,6 +9,12 @@ Use independently or under [contacts-collect](../contacts-collect/SKILL.md).
 Follow its authorization boundary and the
 [shared contract](../../../docs/spec/contacts-technical-spec.md). The executable
 currently accepts normalized handoffs, not phone databases, backups or XML.
+The [CONTACTS-015 format gate](../../../docs/spec/contacts-text-format-gate.md)
+selects owner-operated Android 14 / SyncTech SMS Backup & Restore 10.30.009
+full XML (`synctech-xml-metadata-v1`) for the future CONTACTS-016 converter.
+This is a design profile, not an installed reader or verified device. RCS and
+iMessage are unsupported by that initial profile; even SMS/MMS transport needs
+explicit evidence because RCS can use the same XML containers.
 
 1. Establish the user's explicitly selected device/account/protocol source and
    requested interval/time zone/as-of. Do not inspect devices, backups, messages
@@ -20,6 +26,9 @@ currently accepts normalized handoffs, not phone databases, backups or XML.
    thread IDs and group participants using `source: text-messages`. Missing IDs
    require an explicitly labeled, reviewed stable local-ID strategy, never a name
    or participant-set-only merge. Preserve threads that share the same participants.
+   For the selected XML profile use archive-scoped row IDs and a reviewed thread
+   ledger, not invented provider IDs. Exact archive replay is supported by design;
+   changed/overlapping exports need separate reconciliation before import.
 4. Keep one group message as one observation from its actual sender. Group
    membership, reactions, system events, edits and deletions are not direct messages.
    If group identity cannot be established, retain `kind: unknown`, not direct.
