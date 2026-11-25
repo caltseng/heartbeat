@@ -14,7 +14,7 @@ about their device.
 | Route | Callable/verified here | Outcome and boundary |
 | --- | --- | --- |
 | `contacts:collect` schemaVersion 1 metadata handoff | Implemented local importer; synthetic baseline exercised | Imports synthetic normalized `whatsapp` metadata, not TXT/ZIP or account history. All private requests fail closed before handoff reads/output writes (`private_collection_disabled`, exit 1). |
-| Selected native TXT to metadata converter | Proposed only | CONTACTS-020; until implemented, native TXT is `unsupported`, reason `whatsapp_txt_converter_not_implemented`. |
+| Selected native TXT to metadata converter | CONTACTS-020 implemented and synthetically exercised | `contacts:whatsapp` accepts only the reviewed synthetic iOS profile below. Produces a local snapshot with unknown coverage, never live access or producer certification; private conversion fails before native/registry/output access. |
 | Personal-account structured API/tool | None available or verified in this session's tool inventory | `requires_setup`; no connector, credentials or account permission is implied. Public web/GitHub research tools are not WhatsApp tools. |
 | WhatsApp Business Platform / Cloud API, including Groups API | Public documentation only, not connected | Not the selected personal-account route. Business group creation/messaging does not establish access to existing personal conversations or their history. |
 | Linked Web/Desktop/companion device, Beeper or other bridge | Not inspected, installed or authorized | Not selected. No pairing, QR/session acquisition, browser reuse, scraping or history sync. |
@@ -110,8 +110,9 @@ numbers or cross-export identity equivalence.
    a new account/connector to bypass the gate or double-count overlapping files.
    Separate verified threads can be imported under the same account.
 
-The shared importer cannot enforce this native-export registry policy today;
-CONTACTS-020 must enforce it before producing any handoff. A local file cursor
+CONTACTS-020 enforces this policy before producing a handoff, and the shared
+importer retains the binding per account/thread on successful page commit.
+A local file cursor
 is a conversion checkpoint, never a provider sync token or live refresh claim.
 
 ### Time zones and original times
@@ -209,7 +210,8 @@ transcript as setup or process real data with Muse/remote AI.
 | --- | --- |
 | Any current `dataClass: private` request, including an unavailable-only manifest | Fatal `private_collection_disabled`, exit 1 before handoff/output access; no account/manifest disclosure. Future converter must deny it before native input access as well. |
 | No approvals, verified self, producer or required acquisition evidence | `requires_setup` with the missing prerequisite; no source access. |
-| Supplied native TXT today | `mode: unavailable`, `status: unsupported`, missing-converter reason above; never pass TXT to the shared importer. |
+| Synthetic selected TXT with reviewed acquisition ledger | `contacts:whatsapp` converts to a metadata handoff; unknown history remains partial, exit 2. Never pass TXT directly to the shared importer. |
+| Real native TXT or unverified producer | Private conversion denied, exit 1; synthetic producer/setup gaps are `requires_setup`, exit 2. No actual producer is certified. |
 | Wrong profile/version/layout or unresolved sender/time/overlap | Explicit `unsupported` gap; reject the affected acquisition/records before import and disclose omissions. |
 | Malformed/truncated input, I/O or registry conflict | `failed`; no checkpoint advancement for a failed page and no silent empty result. |
 | Valid metadata with snapshot/history/exclusion gaps | `partial`/unknown coverage, including when zero messages were accepted; not an empty complete page. |
@@ -231,11 +233,141 @@ stays outside CLI logs. No parser or runtime behavior changes in CONTACTS-019.
 | Unknown coverage; no inferred group recipients or blanket cap | Complete-account claims and roster-based direct counts are unjustified. Explicit exclusions reduce apparent counts. | Synthetic direct/four-person group, system/multiline/header ambiguity, exclusions, unknown vs empty and unavailable cases required. Revisit only with independently evidenced history/role guarantees. |
 | Integrate the approved CONTACTS-010 policy without expanding consent; keep 020 synthetic-only and require private denial before native reads/output. | Rejected treating a metadata projection, Without Media or owner-supplied file as permission to process raw content, or treating ignored checkout storage as approved private storage. | Current integrated synthetic CI includes shared private-denial checks. 020 must add pre-native-read denial tests; revisit only with a separate content boundary, exact source/run approvals and enforceable controls. |
 
-CONTACTS-020 owns executable synthetic converter fixtures for these cases, strict
-content projection and nonzero error paths, integrated with existing minimal
-Node tests. CONTACTS-019 is documentation-only; the existing `npm run ci`
-baseline must remain green. No new dependencies, parser, private fixture,
-collection schema rename or real-source validation is delivered.
+CONTACTS-020 implements executable synthetic converter fixtures for these cases,
+strict content projection and nonzero error paths in the existing minimal Node
+tests. CONTACTS-019 selected the design; 020 implements only that design.
+No new dependency, private fixture, collection schema rename or real-source
+validation is delivered.
+
+## CONTACTS-020 operation and delegated decisions
+
+The dependency-free `scripts/contacts/whatsapp.cjs` module and CLI are
+**synthetic-only local snapshot conversion**, not an API, linked-device reader
+or ongoing refresh. There is no account, network, credential, pairing, sending,
+browser or scheduler implementation. Real imports remain disabled even if a
+manifest claims approval.
+
+Prepare synthetic bytes and a reviewed synthetic JSON manifest outside tracked
+output, then run:
+
+```powershell
+npm run contacts:whatsapp -- --txt .private\contacts\fixture\_chat.txt --manifest .private\contacts\fixture\manifest.json --output .private\contacts\whatsapp-store
+```
+
+Inputs resolve from the current directory. Output inside this checkout is allowed
+only under `.private\contacts`; an external temporary directory also works for
+synthetic use. The CLI writes `whatsapp-registry.synthetic.json` and one
+`acquisition-<SHA256-of-account/archive-reference-tuple>` directory containing
+`whatsapp.synthetic.json` and `request.synthetic.json`. Compute that directory
+from the reviewed local references or inspect the synthetic output locally.
+Run `contacts:collect -- --request <that-directory>\request.synthetic.json`.
+Its output is the parent store's existing `collection.json`. No auto-import runs.
+Exact CLI replay reuses immutable files. A new reporting interval can use a
+separate synthetic request referencing the same handoff; do not overwrite the
+acquisition's original request.
+
+The manifest is a strict, version-1 object; unknown fields fail:
+
+```json
+{
+  "schemaVersion": 1,
+  "dataClass": "synthetic",
+  "profile": "whatsapp-ios-txt-metadata-v1",
+  "producer": {
+    "platform": "ios", "appVersion": "synthetic", "osVersion": "synthetic",
+    "locale": "day-first-24h-seconds", "exportOption": "without-media",
+    "deviceRole": "primary-phone"
+  },
+  "account": "fixture-account",
+  "archive": { "ref": "archive-one", "sha256": "<SHA-256 of exact synthetic bytes>" },
+  "ledgerRevision": "review-one",
+  "period": { "preset": "7d", "timeZone": "America/Los_Angeles", "asOf": "2026-11-24T21:00:00Z" },
+  "retrievedAt": "2026-11-24T21:00:00.000Z",
+  "identities": [{ "id": "self", "isSelf": true }, { "id": "peer-a", "isSelf": false }],
+  "thread": {
+    "id": "chat-one", "kind": "direct", "members": ["self", "peer-a"],
+    "membershipEvidenceRef": "roster-review"
+  },
+  "timeEvidence": {
+    "zone": "America/Los_Angeles", "evidenceRef": "zone-review", "clockVerified": true
+  },
+  "rows": [{
+    "startLine": 1, "endLine": 1, "kind": "message",
+    "senderId": "peer-a", "senderLabel": "Fixture Peer A",
+    "wallTime": "24/11/2026, 12:00:00"
+  }]
+}
+```
+
+That row matches the first synthetic header illustration above. No native file
+or real producer was used to prepare this example. References use 1-80 ASCII
+letters/digits/underscore/hyphen, starting alphanumeric. They are reviewed opaque
+local IDs, not names/phones or fabricated provider IDs. Producer versions must
+literally be `synthetic`; actual-version compatibility is not certified.
+
+The complete `rows` ledger covers all logical records and every original line,
+including exclusions and continuations, with contiguous 1-based inclusive spans.
+One final line terminator is not an extra line. A header-looking continuation is
+not counted separately when the reviewed span includes it. Every timestamp-like
+header anywhere must still have the supported grammar and a valid date. A row's
+exact `wallTime` must match its first header; its explicitly reviewed
+`senderLabel` must match the full chosen prefix including colons. Labels are
+matched, not split, merged or treated as identity IDs. `kind` is one of
+`message`, `system`, `call`, `deletion`, `reaction`, `media`; only `message`
+emits an event. Content cannot automatically certify that classification.
+
+Each row may override `timeEvidence` with the same strict shape and supply
+`offset: "-07:00"` for a reviewed DST-fold choice. There must be exactly one
+matching zone instant; gaps and inconsistent offsets fail. Source times before
+1970, invalid/future instants and unverified clocks are rejected. Retrieval time
+cannot be in the future, and reporting as-of cannot exceed retrieval. Source
+zone evidence is independent from reporting zone. The private synthetic registry
+keeps original line spans/wall times, source zones, chosen offset seconds,
+evidence references and resolved instants; bodies/system text are not retained.
+The SHA-256 of original bytes is private archive provenance, not a message ID.
+
+Direct chats require exactly self plus one peer; groups require at least two
+evidenced members including self. Four-person groups are tested. Each sender
+must be in the reviewed identities, exactly one identity is self, and roster
+evidence is mandatory. Membership describes observed association only, not a
+complete temporal roster or a per-message recipient list. All events retain
+empty recipients and unclassified message type.
+
+Conversion first denies non-synthetic manifests before native-file stat/read or
+output/registry resolution. For valid synthetic requests it checks the registry
+before artifacts, then takes an exclusive conversion lock and rechecks under the
+lock. Atomic registry replacement reserves the immutable acquisition before
+writing its immutable handoff/request. An interrupted artifact write can leave
+a reservation; replay the exact manifest/bytes to finish, never clear the
+registry to admit a different export. Corrupt registries, existing locks, I/O
+failures and conflicting output are visible failures. A 16 MiB / 100,000-line
+parser safety limit is **not** a provider history cap.
+
+`whatsappArchive` is the narrow synthetic handoff extension: profile, local
+thread/archive references, original byte SHA-256, reviewed-ledger digest and
+normalized metadata digest. No raw fields enter existing records. The importer
+validates the metadata digest/single-thread scope, commits this binding with
+the first validated page and rejects changed/overlapping acquisitions,
+archive rebinding and unbound alternate connectors for that thread. Existing
+unbound events block first native binding. Distinct verified chats can share
+an account but cannot reuse an archive reference/digest. Do not change
+account/thread references or reset registries/stores to bypass reconciliation.
+The registry is local evidence, not tamper-proof authorization; manually
+prepared generic handoffs still require the shared contract and review.
+
+Exit 2 means partial snapshot (including empty/excluded-only snapshots), or a
+sanitized `unsupported`/`requires_setup` code on stderr; those latter outcomes
+produce no new handoff. Exit 1 means private denial, malformed input, registry,
+locking, storage or other fatal failure. No exit 0 or complete-history claim is
+available for this route. CLI logs contain status/codes only, no account, path,
+sender or payload. Shared import keeps its existing 0/2/1 convention.
+
+| Delegated engineering decision / rationale | Alternatives and assumptions | Validation / revisit |
+| --- | --- | --- |
+| Fail the entire acquisition for unresolved sender, time or boundary evidence rather than emitting a potentially misleading subset. | Per-row quarantine is possible but adds persistent partial-ledger repair semantics. Reviewed synthetic manifests are feasible; they are not owner privacy approval. | Cases cover missing self/senders, colon-bearing names, header-like continuations, fold/gap/travel and future times. Revisit only with a reviewed repair/quarantine contract. |
+| Persist a conversion registry plus importer account/thread binding; reserve before artifact publication and recover by exact replay. | A file-only converter or ordinal IDs without a registry could duplicate overlapping re-exports. No automatic CONTACTS-021 translation is inferred from TXT. | Exact replay, changed bytes/line endings/ledger/ref, alternate connectors, unbound history and separate-chat cases. Revisit with explicit reviewed native-overlap reconciliation, not merely the existence of shared revision support. |
+| Keep metadata-only handoffs separate from private synthetic audit evidence; always unknown history and no group fan-out. | Min/max rows, EOF, old numeric caps or a complete supplied roster cannot prove source-wide history. Reporting filters remain the shared half-open interval contract. | Import replay, four-person groups, identical-looking distinct records, exclusions, empty snapshots and no-body output; `npm run ci` is the integrated check. Revisit when separately authorized coverage/producer evidence warrants a new profile. |
+| Bound parser input and reject non-profile producers; no dependency or compatibility guessing. | Broader locales, Android, linked-device histories and real versions need their own evidence. These are engineering defaults, not consent to inspect a device/export. | Whole-file calendar/UTF-8/layout and private pre-read CLI denial tests. Revisit only with separately reviewed compatibility and the unchanged privacy/source/run gates. |
 
 ## Public evidence and uncertainty
 

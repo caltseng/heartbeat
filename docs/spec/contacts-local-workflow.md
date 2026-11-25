@@ -119,11 +119,13 @@ shape and prerequisites rather than constructing requests from real accounts.
 | `npm run contacts:google -- --config <local-config.json>` | [Google fixture transport](contacts-google-capability.md#contacts-012-local-adapter-and-delegated-decisions); private `google-acquisition.json` plus named `google-handoff-<uuid>.json`. |
 | `npm run contacts:email -- --synthetic-request <request.json>` | [Email fixture transport](contacts-email-adapter.md); fresh-directory `handoff.json`, native `checkpoint.json` and acquisition `report.json`. |
 | `npm run contacts:text-xml -- --xml <fixture.xml> --manifest <manifest.json> --output <fresh-directory>` | [Selected synthetic XML profile](contacts-text-converter.md); `text.synthetic.json` and a collection request. |
+| `npm run contacts:messenger -- --synthetic-request <request.json>` | [Selected synthetic JSON snapshot profile](contacts-messenger-converter.md); local IDs, overlap guard and unknown history, not a personal API. |
+| `npm run contacts:whatsapp -- --txt <fixture.txt> --manifest <manifest.json> --output <synthetic-store>` | [Selected synthetic iOS TXT profile](contacts-whatsapp-format-gate.md#contacts-020-operation-and-delegated-decisions); immutable registry, acquisition handoff/request and unknown snapshot history. |
 
 Feed successful/explicitly partial normalized handoffs into `contacts:collect`
 with their exact source/account/connector and coverage. Native acquisition
 checkpoints are not collector cursors; use each producer's recovery contract.
-There is no Messenger/WhatsApp converter command or live-source access implied.
+Neither Messenger nor WhatsApp snapshot conversion implies live-source access.
 
 `npm run contacts:operate -- --request <operation.synthetic.json>` adds explicit
 synthetic refresh/resync, stale-source reporting, inventoried whole-cache
@@ -192,6 +194,13 @@ The guard also reserves `identity-review.json.lock` and
 `identity-review.json.tmp` as private aliases, in addition to the actual landed
 writer's `identity-review.lock` and `identity-review.json.<pid>.tmp`; this does
 not rename upstream persistence.
+WhatsApp's `whatsapp-registry.synthetic.json`, `whatsapp-conversion.lock`,
+`whatsapp.synthetic.json`, UUID-suffixed atomic temporary JSON files and
+`acquisition-<64-hex-digest>` bundles are private operational output too. The
+delivery guard rejects these filenames/bundles outside ignored storage, including
+force-added files. Preserve the registry and exact reviewed account/thread
+references across replay; never reset them or create fresh references to bypass
+overlap rejection. Interrupted writes use the converter's recovery contract.
 
 Persist derived generations separately from collection. Future producers must
 validate first, write atomically inside the same private boundary (reuse the

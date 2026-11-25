@@ -15,7 +15,7 @@ npm run ci
 ```
 
 `test:contacts` runs Node's built-in test runner for the collector, email/Google
-adapters, text/Messenger converters and identity review. `npm test` also runs the
+adapters, text/Messenger/WhatsApp converters and identity review. `npm test` also runs the
 private-boundary tests using temporary Git repositories. `check` checks all
 collection/demo, adapter, converter, review and test CommonJS files' syntax and
 runs `check:private`; `ci` runs checks and tests. Tests generate synthetic fixtures in
@@ -73,6 +73,12 @@ names must extend the guard. This check is not payload scanning or access contro
 A synthetic demo/replay/inspect/review CLI integration case additionally verifies
 the versioned overlay pins an unchanged collection and remains ignored locally;
 force-adding its generated mapping fails the Git delivery guard.
+
+The [CONTACTS-020 WhatsApp converter](spec/contacts-whatsapp-format-gate.md#contacts-020-operation-and-delegated-decisions)
+adds synthetic selected iOS TXT parsing, immutable registry/import bindings,
+reviewed multiline/sender/time-zone ledgers, DST folds/gaps, overlap/replay,
+group/exclusion/history limits, sanitized CLI exits and private denial before
+native/registry/output access. No real producer/export or live source is verified.
 
 GitHub Actions runs `.github/workflows/ci.yml` for PRs targeting `main` and pushes
 to `main`, on Node 20.11.0. Its stable job/check name is

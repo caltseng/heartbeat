@@ -26,6 +26,8 @@ test('private ignored workflow stays local, including reports and graph files', 
     'collection.lock', 'identity-review.json', 'identity-review.lock', 'identity-review.json.123.tmp',
     'identity-review.json.lock', 'identity-review.json.tmp', 'google-acquisition.json',
     'google-acquisition.lock', 'google-acquisition.json.123.tmp', 'google-handoff-synthetic.json',
+    'whatsapp-registry.synthetic.json', 'whatsapp-conversion.lock', 'whatsapp.synthetic.json',
+    'whatsapp.synthetic.json.12345678-abcd.tmp', 'request.synthetic.json.12345678-abcd.tmp',
     'handoff.json', 'checkpoint.json', 'aggregates.json', 'report.json', 'graph.html', 'graph.svg']) {
     f.write(path.join('.private', 'contacts', 'synthetic', file));
   }
@@ -61,13 +63,21 @@ test('reserved private handoffs fail outside ignored storage', t => {
     'identity-review.json.123.tmp', 'identity-review.json.lock', 'identity-review.json.tmp',
     'google-acquisition.json', 'google-acquisition.lock', 'google-acquisition.json.123.tmp',
     'google-handoff-synthetic.json', 'google-handoff-synthetic.json.123.tmp',
-    'handoff.json', 'checkpoint.json', 'aggregates.json',
+    'whatsapp-registry.synthetic.json', 'whatsapp-registry.synthetic.json.12345678-abcd.tmp',
+    'whatsapp-conversion.lock', 'whatsapp.synthetic.json', 'whatsapp.synthetic.json.12345678-abcd.tmp',
+    'request.synthetic.json.12345678-abcd.tmp', 'handoff.json', 'checkpoint.json', 'aggregates.json',
     'report.json', 'graph.html', 'graph.svg', '.env.local', 'private.key']) {
     const target = f.write(path.join('accidental', name));
     assert.throws(() => checkBoundary(f.root), /Private operational artifact/);
     fs.unlinkSync(target);
   }
   f.write(path.join('accidental', '.email-staging-synthetic', 'opaque.bin'));
+  assert.throws(() => checkBoundary(f.root), /Private operational artifact/);
+});
+
+test('WhatsApp acquisition bundle remains private even if its handoff is renamed', t => {
+  const f = fixture(t);
+  f.write(path.join('accidental', `acquisition-${'a'.repeat(64)}`, 'renamed.bin'));
   assert.throws(() => checkBoundary(f.root), /Private operational artifact/);
 });
 
