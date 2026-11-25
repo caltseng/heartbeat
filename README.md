@@ -63,6 +63,7 @@ hide them. A successful import does not independently certify upstream history.
 - [Technical contracts and source capability matrix](docs/spec/contacts-technical-spec.md)
 - [Google identity access gate: proposed read-only route, no live access](docs/spec/contacts-google-capability.md)
 - [Selected text export format and device/access limits](docs/spec/contacts-text-format-gate.md)
+- [Email access gate: proposed Gmail metadata route and synthetic payload](docs/spec/contacts-email-access.md)
 - [Stable CONTACTS work-item register](docs/spec/contacts-work-items.md)
 - [Exact migration provenance](docs/provenance.md)
 - [Repository rules: topic branches, PRs to main, OWNER MERGE](AGENTS.md)

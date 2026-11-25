@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "dataClass": "synthetic",
+  "source": "email",
+  "account": "synthetic-gmail-account",
+  "connector": "gmail-metadata-proposed-fixture",
+  "coverage": {
+    "start": "2026-11-01T00:00:00Z",
+    "end": "2026-11-24T20:00:00Z",
+    "completeness": "partial",
+    "basis": "Synthetic only: terminal handoff pages, not complete account history; hidden BCC and historical roster unavailable."
+  },
+  "errors": [],
+  "pages": [
+    {
+      "cursor": null,
+      "nextCursor": "synthetic-handoff-page-2",
+      "retrievedAt": "2026-11-24T20:00:00Z",
+      "identities": [
+        {"id": "self", "idKind": "local", "isSelf": true, "addresses": [{"type": "email", "value": "self@example.invalid"}]},
+        {"id": "peer", "idKind": "local", "isSelf": false, "addresses": [{"type": "email", "value": "peer@example.invalid"}]},
+        {"id": "other", "idKind": "local", "isSelf": false, "addresses": [{"type": "email", "value": "other@example.invalid"}]},
+        {"id": "list", "idKind": "local", "isSelf": false, "addresses": [{"type": "email", "value": "list@example.invalid"}]}
+      ],
+      "threads": [
+        {"id": "direct", "idKind": "local", "kind": "direct"},
+        {"id": "group", "idKind": "local", "kind": "group"},
+        {"id": "list-thread", "idKind": "local", "kind": "broadcast"},
+        {"id": "unknown-roster", "idKind": "local", "kind": "unknown"}
+      ],
+      "memberships": [
+        {"threadId": "direct", "identityId": "self"},
+        {"threadId": "direct", "identityId": "peer"},
+        {"threadId": "group", "identityId": "self"},
+        {"threadId": "group", "identityId": "peer"},
+        {"threadId": "group", "identityId": "other"},
+        {"threadId": "list-thread", "identityId": "self"},
+        {"threadId": "list-thread", "identityId": "list"},
+        {"threadId": "unknown-roster", "identityId": "self"},
+        {"threadId": "unknown-roster", "identityId": "peer"}
+      ],
+      "events": [
+        {
+          "id": "direct-message", "idKind": "local", "eventType": "message",
+          "threadId": "direct", "senderId": "peer", "timestamp": "2026-11-23T12:00:00Z",
+          "channel": "email", "recipients": [{"identityId": "self", "role": "to"}],
+          "classification": "interpersonal"
+        },
+        {
+          "id": "group-message", "idKind": "local", "eventType": "message",
+          "threadId": "group", "senderId": "self", "timestamp": "2026-11-23T13:00:00Z",
+          "channel": "email", "recipients": [{"identityId": "peer", "role": "to"}, {"identityId": "other", "role": "cc"}],
+          "classification": "interpersonal"
+        }
+      ]
+    },
+    {
+      "cursor": "synthetic-handoff-page-2",
+      "nextCursor": null,
+      "retrievedAt": "2026-11-24T20:00:00Z",
+      "identities": [],
+      "threads": [],
+      "memberships": [],
+      "events": [
+        {
+          "id": "list-message", "idKind": "local", "eventType": "message",
+          "threadId": "list-thread", "senderId": "list", "timestamp": "2026-11-23T14:00:00Z",
+          "channel": "email", "recipients": [{"identityId": "self", "role": "to"}],
+          "classification": "bulk"
+        },
+        {
+          "id": "automatic-message", "idKind": "local", "eventType": "message",
+          "threadId": "unknown-roster", "senderId": "peer", "timestamp": "2026-11-23T15:00:00Z",
+          "channel": "email", "recipients": [{"identityId": "self", "role": "to"}],
+          "classification": "automated"
+        },
+        {
+          "id": "uncertain-message", "idKind": "local", "eventType": "message",
+          "threadId": "unknown-roster", "senderId": "peer", "timestamp": "2026-11-23T16:00:00Z",
+          "channel": "email", "recipients": [{"identityId": "self", "role": "to"}],
+          "classification": "unclassified"
+        }
+      ]
+    }
+  ]
+}

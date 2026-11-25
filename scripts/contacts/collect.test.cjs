@@ -20,6 +20,51 @@ function fixture(t) {
 }
 const events = state => Object.values(state.records).filter(value => value.record.type === 'event');
 
+test('email gate payload preserves messages, roles and classes without promoting terminal pages to complete history', t => {
+  const f = fixture(t);
+  f.input = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'email-gate.synthetic.json'), 'utf8'));
+  f.request.sources[0].account = f.input.account;
+  f.request.sources[0].connector = f.input.connector;
+  fs.writeFileSync(path.join(f.folder, 'input.json'), JSON.stringify(f.input));
+  const run = () => collect(f.request, f.folder);
+  const result = run();
+  assert.equal(result.exitCode, 2);
+  assert.equal(result.manifest.sources[0].paginationComplete, true);
+  assert.equal(result.manifest.sources[0].coverage.completeness, 'partial');
+  assert.equal(result.manifest.sources[0].observedOnly, true);
+  let rows = events(f.state());
+  assert.equal(rows.length, 5);
+  assert.deepEqual(rows.map(row => row.record.classification).sort(),
+    ['automated', 'bulk', 'interpersonal', 'interpersonal', 'unclassified']);
+  const group = rows.find(row => row.record.recipients.length === 2);
+  assert.deepEqual(Object.fromEntries(group.record.recipients.map(recipient =>
+    [f.state().records[recipient.identityKey].record.addresses[0].value, recipient.role])),
+  { 'peer@example.invalid': 'to', 'other@example.invalid': 'cc' });
+  assert.equal(f.state().records[group.record.threadKey].record.kind, 'group');
+  const uncertain = rows.find(row => row.record.classification === 'unclassified');
+  assert.equal(f.state().records[uncertain.record.threadKey].record.kind, 'unknown');
+  assert.equal(run().exitCode, 2);
+  rows = events(f.state());
+  assert.equal(rows.length, 5);
+});
+
+test('email gate approval and unsupported-source gaps remain unavailable rather than empty success', t => {
+  const f = fixture(t);
+  for (const [status, reason] of [
+    ['requires_setup', 'No separately authorized Gmail metadata route; CONTACTS-010 remains open.'],
+    ['unsupported', 'Selected Gmail route cannot read a non-Gmail account.']
+  ]) {
+    f.request.sources = [{ source: 'email', account: 'synthetic-only', connector: 'none',
+      mode: 'unavailable', status, reason }];
+    const result = collect(f.request, f.folder);
+    assert.equal(result.exitCode, 2);
+    assert.equal(result.manifest.sources[0].status, status);
+    assert.equal(result.manifest.sources[0].reason, reason);
+    assert.equal(result.manifest.sources[0].coverage, null);
+    assert.equal(events(f.state()).length, 0);
+  }
+});
+
 test('all five synthetic sources persist metadata, not inferred cross-source people; repeated imports are idempotent', t => {
   const f = fixture(t);
   const demo = writeDemo(path.join(f.folder, 'demo'));
