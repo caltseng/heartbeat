@@ -44,13 +44,21 @@ function normalized(type, value) {
 }
 function identitiesFrom(collection) {
   requireValue(collection.schemaVersion === 1 && collection.dataClass === 'synthetic',
-    'Identity review currently accepts synthetic snapshots only; private runs require a separately implemented approved boundary.', 'private_run_not_authorized');
+    'Private identity review is disabled: source/run authorization and verified local controls remain required under CONTACTS-010.', 'private_collection_disabled');
   requireValue(collection.records && typeof collection.records === 'object' && !Array.isArray(collection.records) &&
     collection.manifest && ['collected', 'partial'].includes(collection.manifest.status) &&
     Array.isArray(collection.manifest.sources) && collection.manifest.sources.length > 0,
   'Expected a completed collector snapshot, including explicit source status.');
+  const projection = collection.reconciliation;
+  requireValue(projection && projection.schemaVersion === 1 && projection.records &&
+    typeof projection.records === 'object' && !Array.isArray(projection.records) &&
+    Array.isArray(projection.collisions) && Array.isArray(projection.unresolvedTargets) &&
+    Array.isArray(projection.pendingTargets),
+  'Expected CONTACTS-021 reconciliation; replay synthetic handoffs with the current collector before identity review.');
   const identities = {};
-  for (const [key, entry] of Object.entries(collection.records)) {
+  const excludedIdentityKeys = new Set(projection.collisions.map(collision => collision.key)
+    .filter(key => JSON.parse(key)[2] === 'identity'));
+  for (const [key, entry] of Object.entries(projection.records)) {
     if (entry.record?.type !== 'identity') continue;
     const tuple = JSON.parse(key);
     requireValue(Array.isArray(tuple) && tuple.length === 4 && SOURCES.includes(tuple[0]) &&
@@ -58,9 +66,14 @@ function identitiesFrom(collection) {
       typeof tuple[3] === 'string' && tuple[3].length > 0 && JSON.stringify(tuple) === key,
     'Invalid namespaced identity key.');
     const record = entry.record;
-    object(record, ['type', 'idKind', 'isSelf', 'displayName', 'addresses'], 'identity');
+    object(record, ['type', 'idKind', 'isSelf', 'displayName', 'addresses', 'deleted'], 'identity');
     requireValue(['provider', 'local'].includes(record.idKind) && typeof record.isSelf === 'boolean',
       'Identity must retain ID kind and explicit self status.');
+    requireValue(record.deleted === undefined || typeof record.deleted === 'boolean', 'Identity deleted status must be boolean.');
+    if (record.deleted === true || excludedIdentityKeys.has(key)) {
+      excludedIdentityKeys.add(key);
+      continue;
+    }
     if (record.displayName !== undefined) text(record.displayName, 'displayName');
     if (record.addresses !== undefined) {
       requireValue(Array.isArray(record.addresses), 'Identity addresses must be an array.');
@@ -72,9 +85,9 @@ function identitiesFrom(collection) {
     }
     identities[key] = record;
   }
-  return identities;
+  return { identities, excludedIdentityKeys: [...excludedIdentityKeys].sort() };
 }
-function validateView(view, identities) {
+function validateView(view, identities, retainedKeys) {
   object(view, ['people', 'assignments', 'households'], 'mapping view');
   for (const field of ['people', 'assignments', 'households']) {
     requireValue(view[field] && typeof view[field] === 'object' && !Array.isArray(view[field]), 'Invalid mapping dictionaries.');
@@ -86,7 +99,7 @@ function validateView(view, identities) {
       view.people[person.mergedInto].mergedInto === null), 'Person aliases must resolve directly to an active person.');
   }
   for (const [key, id] of Object.entries(view.assignments)) {
-    requireValue(own(identities, key) && own(view.people, id) && view.people[id].mergedInto === null,
+    requireValue((own(identities, key) || retainedKeys.has(key)) && own(view.people, id) && view.people[id].mergedInto === null,
       'Mapping references a missing identity or inactive person.');
   }
   for (const [id, household] of Object.entries(view.households)) {
@@ -100,7 +113,8 @@ function validateView(view, identities) {
   const memberships = Object.values(view.households).flatMap(household => household.people);
   requireValue(new Set(memberships).size === memberships.length, 'A person can belong to at most one curated household.');
   for (const id of Object.keys(view.people)) {
-    const assigned = Object.entries(view.assignments).filter(([, person]) => person === id).map(([key]) => identities[key].isSelf);
+    const assigned = Object.entries(view.assignments).filter(([key, person]) => person === id && own(identities, key))
+      .map(([key]) => identities[key].isSelf);
     requireValue(assigned.every(value => value === assigned[0]), 'Self identities cannot be combined with other people.');
   }
 }
@@ -157,10 +171,14 @@ function split(view, operation) {
   // Notes keep their original person references. A partial split cannot guess their owner.
   // Household membership is deliberately not copied to the split destination.
 }
-function applyOperations(view, operations, identities) {
+function applyOperations(view, operations, identities, retainedKeys) {
   for (const operation of operations) {
     requireValue(operation && typeof operation === 'object', 'Invalid operation.');
-    if (operation.type === 'merge') merge(view, operation, identities);
+    if (operation.type === 'refresh') {
+      object(operation, ['type', 'identityKeys'], 'refresh');
+      requireValue(list(operation.identityKeys, 'refresh identities', 1).every(key => own(identities, key)),
+        'Only current, nondeleted, unambiguous identities can be refreshed.');
+    } else if (operation.type === 'merge') merge(view, operation, identities);
     else if (operation.type === 'split') split(view, operation);
     else if (operation.type === 'household') {
       object(operation, ['type', 'id', 'label', 'people'], 'household operation');
@@ -169,7 +187,7 @@ function applyOperations(view, operations, identities) {
       list(operation.people, 'household people');
       view.households[id] = { label: operation.label, people: [...operation.people].sort() };
     } else requireValue(false, 'Unknown operation; undo must be the sole operation.');
-    validateView(view, identities);
+    validateView(view, identities, retainedKeys);
   }
 }
 function persist(file, state) {
@@ -184,9 +202,17 @@ function persist(file, state) {
 function review(request, requestFolder = process.cwd(), inspect = false) {
   object(request, ['schemaVersion', 'dataClass', 'collection', 'output', 'expectedRevision', 'collectionDigest', 'reason', 'operations'], 'request');
   requireValue(request.schemaVersion === 1 && request.dataClass === 'synthetic',
-    'Identity review supports schemaVersion 1 synthetic requests only.', 'private_run_not_authorized');
+    'Private identity review is disabled; only schemaVersion 1 synthetic requests are supported.', 'private_collection_disabled');
   const input = readJSON(path.resolve(requestFolder, text(request.collection, 'collection')));
-  const identities = identitiesFrom(input.value);
+  const { identities, excludedIdentityKeys } = identitiesFrom(input.value);
+  const projection = input.value.reconciliation;
+  const reconciliationRequired = input.value.manifest.reconciliationRequired === true ||
+    projection.collisions.length > 0 || projection.unresolvedTargets.length > 0;
+  const sourceState = {
+    sources: input.value.manifest.sources, reconciliationRequired, excludedIdentityKeys,
+    collisions: projection.collisions, unresolvedTargets: projection.unresolvedTargets, pendingTargets: projection.pendingTargets,
+    exitCode: input.value.manifest.status === 'collected' && !reconciliationRequired ? 0 : 2
+  };
   const output = outputLocation(path.resolve(requestFolder, text(request.output, 'output')));
   const file = path.join(output, 'identity-review.json');
   if (!inspect) fs.mkdirSync(output, { recursive: true, mode: 0o700 });
@@ -204,29 +230,36 @@ function review(request, requestFolder = process.cwd(), inspect = false) {
     requireValue(!fs.existsSync(file) || !fs.lstatSync(file).isSymbolicLink(), 'Review snapshot must not be a symbolic link.', 'unsafe_output');
     const state = fs.existsSync(file) ? readJSON(file).value : {
       schemaVersion: 1, dataClass: request.dataClass, revision: 0, collectionDigest: null,
-      identityDigests: {}, view: { people: {}, assignments: {}, households: {} }, history: []
+      identityDigests: {}, inactiveIdentityKeys: [], view: { people: {}, assignments: {}, households: {} }, history: []
     };
-    object(state, ['schemaVersion', 'dataClass', 'revision', 'collectionDigest', 'identityDigests', 'view', 'history'], 'stored review');
+    object(state, ['schemaVersion', 'dataClass', 'revision', 'collectionDigest', 'identityDigests', 'inactiveIdentityKeys', 'view', 'history'], 'stored review');
     requireValue(state.schemaVersion === 1 && state.dataClass === request.dataClass &&
       Number.isSafeInteger(state.revision) && state.revision >= 0 && Array.isArray(state.history) &&
       state.history.length === state.revision && state.identityDigests && typeof state.identityDigests === 'object',
     'Stored review schema, data class or revision is invalid.');
-    validateView(state.view, identities);
-    requireValue(Object.entries(state.identityDigests).every(([key, hash]) => own(identities, key) && digest(JSON.stringify(identities[key])) === hash) &&
-      Object.keys(state.view.assignments).every(key => own(state.identityDigests, key)),
-    'Previously reviewed identities are missing or changed; reconcile source revisions separately.', 'identity_conflict');
+    const retainedKeys = new Set(Object.keys(state.identityDigests));
+    validateView(state.view, identities, retainedKeys);
+    requireValue(Object.keys(state.view.assignments).every(key => retainedKeys.has(key)), 'Stored identity fingerprints are missing.', 'identity_conflict');
+    const changedIdentityKeys = Object.entries(state.identityDigests)
+      .filter(([key, hash]) => own(identities, key) && digest(JSON.stringify(identities[key])) !== hash).map(([key]) => key).sort();
+    const inactiveIdentityKeys = Object.keys(state.view.assignments).filter(key => !own(identities, key)).sort();
     if (inspect) return {
       heading: 'Heartbeat identity review', revision: state.revision, collectionDigest: input.digest, view: state.view,
+      ...sourceState, changedIdentityKeys, inactiveIdentityKeys,
       unassignedPersonIds: Object.keys(state.view.people).filter(id => state.view.people[id].mergedInto === null &&
         !Object.values(state.view.assignments).includes(id)),
       identities: Object.entries(identities).map(([key, record]) => ({
         key, ...record, personId: state.view.assignments[key] || null, suggestedPersonId: personId(key)
-      })), sources: input.value.manifest.sources
+      }))
     };
     requireValue(request.expectedRevision === state.revision, 'Mapping revision changed; inspect and review again.', 'revision_conflict');
     requireValue(request.collectionDigest === input.digest, 'Collection changed; inspect and review the exact snapshot again.', 'collection_conflict');
     text(request.reason, 'review reason');
     requireValue(Array.isArray(request.operations), 'Review operations must be an array.');
+    const refreshedKeys = new Set(request.operations.filter(operation => operation?.type === 'refresh')
+      .flatMap(operation => list(operation.identityKeys, 'refresh identities', 1)));
+    requireValue(changedIdentityKeys.every(key => refreshedKeys.has(key)),
+      'Current identity metadata changed; inspect it and explicitly refresh those keys before accepting this review.', 'identity_conflict');
     const before = structuredClone(state.view);
     const undo = request.operations.length === 1 && request.operations[0]?.type === 'undo';
     if (undo) {
@@ -252,22 +285,25 @@ function review(request, requestFolder = process.cwd(), inspect = false) {
         state.view.people[id] = { mergedInto: null };
         state.view.assignments[key] = id;
       }
-      applyOperations(state.view, request.operations, identities);
+      applyOperations(state.view, request.operations, identities, retainedKeys);
     }
-    validateView(state.view, identities);
+    validateView(state.view, identities, retainedKeys);
     requireValue(undo || !isDeepStrictEqual(before, state.view) || state.collectionDigest !== input.digest,
       'Review contains no mapping changes or new collection snapshot.');
     state.revision++;
     state.collectionDigest = input.digest;
-    state.identityDigests = Object.fromEntries(Object.keys(state.view.assignments).map(key => [key, digest(JSON.stringify(identities[key]))]));
+    state.identityDigests = { ...state.identityDigests, ...Object.fromEntries(Object.keys(state.view.assignments)
+      .map(key => [key, own(identities, key) ? digest(JSON.stringify(identities[key])) : state.identityDigests[key]])) };
+    state.inactiveIdentityKeys = Object.keys(state.view.assignments).filter(key => !own(identities, key)).sort();
     state.history.push({
       revision: state.revision, reviewedAt: new Date().toISOString(), reason: request.reason,
-      collectionDigest: input.digest, operations: structuredClone(request.operations), before, after: structuredClone(state.view)
+      collectionDigest: input.digest, inactiveIdentityKeys: [...state.inactiveIdentityKeys],
+      operations: structuredClone(request.operations), before, after: structuredClone(state.view)
     });
     persist(file, state);
     return {
       heading: 'Heartbeat identity review', file, revision: state.revision, collectionDigest: input.digest,
-      sources: input.value.manifest.sources, exitCode: input.value.manifest.status === 'collected' ? 0 : 2
+      ...sourceState, inactiveIdentityKeys: state.inactiveIdentityKeys
     };
   } finally {
     if (lockFd !== undefined) { fs.closeSync(lockFd); fs.unlinkSync(lock); }
@@ -281,7 +317,7 @@ if (require.main === module) {
     const file = path.resolve(args[1]);
     const result = review(readJSON(file).value, path.dirname(file), args[0] === '--inspect');
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-    process.exitCode = result.exitCode || (result.sources.every(source => source.status === 'collected') ? 0 : 2);
+    process.exitCode = result.exitCode;
   } catch (error) {
     process.stderr.write(`Identity review failed [${error.code || 'unexpected_error'}]: ${error.message}\n`);
     process.exitCode = 1;

@@ -26,6 +26,12 @@ demo-to-registration invocation. Request fields:
 Unknown request, identity, operation and evidence fields fail. No raw payload,
 message body or note field is accepted. An existing complete or partial collection
 is required; missing input and malformed JSON fail rather than imply no people.
+The collection must expose CONTACTS-021's version-1 `reconciliation` projection.
+Legacy synthetic snapshots must be replayed through the current collector; review
+never substitutes immutable first observations for current identity metadata.
+Private requests fail with `private_collection_disabled` before reading any
+collection path, consistent with the approved CONTACTS-010 policy. Policy approval
+does not authorize any source/account or run, nor verify required local controls.
 
 All keys below are synthetic symbolic placeholders: replace them with exact
 inspection values. Person IDs are `person-<full SHA-256 of namespaced key>` at
@@ -67,6 +73,20 @@ Assignments move to the survivor; all original people remain as direct aliases
 via `people[id].mergedInto`. Earlier aliases follow subsequent merges. A
 single curated household retains the survivor's membership. Different existing
 households block the merge until curation explicitly resolves the conflict.
+
+### Current metadata review
+
+```json
+{ "type": "refresh", "identityKeys": ["<source-key-a>"] }
+```
+
+Inspection lists `changedIdentityKeys` when a current identity's metadata differs
+from its last reviewed fingerprint. Every changed key needs an explicit `refresh`
+in the transaction before the new snapshot can be accepted. Refresh acknowledges
+the current evidence, not identity equivalence; it leaves assignments and notes
+unchanged. Split a mistaken person link explicitly instead of treating a source
+profile edit as automatic match approval. Deleted or colliding identities cannot
+be refreshed or used as merge evidence.
 
 ### Split
 
@@ -128,7 +148,7 @@ Inspection exposes `unassignedPersonIds`; consumers must not silently drop them.
 ## Persistence and downstream contract
 
 `identity-review.json` (schema version 1) contains `dataClass`, monotonic
-`revision`, exact `collectionDigest`, `identityDigests`, current `view` and
+`revision`, exact `collectionDigest`, `identityDigests`, `inactiveIdentityKeys`, current `view` and
 append-only `history`. `view` comprises:
 
 - `people`: canonical ID to `{mergedInto: null | activePersonId}`.
@@ -137,11 +157,21 @@ append-only `history`. `view` comprises:
 
 Each history entry has its revision, review timestamp, reason, collection digest,
 explicit operations/evidence, and full `before`/`after` views. Undo never discards
-history. Fingerprints reject changed/missing reviewed identity records instead
-of overwriting decisions; source revision reconciliation remains CONTACTS-021.
+history. Fingerprints detect changes in current projected identities; changes
+require explicit refresh rather than silently accepting first-observed or newer
+addresses. Source revision reconciliation remains CONTACTS-021.
 New identities can be registered on later reviews without altering prior links.
 When only observations/freshness change, an explicit empty-operations review can
 pin the unchanged mappings to the new snapshot digest in a new revision.
+Tombstoned, colliding and missing identities are excluded from matching and new
+registration. Previously reviewed assignments, fingerprints, canonical people,
+households and note references survive as explicitly inactive links. This also
+supports corrected fresh-store overlap replays without permanently blocking the
+mapping. Returning identities reuse their links; changed metadata still needs
+refresh. Each saved revision records its inactive keys; downstream consumers must
+not present inactive mappings as observed current people or silently discard them.
+Inspection additionally exposes `excludedIdentityKeys` for current source
+tombstones/collisions, including ones never assigned a canonical person.
 
 An exclusive `identity-review.lock`, revision precondition and same-directory
 flush/atomic rename prevent overlapping or partial transactions. One bad operation
@@ -165,6 +195,10 @@ CLI output has the heading `Heartbeat identity review`. It retains the collectio
 per-source statuses, freshness, coverage and errors unchanged. Exit 0 means the
 supplied collection was complete, 2 means partial/unavailable source coverage
 (the mapping can still commit), and 1 is a fatal review/storage failure.
+`reconciliationRequired`, collisions and broken `unresolvedTargets` remain
+explicit and produce exit 2 even when individual source statuses are collected.
+Absent historical mutation targets remain informational `pendingTargets`,
+following the merged CONTACTS-021 contract; they do not alone force exit 2.
 Successful identity review is not successful source acquisition.
 
 ## Delegated engineering decisions (2026-11-24)
@@ -179,4 +213,5 @@ remote-AI processing, sending or schedules.
 | Register each identity separately, even matching names/addresses; accept only explicit connected reviewed evidence. Conservative email/phone normalization avoids regional and alias guesses. | Automatic address merging or fuzzy/name matching; shared identifiers and recycled numbers can be ambiguous. | Synthetic same-name, email/phone/provider, cross-namespace, disconnected evidence and mixed-self cases. Revisit normalization with a separately specified provider/region policy, not private-data trial access. |
 | Preserve original canonical IDs/aliases and audit snapshots; explicit split or latest-revision undo rather than destructive reassignment of notes. | Move/copy notes to split people, delete merged IDs, or rewrite history; source evidence and original references must survive. | Synthetic merge/split/undo tests compare source and independent note bytes and retain IDs created by undone splits. Revisit note attribution only in CONTACTS-027's explicit curation workflow. |
 | Household links optional, explicit, at most one per person; conflicts block merges and splits do not inherit membership. | Automatic one-person households, surname/address/chat grouping, or multiple households; unreviewed identity ingestion precedes household curation. | Synthetic one-person, empty, conflicting and post-split cases. Revisit multiple-household semantics only with a specified product requirement. |
-| CLI rejects private data until an approved private-run boundary is implemented. Full JSON history is retained locally for this synthetic slice. | Treat existing local storage as blanket consent or add an unreviewed approval flag; neither establishes CONTACTS-010. | Synthetic-only tests reject private requests/snapshots and unsafe output. Revisit only after explicit CONTACTS-010 and source authorization plus retention/ACL implementation; do not copy private notes into this history. |
+| CLI rejects private data until required controls under the approved CONTACTS-010 policy are implemented and verified. Full JSON history is retained locally for this synthetic slice. | Treat existing local storage as blanket consent or add an unreviewed approval flag; neither establishes source/account or each-run approval or verifies controls. | Synthetic-only tests reject private requests/snapshots and unsafe output. Revisit only with exact source and run authorization plus retention/ACL implementation under the approved policy; do not copy private notes into this history. |
+| Integration (2026-11-25): consume only the landed CONTACTS-021 current projection; keep inactive links and require explicit refresh of changed current metadata. | Rejected raw-record fallback, erasing tombstoned/missing canonical references and automatic approval of changed addresses. Assumes the approved CONTACTS-010 policy remains authoritative while actual source/run access and local controls are still gated. | Actual collector regressions cover revised addresses, branch collisions, tombstones, informational historical targets and corrected-store replay; source/notes remain unchanged. Revisit inactive-link expiry only with approved retention/deletion implementation; revisit refresh only with an explicit replacement review contract. |

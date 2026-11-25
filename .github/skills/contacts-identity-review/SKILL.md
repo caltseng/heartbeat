@@ -12,10 +12,12 @@ overlay, not a connector, numerical reducer, report renderer or hosted service.
 
 ## Boundary
 
-Use synthetic snapshots only. The CLI rejects `private` requests and snapshots.
-CONTACTS-010, explicit source authorization and implementation of an approved
-private-run boundary are separate requirements, not granted by this skill or the
-delegated engineering decisions. Do not acquire credentials, access accounts,
+Use synthetic snapshots only. The CLI rejects `private` requests before reading
+the collection and also rejects private snapshots (`private_collection_disabled`).
+The approved CONTACTS-010 policy is not exact source/account or each-run
+authorization; verified local protection and retention/deletion controls remain
+unimplemented. This skill and delegated engineering decisions grant none of
+these approvals. Do not acquire credentials, access accounts,
 devices or browser sessions, pair, send, schedule, or process private records
 through remote AI. Sensitive note capture remains CONTACTS-027/010.
 
@@ -66,6 +68,15 @@ npm run contacts:review -- --request .private\contacts\identity-demo\review.synt
 Reinspect before each mutation and use the exact returned keys/IDs. The companion
 contract specifies complete operation shapes. Record a meaningful `reason` and:
 
+- Read only CONTACTS-021's `reconciliation.records`, never immutable first
+  observations. Older synthetic snapshots must be replayed through the current
+  collector. Inspect `changedIdentityKeys` and explicitly `refresh` those keys
+  after reviewing current metadata; refresh acknowledges metadata, not a match.
+- Keep tombstoned, colliding or missing identities inactive, not rematched from
+  old addresses. Existing canonical links and note references remain stored;
+  inspect `inactiveIdentityKeys`/`excludedIdentityKeys` and source reconciliation
+  limits rather than deleting them. Informational `pendingTargets` are not broken
+  links and do not alone make a complete source partial.
 - Merge only with explicit reviewed email, international phone or provider
   evidence connecting every selected person. Shared addresses can belong to
   different people; matching evidence is not automatic approval. Names, surnames
@@ -95,8 +106,8 @@ endpoint is connected. Exit 2 preserves partial/unavailable/failed source status
 it can accompany a successfully saved mapping. Exit 1 means no review transaction
 committed. Do not turn unavailable sources into empty success.
 
-Stale revision/digest, changed or missing reviewed source identities, unknown
-fields, invalid evidence, unsafe output and lock conflicts fail visibly. Reinspect
+Stale revision/digest, unacknowledged changed identities, missing reconciliation,
+unknown fields, invalid evidence, unsafe output and lock conflicts fail visibly. Reinspect
 and re-review, rather than rewriting the revision or bypassing the lock. After an
 interruption, verify the recorded PID stopped before removing only that exact
 `identity-review.lock`. Retry an uncertain write only after inspecting its revision.

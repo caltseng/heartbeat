@@ -30,11 +30,15 @@ function fixture(t, group = false) {
     page.threads[0].kind = 'group';
     page.memberships = page.identities.slice(0, 4).map(identity => ({ threadId: 'thread-1', identityId: identity.id }));
   }
-  fs.writeFileSync(path.join(folder, 'input.json'), JSON.stringify(input));
-  const collected = collect({
+  const collectionRequest = {
     schemaVersion: 1, dataClass: 'synthetic', period, output: 'store',
     sources: [{ source: 'email', account: input.account, connector: input.connector, mode: 'metadata-import', input: 'input.json' }]
-  }, folder);
+  };
+  const runCollection = () => {
+    fs.writeFileSync(path.join(folder, 'input.json'), JSON.stringify(input));
+    return collect(collectionRequest, folder);
+  };
+  const collected = runCollection();
   assert.equal(collected.exitCode, 0);
   const request = {
     schemaVersion: 1, dataClass: 'synthetic', collection: collected.file, output: path.join(folder, 'review'),
@@ -57,7 +61,7 @@ function fixture(t, group = false) {
     type: 'merge', people: names.map(id), into: id(names[0]),
     evidence: [{ kind, identityKeys: names.map(key), ...(kind === 'provider' ? { reference: 'synthetic-reviewed-profile' } : {}) }]
   });
-  return { folder, request, inspect, key, id, file, state, apply, merge, collection: collected.file };
+  return { folder, request, inspect, key, id, file, state, apply, merge, input, runCollection, collection: collected.file };
 }
 
 test('inspection is read-only; registration keeps same names and shared addresses distinct until reviewed', t => {
@@ -107,6 +111,7 @@ test('cross-source/account namespaces combine only on reviewed evidence, not ide
   const collection = JSON.parse(fs.readFileSync(f.collection));
   const otherKey = JSON.stringify(['whatsapp', 'other-synthetic-account', 'identity', 'peer']);
   collection.records[otherKey] = structuredClone(collection.records[f.key('peer')]);
+  collection.reconciliation.records[otherKey] = structuredClone(collection.reconciliation.records[f.key('peer')]);
   fs.writeFileSync(f.collection, JSON.stringify(collection));
   const otherId = f.inspect().identities.find(identity => identity.key === otherKey).suggestedPersonId;
   f.apply([]);
@@ -143,7 +148,7 @@ test('conservative normalization rejects regional phones and email local-part/al
     const f = fixture(t);
     const collection = JSON.parse(fs.readFileSync(f.collection));
     const alias = type === 'phone' ? 'phone-alias' : 'mail-alias';
-    collection.records[f.key(alias)].record.addresses = [{ type, value }];
+    collection.reconciliation.records[f.key(alias)].record.addresses = [{ type, value }];
     fs.writeFileSync(f.collection, JSON.stringify(collection));
     f.apply([]);
     assert.throws(() => f.apply([f.merge(['peer', alias], type)]), /exact conservative/);
@@ -174,6 +179,7 @@ test('new snapshots can explicitly reaffirm existing mappings or register new id
   f.apply([{ type: 'undo', revision: 3 }]);
   const newKey = f.key('new-synthetic-identity');
   collection.records[newKey] = { record: { type: 'identity', idKind: 'local', isSelf: false }, provenance: [] };
+  collection.reconciliation.records[newKey] = { revision: '$initial', record: collection.records[newKey].record };
   fs.writeFileSync(f.collection, JSON.stringify(collection));
   f.apply([]);
   assert.equal(f.state().revision, 5);
@@ -230,14 +236,99 @@ test('stale reviews, changed identities, lock conflicts, unsafe output and priva
   fs.unlinkSync(path.join(f.request.output, 'identity-review.lock'));
   const unsafe = path.resolve(__dirname, '..', '..', 'public');
   assert.throws(() => review({ ...f.request, output: unsafe }, f.folder), { code: 'unsafe_output' });
-  assert.throws(() => review({ ...f.request, dataClass: 'private' }, f.folder), { code: 'private_run_not_authorized' });
+  assert.throws(() => review({ ...f.request, dataClass: 'private', collection: 'unreadable.synthetic.json' }, f.folder),
+    { code: 'private_collection_disabled' });
   const collection = JSON.parse(fs.readFileSync(f.collection));
   fs.writeFileSync(f.collection, JSON.stringify({ ...collection, dataClass: 'private' }));
-  assert.throws(() => f.inspect(), { code: 'private_run_not_authorized' });
-  collection.records[f.key('peer')].record.displayName = 'Changed synthetic profile';
+  assert.throws(() => f.inspect(), { code: 'private_collection_disabled' });
+  collection.reconciliation.records[f.key('peer')].record.displayName = 'Changed synthetic profile';
   fs.writeFileSync(f.collection, JSON.stringify(collection));
   assert.throws(() => f.apply([]), { code: 'identity_conflict' });
   assert.deepEqual(fs.readFileSync(f.file), original);
+});
+
+test('review reads current identity revisions, never first-observed evidence, and requires explicit refresh', t => {
+  const f = fixture(t);
+  f.apply([]);
+  const identity = f.input.pages[0].identities.find(row => row.id === 'mail-alias');
+  identity.revision = { id: 'profile-2', supersedes: '$initial' };
+  identity.addresses = [{ type: 'email', value: 'different@example.invalid' }];
+  assert.equal(f.runCollection().exitCode, 0);
+  const source = JSON.parse(fs.readFileSync(f.collection));
+  assert.equal(source.records[f.key('mail-alias')].record.addresses[0].value, 'alex@EXAMPLE.INVALID');
+  assert.equal(f.inspect().identities.find(row => row.key === f.key('mail-alias')).addresses[0].value, 'different@example.invalid');
+  assert.deepEqual(f.inspect().changedIdentityKeys, [f.key('mail-alias')]);
+  assert.throws(() => f.apply([f.merge(['peer', 'mail-alias'])]), { code: 'identity_conflict' });
+  f.apply([{ type: 'refresh', identityKeys: [f.key('mail-alias')] }]);
+  assert.deepEqual(f.inspect().changedIdentityKeys, []);
+  assert.throws(() => f.apply([f.merge(['peer', 'mail-alias'])]), /exact conservative/);
+  assert.throws(() => f.apply([{ type: 'refresh', identityKeys: [f.key('missing')] }]), /Only current/);
+  assert.equal(f.state().view.assignments[f.key('mail-alias')], f.id('mail-alias'));
+});
+
+test('tombstoned and colliding identities stay inactive without losing reviewed links or note references', t => {
+  const f = fixture(t);
+  f.apply([]);
+  f.apply([f.merge(['peer', 'mail-alias'])]);
+  const notesFile = path.join(f.folder, 'notes.synthetic.json');
+  const notes = JSON.stringify({ personId: f.id('mail-alias'), original: 'Preserved synthetic note.' });
+  fs.writeFileSync(notesFile, notes);
+  const identity = f.input.pages[0].identities.find(row => row.id === 'mail-alias');
+  identity.revision = { id: 'deleted-2', supersedes: '$initial' };
+  identity.deleted = true;
+  assert.equal(f.runCollection().exitCode, 0);
+  assert.ok(f.inspect().excludedIdentityKeys.includes(f.key('mail-alias')));
+  assert.ok(f.inspect().inactiveIdentityKeys.includes(f.key('mail-alias')));
+  assert.ok(!f.inspect().identities.some(row => row.key === f.key('mail-alias')));
+  f.apply([]);
+  assert.equal(f.state().view.assignments[f.key('mail-alias')], f.id('peer'));
+  const peer = f.input.pages[0].identities.find(row => row.id === 'peer');
+  peer.revision = { id: 'branch-a', supersedes: '$initial' };
+  assert.equal(f.runCollection().exitCode, 0);
+  peer.revision = { id: 'branch-b', supersedes: '$initial' };
+  peer.displayName = 'Synthetic conflicting branch';
+  assert.equal(f.runCollection().exitCode, 2);
+  const inspection = f.inspect();
+  assert.equal(inspection.exitCode, 2);
+  assert.equal(inspection.reconciliationRequired, true);
+  assert.ok(inspection.inactiveIdentityKeys.includes(f.key('peer')));
+  assert.ok(inspection.collisions.some(row => row.key === f.key('peer')));
+  assert.equal(f.apply([]).exitCode, 2);
+  assert.ok(f.state().inactiveIdentityKeys.includes(f.key('peer')));
+  assert.throws(() => f.apply([f.merge(['peer', 'phone-alias'], 'phone')]), /Evidence must reference/);
+  assert.equal(fs.readFileSync(notesFile, 'utf8'), notes);
+  assert.equal(f.state().view.people[f.id('mail-alias')].mergedInto, f.id('peer'));
+});
+
+test('pending historical mutation targets remain informational, while legacy snapshots require reconciliation', t => {
+  const f = fixture(t);
+  const event = f.input.pages[0].events[0];
+  f.input.pages[0].events.push({ ...event, id: 'historical-edit', eventType: 'edit', targetId: 'unimported-history' });
+  assert.equal(f.runCollection().exitCode, 0);
+  assert.equal(f.inspect().pendingTargets.length, 1);
+  assert.equal(f.inspect().reconciliationRequired, false);
+  assert.equal(f.apply([]).exitCode, 0);
+  const source = JSON.parse(fs.readFileSync(f.collection));
+  delete source.reconciliation;
+  fs.writeFileSync(f.collection, JSON.stringify(source));
+  assert.throws(() => f.inspect(), /Expected CONTACTS-021 reconciliation/);
+});
+
+test('missing identities after a corrected replay remain explicitly inactive and can later return', t => {
+  const f = fixture(t);
+  f.apply([]);
+  const original = JSON.parse(fs.readFileSync(f.collection));
+  const replay = structuredClone(original);
+  delete replay.records[f.key('unrelated')];
+  delete replay.reconciliation.records[f.key('unrelated')];
+  fs.writeFileSync(f.collection, JSON.stringify(replay));
+  f.apply([]);
+  assert.ok(f.state().inactiveIdentityKeys.includes(f.key('unrelated')));
+  assert.equal(f.state().view.assignments[f.key('unrelated')], f.id('unrelated'));
+  fs.writeFileSync(f.collection, JSON.stringify(original));
+  f.apply([]);
+  assert.deepEqual(f.state().inactiveIdentityKeys, []);
+  assert.equal(f.state().view.assignments[f.key('unrelated')], f.id('unrelated'));
 });
 
 test('undo of a new split retains canonical references for notes; registration undo can be replayed', t => {

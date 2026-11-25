@@ -47,6 +47,10 @@ Identity-review cases additionally exercise conservative reviewed matches,
 same-name separation, cross-namespace identity links, split/undo, stable note
 references, curated household conflicts, revision/digest preconditions, private
 input rejection and transactional rollback. No private notes are read.
+CONTACTS-022 reads current reconciled identities, preserves inactive
+tombstone/collision/missing links, and requires explicit metadata refresh. Its
+integration cases exercise the actual collector's revision/target semantics,
+including informational historical pending targets.
 
 GitHub Actions runs `.github/workflows/ci.yml` for PRs targeting `main` and pushes
 to `main`, on Node 20.11.0. Its stable job/check name is
