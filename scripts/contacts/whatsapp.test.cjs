@@ -309,3 +309,38 @@ test('interrupted artifact publication retains reservation, blocks different byt
   assert.ok(fs.existsSync(path.join(bundle, 'request.synthetic.json')));
   assert.ok(!fs.existsSync(path.join(output, 'whatsapp-conversion.lock')));
 });
+
+test('partial artifact writes cannot expose a truncated final file or prevent exact replay', t => {
+  const folder = temporary(t), f = fixture();
+  const txt = path.join(folder, 'fixture.txt'), manifest = path.join(folder, 'manifest.json'), output = path.join(folder, 'output');
+  fs.writeFileSync(txt, f.bytes);
+  fs.writeFileSync(manifest, JSON.stringify(f.manifest));
+  const script = `
+    const fs = require('node:fs');
+    const open = fs.openSync, write = fs.writeFileSync;
+    let artifact;
+    fs.openSync = function(file, ...args) {
+      const fd = open.call(this, file, ...args);
+      if (String(file).includes('whatsapp.synthetic.json.') && String(file).endsWith('.tmp')) artifact = fd;
+      return fd;
+    };
+    fs.writeFileSync = function(file, value, ...args) {
+      if (file === artifact && artifact !== undefined) {
+        write.call(this, file, String(value).slice(0, 10), ...args);
+        throw Object.assign(new Error('synthetic interrupted write'), { code: 'EIO' });
+      }
+      return write.call(this, file, value, ...args);
+    };
+    process.argv = [process.execPath, process.argv[1], '--txt', process.argv[2],
+      '--manifest', process.argv[3], '--output', process.argv[4]];
+    require('node:module').runMain();
+  `;
+  const result = spawnSync(process.execPath, ['-e', script, path.join(__dirname, 'whatsapp.cjs'),
+    txt, manifest, output], { encoding: 'utf8' });
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(JSON.parse(result.stderr).code, 'conversion_input_or_io_error');
+  const bundle = fs.readdirSync(output).find(name => name.startsWith('acquisition-'));
+  assert.deepEqual(fs.readdirSync(path.join(output, bundle)), []);
+  assert.equal(cli(folder, f).status, 2);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(output, bundle, 'whatsapp.synthetic.json'))).source, 'whatsapp');
+});

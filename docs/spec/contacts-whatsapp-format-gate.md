@@ -337,11 +337,16 @@ Conversion first denies non-synthetic manifests before native-file stat/read or
 output/registry resolution. For valid synthetic requests it checks the registry
 before artifacts, then takes an exclusive conversion lock and rechecks under the
 lock. Atomic registry replacement reserves the immutable acquisition before
-writing its immutable handoff/request. An interrupted artifact write can leave
+atomically publishing its immutable handoff/request from same-directory temporary
+files. An interrupted artifact write can leave
 a reservation; replay the exact manifest/bytes to finish, never clear the
 registry to admit a different export. Corrupt registries, existing locks, I/O
 failures and conflicting output are visible failures. A 16 MiB / 100,000-line
 parser safety limit is **not** a provider history cap.
+After a terminated process, confirm it is stopped before removing only its exact
+stale conversion lock; any orphan temporary metadata file is not a published
+handoff. Conflicting completed artifacts require explicit local review, not
+automatic replacement.
 
 `whatsappArchive` is the narrow synthetic handoff extension: profile, local
 thread/archive references, original byte SHA-256, reviewed-ledger digest and

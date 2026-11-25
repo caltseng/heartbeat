@@ -176,10 +176,21 @@ function convert(bytes, manifest, registry = []) {
   return { handoff, audit };
 }
 
+function atomic(file, value) {
+  const temporary = `${file}.${crypto.randomUUID()}.tmp`;
+  const fd = fs.openSync(temporary, 'wx', 0o600);
+  try {
+    try { fs.writeFileSync(fd, value); }
+    finally { fs.closeSync(fd); }
+    fs.renameSync(temporary, file);
+  } finally {
+    if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
+  }
+}
 function immutable(file, value) {
   if (fs.existsSync(file)) {
     need(!fs.lstatSync(file).isSymbolicLink() && fs.readFileSync(file, 'utf8') === value, 'output_conflict');
-  } else fs.writeFileSync(file, value, { flag: 'wx', mode: 0o600 });
+  } else atomic(file, value);
 }
 function run(argv) {
   need(argv.length === 6 && argv[0] === '--txt' && argv[2] === '--manifest' && argv[4] === '--output', 'invalid_arguments');
@@ -200,17 +211,12 @@ function run(argv) {
     if (error.code === 'EEXIST') throw new ConversionError('conversion_locked');
     throw error;
   }
-  const temporary = path.join(folder, `whatsapp-registry.${crypto.randomUUID()}.tmp`);
-  let temporaryWritten = false;
   try {
     const latest = fs.existsSync(registryFile) ? JSON.parse(fs.readFileSync(registryFile, 'utf8')) : [];
     const { handoff, audit } = convert(bytes, manifest, latest);
     if (!latest.some(entry => entry.account === manifest.account && entry.binding.threadId === manifest.thread.id)) {
       latest.push({ account: manifest.account, binding: handoff.whatsappArchive, audit });
-      fs.writeFileSync(temporary, JSON.stringify(latest, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
-      temporaryWritten = true;
-      fs.renameSync(temporary, registryFile);
-      temporaryWritten = false;
+      atomic(registryFile, JSON.stringify(latest, null, 2) + '\n');
     }
     const bundle = path.join(folder, `acquisition-${hash(JSON.stringify([manifest.account, manifest.archive.ref]))}`);
     fs.mkdirSync(bundle, { recursive: true, mode: 0o700 });
@@ -222,7 +228,6 @@ function run(argv) {
     process.stdout.write(JSON.stringify({ status: 'partial', code: 'snapshot_unknown_history', live: false }) + '\n');
     return 2;
   } finally {
-    if (temporaryWritten) fs.unlinkSync(temporary);
     fs.closeSync(fd);
     fs.unlinkSync(lock);
   }
