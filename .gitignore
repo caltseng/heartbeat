@@ -1,0 +1,10 @@
+node_modules/
+.tmp/
+.private/
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+*.p12
+npm-debug.log*

@@ -1,0 +1,16 @@
+{
+  "name": "heartbeat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Single-user local relationship and interaction graph tooling",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "contacts:collect": "node scripts/contacts/collect.cjs",
+    "test:contacts": "node --test scripts/contacts/collect.test.cjs",
+    "test": "npm run test:contacts",
+    "check": "node --check scripts/contacts/collect.cjs && node --check scripts/contacts/demo.cjs && node --check scripts/contacts/collect.test.cjs",
+    "ci": "npm run check && npm test"
+  }
+}
