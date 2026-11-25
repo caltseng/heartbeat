@@ -108,6 +108,10 @@ CONTACTS-022/023/024 own exact schemas, version migration and validators.
 CONTACTS-025 depends on this workflow, not on this item shipping its renderer.
 Do not pass the raw collection directly to a graph or derive totals in a renderer.
 
+Source-acquisition artifacts `handoff.json`, `checkpoint.json`, `report.json`
+and `.email-staging-*` directories are private too. Each source adapter owns its
+format and recovery contract; reserving these names does not authorize acquisition.
+
 Persist derived generations separately from collection. Future producers must
 validate first, write atomically inside the same private boundary (reuse the
 collector's output-location checks), and leave prior valid output intact on
@@ -150,8 +154,9 @@ There is deliberately **no public build or deployment output**.
   redirects and files at those roots fail too. This excludes contacts docs,
   skills/tooling, datasets, checkpoints and graph files, even when renamed.
 - Checks Git's tracked and non-ignored untracked candidates, including force-added
-  ignored paths, for `.private`, environment/key files and the reserved operational
-  filenames above (plus `request.json`, `config.local.json` and snapshot temp files).
+  ignored paths, for `.private`, `.email-staging-*`, environment/key files and the
+  reserved operational filenames above (plus `request.json`, `config.local.json`
+  and snapshot temp files).
 - Can audit an additional export destination with
   `npm run check:private -- --output <public-output-directory>`. This is a check,
   never a generator, uploader or deletion command.

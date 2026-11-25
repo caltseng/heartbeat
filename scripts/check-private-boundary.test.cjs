@@ -24,11 +24,12 @@ test('private ignored workflow stays local, including reports and graph files', 
   f.write('.gitignore', '.private/\n');
   for (const file of ['config.local.json', 'request.synthetic.json', 'collection.json',
     'collection.lock', 'identity-review.json', 'identity-review.lock', 'identity-review.json.123.tmp',
-    'aggregates.json', 'report.json', 'graph.html', 'graph.svg']) {
+    'handoff.json', 'checkpoint.json', 'aggregates.json', 'report.json', 'graph.html', 'graph.svg']) {
     f.write(path.join('.private', 'contacts', 'synthetic', file));
   }
   f.write(path.join('docs', 'spec', 'contacts-local-workflow.md'));
   f.write(path.join('scripts', 'contacts', 'fixtures', 'email-gate.synthetic.json'), '{}');
+  f.write(path.join('.private', 'contacts', '.email-staging-synthetic', 'opaque.bin'));
   fs.mkdirSync(path.join(f.root, 'dist'));
   assert.doesNotThrow(() => checkBoundary(f.root));
   execFileSync('git', ['add', '--force', '.private'], { cwd: f.root });
@@ -40,6 +41,7 @@ test('all public output roots reject docs, tooling, private data, checkpoints an
   const artifacts = ['docs/spec/contacts-local-workflow.md', 'scripts/contacts/collect.cjs',
     '.github/skills/contacts-collect/SKILL.md',
     '.private/contacts/collection.json', 'collection.lock', 'graph.html', 'graph.svg',
+    '.email-staging-synthetic/opaque.bin',
     'renamed-dataset.bin'];
   for (const output of OUTPUT_ROOTS) {
     for (const artifact of artifacts) {
@@ -54,12 +56,14 @@ test('reserved private handoffs fail outside ignored storage', t => {
   const f = fixture(t);
   for (const name of ['request.json', 'request.synthetic.json', 'collection.json', 'collection.lock',
     'collection.json.123.tmp', 'config.local.json', 'identity-review.json', 'identity-review.lock',
-    'identity-review.json.123.tmp', 'aggregates.json',
+    'identity-review.json.123.tmp', 'handoff.json', 'checkpoint.json', 'aggregates.json',
     'report.json', 'graph.html', 'graph.svg', '.env.local', 'private.key']) {
     const target = f.write(path.join('accidental', name));
     assert.throws(() => checkBoundary(f.root), /Private operational artifact/);
     fs.unlinkSync(target);
   }
+  f.write(path.join('accidental', '.email-staging-synthetic', 'opaque.bin'));
+  assert.throws(() => checkBoundary(f.root), /Private operational artifact/);
 });
 
 test('additional output locations, filesystem redirects and CLI errors fail closed', t => {

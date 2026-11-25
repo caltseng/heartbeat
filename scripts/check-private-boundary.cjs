@@ -4,7 +4,7 @@ const { execFileSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const OUTPUT_ROOTS = ['public', 'dist', 'build', 'out', '_site', '.output'];
-const PRIVATE_FILE = /^(?:(?:collection|identity-review)\.(?:json(?:\.\d+\.tmp)?|lock)|request(?:\.synthetic)?\.json|config\.local\.json|aggregates\.json|report\.json|graph\.(?:html|svg))$/i;
+const PRIVATE_FILE = /^(?:(?:collection|identity-review)\.(?:json(?:\.\d+\.tmp)?|lock)|request(?:\.synthetic)?\.json|config\.local\.json|(?:handoff|checkpoint|aggregates|report)\.json|graph\.(?:html|svg))$/i;
 
 function checkBoundary(root = ROOT, extraOutputs = []) {
   for (const output of [...OUTPUT_ROOTS.map(name => path.join(root, name)), ...extraOutputs]) {
@@ -24,7 +24,7 @@ function checkBoundary(root = ROOT, extraOutputs = []) {
   for (const file of files) {
     const parts = file.split('/');
     const name = parts[parts.length - 1];
-    if (parts.some(part => part.toLowerCase() === '.private') || PRIVATE_FILE.test(name) ||
+    if (parts.some(part => part.toLowerCase() === '.private' || /^\.email-staging-/i.test(part)) || PRIVATE_FILE.test(name) ||
         /^\.env(?:\.|$)/i.test(name) || /\.(?:pem|key|pfx|p12)$/i.test(name)) {
       throw new Error('Private operational artifact is a Git delivery candidate; move it outside tracked paths.');
     }
