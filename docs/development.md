@@ -208,3 +208,12 @@ The [CONTACTS-026 opportunity report](spec/contacts-opportunities.md) adds
 Synthetic cases cover threshold boundaries, matched complete versus uncertain/
 asymmetric/absent channel coverage, group-only/no-history suppression, separate
 civil-date rhythms, unchanged inputs, immutable output and CLI 0/2/1.
+
+The [CONTACTS-028 reconnection review](spec/contacts-reconnection-review.md) adds
+`contacts:reconnect`, `check:reconnection` and `reconnection.test.cjs` to CI.
+Synthetic cases cover evidence-category ordering/overflow, due civil-day
+boundaries, unknown/confirmed/observed separation, original notes and prayer
+status, direct/group/passive membership, saved links, thread tombstones,
+follow-up completion, deferral expiry without rhythm changes, stale input/revision,
+atomic rollback, immutable report publication and sanitized CLI 0/2/1 exits.
+No real content, source access, sending or schedules are authorized.

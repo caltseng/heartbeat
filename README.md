@@ -82,6 +82,15 @@ CONTACTS-026 adds `contacts:opportunities`: explainable own-baseline direct-acti
 declines under complete matched coverage and separate curated household rhythm
 reminders. All thresholds are explicit tuning proposals, not relationship scores.
 See the [synthetic workflow and decisions](docs/spec/contacts-opportunities.md).
+
+CONTACTS-028 adds `contacts:reconnect` and `contacts-reconnection` for a
+user-invoked synthetic household review: evidence-backed due rhythms and
+commitments, confirmed dates or unknown, original context, existing thread
+references, explicit follow-up completion and rhythm-preserving deferral.
+Optional saved prayer context retains ambiguous status. Reviews can be saved as
+immutable private local reports; nothing sends or schedules. See the
+[workflow and delegated decisions](docs/spec/contacts-reconnection-review.md).
+
 Heartbeat's map is **not implemented**. Missing source
 data means unknown, not zero. No private accounts, devices, browser sessions,
 credentials or real data are included or authorized by this repository.

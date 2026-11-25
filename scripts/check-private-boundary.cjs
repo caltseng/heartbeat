@@ -4,7 +4,7 @@ const { execFileSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const OUTPUT_ROOTS = ['public', 'dist', 'build', 'out', '_site', '.output'];
-const PRIVATE_FILE = /^(?:(?:collection|identity-review|curated|prayer|audience|google-acquisition)\.(?:json(?:\.\d+\.tmp)?|lock)|identity-review\.json\.(?:lock|tmp)|google-handoff-.+\.json(?:\.\d+\.tmp)?|(?:request|operation|aggregate|summary|audience|opportunities)(?:\.synthetic)?\.json|(?:aggregates|report)\.[a-f0-9-]+\.tmp|config\.local\.json|(?:handoff|checkpoint|aggregates|report)\.json|graph\.(?:html|svg))$/i;
+const PRIVATE_FILE = /^(?:(?:collection|identity-review|curated|prayer|audience|reconnection|google-acquisition)\.(?:json(?:\.\d+\.tmp)?|lock)|identity-review\.json\.(?:lock|tmp)|google-handoff-.+\.json(?:\.\d+\.tmp)?|(?:request|operation|aggregate|summary|audience|reconnection|opportunities)(?:\.synthetic)?\.json|(?:aggregates|report)\.[a-f0-9-]+\.tmp|config\.local\.json|(?:handoff|checkpoint|aggregates|report)\.json|graph\.(?:html|svg))$/i;
 const WHATSAPP_FILE = /^(?:(?:whatsapp-registry\.synthetic|whatsapp\.synthetic|request\.synthetic)\.json(?:\.[a-f0-9-]+\.tmp)?|whatsapp-conversion\.lock)$/i;
 
 function checkBoundary(root = ROOT, extraOutputs = []) {
