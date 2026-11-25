@@ -15,10 +15,12 @@ The CONTACTS-001 through CONTACTS-004 baseline provides six composable collectio
 skills, a strict metadata-handoff importer, atomic JSON persistence, provenance,
 coverage, replay/resume, synthetic fixtures and tests. It imports normalized
 Google identity, email, text-message, personal Messenger and WhatsApp metadata.
-**It does not fetch live endpoints or parse native vendor archives.**
 The [CONTACTS-014 Gmail metadata adapter](docs/spec/contacts-email-adapter.md)
 also converts synthetic native pages with an injected transport, separate native
 cursors and explicit partial coverage. Its CLI cannot access real accounts.
+It also provides a [synthetic-only text XML converter](docs/spec/contacts-text-converter.md)
+for the one profile selected by CONTACTS-015. **It does not fetch live endpoints
+or authorize processing real vendor archives.**
 
 CONTACTS-010 records the [owner-approved metadata policy](docs/privacy.md).
 The importer currently accepts **synthetic requests only**: private imports fail

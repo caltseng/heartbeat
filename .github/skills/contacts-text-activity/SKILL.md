@@ -8,11 +8,13 @@ description: Prepare authorized SMS, MMS, RCS or iMessage metadata while exposin
 Use independently or under [contacts-collect](../contacts-collect/SKILL.md).
 Follow its authorization boundary and the
 [shared contract](../../../docs/spec/contacts-technical-spec.md). The executable
-currently accepts normalized handoffs, not phone databases, backups or XML.
+accepts normalized handoffs, not raw XML. A separate
+[CONTACTS-016 converter](../../../docs/spec/contacts-text-converter.md) handles
+synthetic XML fixtures only.
 The [CONTACTS-015 format gate](../../../docs/spec/contacts-text-format-gate.md)
 selects owner-operated Android 14 / SyncTech SMS Backup & Restore 10.30.009
-full XML (`synctech-xml-metadata-v1`) for the future CONTACTS-016 converter.
-This is a design profile, not an installed reader or verified device. RCS and
+full XML (`synctech-xml-metadata-v1`) for that bounded converter.
+This is not a device reader, real-data authorization or verified device. RCS and
 iMessage are unsupported by that initial profile; even SMS/MMS transport needs
 explicit evidence because RCS can use the same XML containers.
 
@@ -21,13 +23,16 @@ explicit evidence because RCS can use the same XML containers.
    or pairing sessions just because this skill is invoked for planning.
 2. Inspect a separately authorized existing tool or supplied normalized handoff.
    Live access, local database access and imported snapshots are different capabilities.
-   No SMS/MMS/RCS/iMessage endpoint or native export parser is installed here.
+   No SMS/MMS/RCS/iMessage endpoint or real-export conversion is enabled here.
+   For invented XML only, follow the converter contract's `contacts:text-xml`
+   command and explicit manifest/transport/SIM/thread ledger. Keep its generated
+   bundle private, inspect exit 2/unknown coverage, then use its collection request.
 3. Preserve actual protocols (`sms/mms/rcs/imessage`), sender identities, timestamps,
    thread IDs and group participants using `source: text-messages`. Missing IDs
    require an explicitly labeled, reviewed stable local-ID strategy, never a name
    or participant-set-only merge. Preserve threads that share the same participants.
    For the selected XML profile use archive-scoped row IDs and a reviewed thread
-   ledger, not invented provider IDs. Exact archive replay is supported by design;
+   ledger, not invented provider IDs. Exact synthetic archive replay is supported;
    changed/overlapping exports need separate reconciliation before import.
 4. Keep one group message as one observation from its actual sender. Group
    membership, reactions, system events, edits and deletions are not direct messages.

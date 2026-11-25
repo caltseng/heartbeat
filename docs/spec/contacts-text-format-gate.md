@@ -29,7 +29,7 @@ an arbitrary file because it has an `.xml` extension.
 | Route | Callable now | Selected next step / limitation |
 | --- | --- | --- |
 | Shared `contacts:collect` metadata handoff | Yes, schemaVersion 1 | Import normalized `text-messages` only; no XML input. |
-| Local SyncTech XML to metadata | No | CONTACTS-016 implements only this selected profile with synthetic fixtures first. Until then native XML is `unsupported`, reason `text_xml_converter_not_implemented`. |
+| Local SyncTech XML to metadata | Synthetic only | [CONTACTS-016](contacts-text-converter.md) implements only this selected profile and synthetic fixtures. Real conversion is rejected as `requires_setup`; no device or actual export is verified. |
 | Device or Android database reader | No | Owner-created local export only; no ADB, root, database probing, bridge, pairing or default-app switch. |
 | RCS, including Google/Samsung messages serialized as SMS/MMS | No | Unsupported in v1; XML container type alone cannot prove transport. Ambiguous protocol must not become SMS/MMS. |
 | iMessage/iOS/macOS databases, Apple/iCloud backups | No | Unsupported; this Android route provides no Apple history. |
@@ -200,8 +200,10 @@ unavailable/partial/failed sources and 1 for fatal request/storage errors.
 CONTACTS-016 must exercise synthetic direct SMS, four-person MMS, role/direction
 ambiguity, millisecond/DST boundaries, absent IDs/self/thread evidence, RCS
 ambiguity, duplicate-looking rows, exact replay, changed/overlapping archives,
-invalid XML/counts, content exclusion and unavailable outcomes. This gate adds
-no parser, real-data fixture or new test tooling.
+invalid XML/counts, content exclusion and unavailable outcomes. This gate itself adds no parser, real-data fixture or new test tooling.
+The [CONTACTS-016 converter contract](contacts-text-converter.md) records the
+bounded synthetic implementation, manifest, conservative failures and engineering
+decisions; it does not lift the real-run boundary.
 
 ## Public evidence and remaining uncertainty
 

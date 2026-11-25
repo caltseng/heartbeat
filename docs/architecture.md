@@ -3,7 +3,8 @@
 ## Delivered and planned stages
 
 ```text
-Separately authorized acquisition / native conversion [NOT IMPLEMENTED]
+Separately authorized acquisition / real native conversion [NOT IMPLEMENTED]
+Synthetic SyncTech XML -> metadata handoff [IMPLEMENTED: CONTACTS-016]
                          |
 Normalized handoff JSON, or synthetic demo [IMPLEMENTED]
                          |
@@ -66,6 +67,7 @@ tracked paths. External locations still require privacy approval.
 | `schemaVersion`, `dataClass` | Version and `synthetic`/`private` isolation; mixing classes in a store fails. |
 | `records` | Normalized identities, threads, memberships and events keyed by JSON tuples of source/account/type/original ID. Each value carries the record and connector/input SHA-256/page/retrieval provenance. |
 | `checkpoints` | Source/account/connector cursor, terminal state and exact resolved-period signature. |
+| `textArchives` (optional) | Synthetic text converter's immutable source/account archive and reviewed-ledger binding; changed/overlapping archives fail pending CONTACTS-021. See the [converter contract](spec/contacts-text-converter.md). |
 | `manifest` | Current collection time/period, per-source status/coverage/freshness/errors, unresolved identities and explicit implementation limits. |
 | `history` | Prior manifests' period/status/source coverage; not a claim that old data is fresh. |
 
