@@ -8,8 +8,8 @@ Migrated from caltseng/churchtree PR #68, exact merge
 **Global bootstrap prerequisite:** every remaining CONTACTS-010 through
 CONTACTS-032 item is blocked from execution until this Heartbeat bootstrap
 (Phalanx item `1fda16d150ab44ae8313bd455c0240ed`) is verified **checked_in**
-by an owner merge into `main`. This prerequisite applies to every row below in
-addition to its listed dependencies. "Ready" below describes only the original
+by an authorized merge into `main`. This prerequisite applies to every row below
+in addition to its listed dependencies. "Ready" below describes only the original
 bounded task's capability state **after** that prerequisite; it does not permit
 starting it now. Do not resume old Churchtree CONTACTS execution.
 
@@ -108,11 +108,18 @@ account/device setup can lift a real-data execution block.
 
 ## Dispatch boundary
 
-Only the service owner merges the independently reviewed exact HEAD. Agents must
-not enable auto-merge, schedule a merge, self-merge or execute merge commands.
+For explicitly authorized `checked_in` work, the retained writer may deliver the
+merge after any qualified independent reviewer approves the exact final HEAD,
+required CI passes and GitHub protections permit it. No routine service-owner-only
+or manual merge hop is required; self-review is insufficient and rules/checks
+cannot be bypassed. Explicit ready-only, report and draft ceilings remain binding.
 The stable GitHub Actions check is `Heartbeat synthetic baseline`; the owner must
 configure Heartbeat Phalanx `ready_checks` before merging. Captain coordinates
-independent review and must receive the exact PR/head/green-check evidence.
+independent review and must receive exact PR/head/reviewer/green-check and primary
+merge evidence. Follow the [serialized delivery and active-execution adoption
+rules](../development.md#delivery-and-active-execution-adoption): integrate actual
+conflicting target changes, recheck/review new heads and reconcile immutable
+acceptance explicitly rather than assuming this register amends active executions.
 An open green PR does not lift the global bootstrap execution dependency.
 
 After the prerequisite PR is merged, hand this register and its merged commit to

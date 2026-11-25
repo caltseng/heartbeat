@@ -139,10 +139,14 @@ hide them. A successful import does not independently certify upstream history.
 - [Stable CONTACTS work-item register](docs/spec/contacts-work-items.md)
 - [Exact migration provenance](docs/provenance.md)
 - [Approved branding assets and crop decision](docs/spec/heartbeat-branding.md)
-- [Repository rules: topic branches, PRs to main, OWNER MERGE](AGENTS.md)
+- [Repository rules: topic branches, PRs to main, authorized delivery](AGENTS.md)
 
 The bootstrap must be independently reviewed at its exact HEAD, pass the
-`Heartbeat synthetic baseline` GitHub Actions check, and be merged by the owner.
+`Heartbeat synthetic baseline` GitHub Actions check, and have an authorized merge.
+For explicitly authorized `checked_in` work the retained writer may merge after
+qualified independent exact-final-head review, required CI and GitHub protections;
+explicit ready-only/report targets and draft ceilings remain unchanged. See
+[delivery and active-execution adoption](docs/development.md#delivery-and-active-execution-adoption).
 The owner configures Heartbeat's Phalanx `ready_checks` before merging. An open
 green PR is not checked in; remaining CONTACTS execution stays blocked until the
 bootstrap's merge into `main` is verified. There is no deployment step.

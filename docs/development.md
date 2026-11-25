@@ -1,7 +1,7 @@
 # Developing Heartbeat
 
 Read [AGENTS.md](../AGENTS.md): topic branches, PRs to `main`, independent
-exact-head review and **OWNER MERGE**. Do not enable auto-merge or execute merges.
+exact-final-head review and authorized retained-writer delivery.
 
 ## Checks and CI
 
@@ -94,6 +94,63 @@ configure that exact check in Phalanx `ready_checks` before merging the bootstra
 repository required-check/ruleset configuration remains owner-controlled and must
 not be bypassed. Green checks are not independent review or permission to merge.
 
+## Delivery and active-execution adoption
+
+For explicitly authorized `checked_in` work, the same retained writer owns delivery
+through independent review, required CI, rework and verified primary-PR merge into
+`main`. Any qualified reviewer independent of the writer may review; no particular
+named session is required. Self-review does not satisfy this gate. Record the
+reviewer's identity, exact final commit and approval evidence alongside the PR
+and check results. Only after that review and required CI pass may the writer
+enable GitHub auto-merge or execute a normal permitted merge. Repository GitHub
+reviews, checks and protections still apply; never waive them, use admin overrides
+or require a routine service-owner/manual merge hop instead of authorized delivery.
+
+Keep mutation ownership serialized with the retained writer. Reuse the branch's
+one open PR, inspect live state before changing it and reconcile uncertain
+push/merge outcomes before retrying so delivery remains idempotent. Conflicting
+PRs require integrating actual current `main` changes, not merely retrying merges
+or discarding another item's work. Any new head, including integration or review
+fixes, requires fresh checks and independent exact-final-head review before merge.
+Observe GitHub's primary PR merge and target base before reporting `checked_in`;
+an open green PR, approval, auto-merge request or another PR's merge is not delivery.
+
+Explicit `ready_for_check_in`/ready-only targets stop without merge; report-only
+work stays a report and explicit draft publication stays draft. Do not enable
+auto-merge under those ceilings, and disable pending auto-merge if an authorized
+target change removes merge authority. Do not infer promotion from green checks.
+Delivery authorization changes no synthetic-only validation, private-data/source/
+device access, no-sending or no-scheduling/privacy boundary.
+
+**Active-execution adoption (2026-11-25):** this policy-change item
+`21da9c92b1c2457eba2028386c0d471f`, execution
+`0b39cde1d76a49e58853dac6ca5270f1`, explicitly requests authorized retained-writer
+delivery. Other active executions may still carry immutable acceptance requiring
+owner-only/manual merge or a named reviewer. Captain must inspect and record each
+affected item/execution, its conflicting acceptance and the explicit authorized
+adoption decision through the execution's supported owner/Captain decision path.
+This repository edit alone does not rewrite those criteria, change targets or
+raise draft/report ceilings. Until that reconciliation is recorded, surface the
+specific conflict rather than silently overriding it or leaving it waiting for
+an unexplained owner hop.
+
+Captain's owner-inspected adoption inventory at this change's preparation:
+
+| Work | Item / execution | Observed state / required adoption |
+| --- | --- | --- |
+| CONTACTS-026 | `a551e858d4a84ddabe81b3d8246fa7a1` / `1ef8cda632e84914a21eccbbbcd6871e` | Reserved/running, version 3; native writer creation underway. |
+| CONTACTS-028 | `174cdee7dd144f07b13dd9bcd0b0986c` / `cc67c244e4044e66af7d41829324eb55` | Queued, version 2. |
+| CONTACTS-025 | `997e4411757445fcac46e42f37444e61` / `8c92f1b316cc47d69a84c16b44bc2b92` | Queued, version 2. |
+
+All three carry acceptance beginning `Unconditional Heartbeat delivery override:
+comply with AGENTS.md OWNER MERGE`. Captain/operator must reconcile that immutable
+owner-only restriction through supported versioned queued/delivery adoption and
+record the decision before retained-writer merging; this writer changes only its
+own policy worktree, not those executions. CONTACTS-020/024/030 are already verified
+merged/completed; do not revive their ended writer credentials. This is a dated
+snapshot, not a claim that adoption has occurred; refresh live execution state
+and versions before acting.
+
 ## Adding a collector
 
 1. Read the [stable register](spec/contacts-work-items.md) and
@@ -113,7 +170,8 @@ not be bypassed. Green checks are not independent review or permission to merge.
 5. Update the relevant source skill, capability matrix and affected docs. Adding
    a skill alone does not deliver a live connector; unavailable routes must
    remain visibly unavailable. Run `npm run ci`, self-review, commit and publish
-   the exact head for independent review and owner merge.
+   the exact head for independent review and delivery under the item's authorized
+   target and publication ceiling.
 
 Preserve `contacts-*` skill names, `scripts/contacts/`, schema version and store
 names unless a separately specified compatibility change requires otherwise.
