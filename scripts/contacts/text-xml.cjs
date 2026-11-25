@@ -1,11 +1,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
 const { TextDecoder } = require('node:util');
-const { outputLocation, resolvePeriod } = require('./collect.cjs');
+const { hash: digest, stripBOM, readJSONValue, runCLI, outputLocation } = require('./lib.cjs');
+const { resolvePeriod } = require('./collect.cjs');
 
 const PROFILE = 'synctech-xml-metadata-v1';
-const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 class ConversionError extends Error {
   constructor(code, status = 'failed') { super(code); this.code = code; this.status = status; }
 }
@@ -45,7 +44,7 @@ function parseXML(bytes) {
   try { xml = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
   catch { throw new ConversionError('invalid_utf8'); }
   xmlChars(xml);
-  xml = xml.replace(/^\uFEFF/, '');
+  xml = stripBOM(xml);
   const declaration = xml.match(/^<\?xml[\t\r\n ]+version[\t\r\n ]*=[\t\r\n ]*(["'])1\.0\1[\t\r\n ]+encoding[\t\r\n ]*=[\t\r\n ]*(["'])UTF-8\2(?:[\t\r\n ]+standalone[\t\r\n ]*=[\t\r\n ]*(["'])(?:yes|no)\3)?[\t\r\n ]*\?>/);
   need(declaration, 'unsupported_xml_declaration', 'unsupported');
   xml = xml.slice(declaration[0].length);
@@ -255,7 +254,7 @@ function convert(bytes, manifest) {
 
 function run(argv) {
   need(argv.length === 6 && argv[0] === '--xml' && argv[2] === '--manifest' && argv[4] === '--output', 'invalid_arguments');
-  const manifest = JSON.parse(fs.readFileSync(argv[3], 'utf8').replace(/^\uFEFF/, ''));
+  const manifest = readJSONValue(argv[3]);
   need(manifest?.dataClass === 'synthetic', 'private_collection_disabled');
   const stat = fs.statSync(argv[1]);
   need(stat.size <= 32 * 1024 * 1024, 'xml_size_limit', 'unsupported');
@@ -272,11 +271,13 @@ function run(argv) {
   return 2;
 }
 if (require.main === module) {
-  try { process.exitCode = run(process.argv.slice(2)); }
-  catch (error) {
+  runCLI(() => {
+    return run(process.argv.slice(2));
+  }, error => {
     const known = error instanceof ConversionError;
     process.stderr.write(JSON.stringify({ status: known ? error.status : 'failed', code: known ? error.code : 'conversion_input_or_io_error' }) + '\n');
-    process.exitCode = known && error.status !== 'failed' ? 2 : 1;
-  }
+    return known && error.status !== 'failed' ? 2 : 1;
+  });
 }
+
 module.exports = { convert, ConversionError };

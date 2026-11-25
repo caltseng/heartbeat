@@ -1,44 +1,17 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
+const { CollectionError, requireValue, object, text, array, instant, hash, readJSON, within,
+  outputLocation, persist: persistJSON, openLock, releaseLock, runCLI } = require('./lib.cjs');
 
-const ROOT = path.resolve(__dirname, '..', '..');
-const PRIVATE = path.join(ROOT, '.private', 'contacts');
 const SOURCES = ['google-contacts', 'email', 'text-messages', 'messenger', 'whatsapp'];
 const CHANNELS = {
   email: ['email'], 'text-messages': ['sms', 'mms', 'rcs', 'imessage'],
   messenger: ['messenger'], whatsapp: ['whatsapp'], 'google-contacts': []
 };
 
-class CollectionError extends Error {
-  constructor(code, message) { super(message); this.code = code; }
-}
-function requireValue(condition, message, code = 'invalid_input') {
-  if (!condition) throw new CollectionError(code, message);
-}
-function object(value, allowed, label) {
-  requireValue(value && typeof value === 'object' && !Array.isArray(value), `${label} must be an object.`);
-  requireValue(Object.keys(value).every(key => allowed.includes(key)), `${label} has unsupported fields; message bodies and credentials are not accepted.`);
-}
-function text(value, label) {
-  requireValue(typeof value === 'string' && value.trim().length > 0, `${label} must be nonempty text.`);
-  return value;
-}
-function array(value, label) {
-  requireValue(Array.isArray(value), `${label} must be an array.`);
-  return value;
-}
-function instant(value, label) {
-  requireValue(typeof value === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?(?:Z|[+-]\d\d:\d\d)$/.test(value) &&
-    Number.isFinite(Date.parse(value)), `${label} must be an ISO timestamp with an offset.`);
-  const date = value.slice(0, 10);
-  requireValue(new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) === date, `${label} has an invalid calendar date.`);
-  return new Date(value).toISOString();
-}
 const key = (source, account, type, id) => JSON.stringify([source, account, type, id]);
 const sourceKey = source => JSON.stringify([source.source, source.account, source.connector]);
-const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 function dateFormatter(timeZone) {
   try { return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }); }
   catch (error) {
@@ -77,39 +50,6 @@ function resolvePeriod(input) {
   }
   requireValue(start < end && end <= asOf, 'The interval must be nonempty and end no later than asOf.');
   return { preset: input.preset, timeZone, start, end, asOf, bounds: '[start,end)', currentDayPartial: input.preset !== 'custom' };
-}
-function readJSON(file) {
-  let data;
-  try { data = fs.readFileSync(file, 'utf8'); }
-  catch (error) {
-    if (['ENOENT', 'EACCES', 'EISDIR'].includes(error.code)) throw new CollectionError('input_unreadable', 'A requested JSON input cannot be read.');
-    throw error;
-  }
-  try { return { value: JSON.parse(data.replace(/^\uFEFF/, '')), digest: hash(data) }; }
-  catch (error) {
-    if (error instanceof SyntaxError) throw new CollectionError('invalid_json', 'A requested input is not valid JSON.');
-    throw error;
-  }
-}
-function within(folder, file) {
-  const relative = path.relative(folder, file);
-  return relative === '' || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative));
-}
-function realLocation(file) {
-  if (fs.existsSync(file)) return fs.realpathSync(file);
-  const parent = path.dirname(file);
-  requireValue(parent !== file, 'Cannot resolve output location.');
-  return path.join(realLocation(parent), path.basename(file));
-}
-function outputLocation(value) {
-  const target = path.resolve(text(value, 'output'));
-  const resolved = realLocation(target);
-  const root = fs.realpathSync(ROOT);
-  const privateRoot = path.join(root, '.private', 'contacts');
-  requireValue(!within(root, resolved) || (within(privateRoot, resolved) && within(PRIVATE, target)),
-    'Output inside this checkout is allowed only under .private\\contacts, never in website or tracked data folders.', 'unsafe_output');
-  requireValue(target === resolved || !within(root, resolved), 'Private output must not use a redirected directory.', 'unsafe_output');
-  return target;
 }
 function validateSource(source) {
   object(source, ['source', 'account', 'connector', 'mode', 'input', 'status', 'reason'], 'source');
@@ -375,13 +315,7 @@ function persist(file, state) {
   reconcile(state);
   state.manifest.unresolvedIdentityKeys = Object.entries(state.records)
     .filter(([, value]) => value.record.type === 'identity' && !value.record.isSelf).map(([id]) => id).sort();
-  const temporary = `${file}.${process.pid}.tmp`;
-  try {
-    const fd = fs.openSync(temporary, 'wx', 0o600);
-    try { fs.writeFileSync(fd, JSON.stringify(state, null, 2) + '\n'); fs.fsyncSync(fd); }
-    finally { fs.closeSync(fd); }
-    fs.renameSync(temporary, file);
-  } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
+  persistJSON(file, state);
 }
 function guardMessengerSnapshot(source, pages, state) {
   if (source.source !== 'messenger') return;
@@ -592,11 +526,7 @@ function collect(request, requestFolder = process.cwd(), operationAsOf = null) {
   fs.mkdirSync(output, { recursive: true, mode: 0o700 });
   const lock = path.join(output, 'collection.lock');
   let lockFd;
-  try { lockFd = fs.openSync(lock, 'wx', 0o600); }
-  catch (error) {
-    if (error.code === 'EEXIST') throw new CollectionError('store_locked', 'Collection store is locked. Confirm no collector is running before removing the exact stale lock file.');
-    throw error;
-  }
+  lockFd = openLock(lock, () => new CollectionError('store_locked', 'Collection store is locked. Confirm no collector is running before removing the exact stale lock file.'));
   try {
     fs.writeFileSync(lockFd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }) + '\n');
     const file = path.join(output, 'collection.json');
@@ -656,13 +586,12 @@ function collect(request, requestFolder = process.cwd(), operationAsOf = null) {
     persist(file, state);
     return { file, manifest: state.manifest, exitCode: state.manifest.status === 'collected' ? 0 : 2 };
   } finally {
-    fs.closeSync(lockFd);
-    fs.unlinkSync(lock);
+    releaseLock(lock, lockFd);
   }
 }
 
 if (require.main === module) {
-  try {
+  runCLI(() => {
     const args = process.argv.slice(2);
     let result;
     if (args.length === 3 && args[0] === '--demo' && args[1] === '--output') {
@@ -675,11 +604,11 @@ if (require.main === module) {
       result = collect(readJSON(requestFile).value, path.dirname(requestFile));
     }
     process.stdout.write(JSON.stringify({ file: result.file, ...result.manifest }, null, 2) + '\n');
-    process.exitCode = result.exitCode;
-  } catch (error) {
+    return result.exitCode;
+  }, error => {
     process.stderr.write(`Collection failed [${error.code || 'unexpected_error'}]: ${error.message}\n`);
-    process.exitCode = 1;
-  }
+    return 1;
+  });
 }
 
 module.exports = { collect, resolvePeriod, outputLocation, persist, readJSON, instant, requireValue, object };

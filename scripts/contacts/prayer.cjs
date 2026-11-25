@@ -1,15 +1,12 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
-const { outputLocation } = require('./collect.cjs');
+const { hashJSON, readJSONValue: readJSON, createGuard, persist, openLock, releaseLock, runCLI,
+  outputLocation } = require('./lib.cjs');
 const { curate } = require('./curated.cjs');
-const { persist } = require('./local-json.cjs');
 
 const STATUSES = ['unknown', 'active', 'paused', 'answered', 'resolved'];
-function requireValue(condition, message, code = 'invalid_prayer') {
-  if (!condition) throw Object.assign(new Error(message), { code });
-}
+const requireValue = createGuard('invalid_prayer');
 function object(value, fields) {
   requireValue(value && typeof value === 'object' && !Array.isArray(value) &&
     Object.keys(value).every(key => fields.includes(key)), 'Invalid prayer fields.');
@@ -35,7 +32,6 @@ function date(value) {
     Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value),
   'Prayer recordedOn must be a real YYYY-MM-DD or null.');
 }
-function readJSON(file) { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); }
 function validateRecords(records, notes) {
   object(records, ['requests', 'plans']);
   for (const dictionary of [records.requests, records.plans]) {
@@ -79,21 +75,17 @@ function prayer(request, requestFolder = process.cwd(), inspect = false) {
     schemaVersion: 1, dataClass: request.dataClass, collection: request.collection,
     mapping: request.mapping, output: text(request.curated)
   }, requestFolder, true);
-  const curatedDigest = crypto.createHash('sha256').update(JSON.stringify({
+  const curatedDigest = hashJSON({
     revision: curated.revision, records: curated.records,
     mappingDigest: curated.mappingDigest, collectionDigest: curated.collectionDigest
-  })).digest('hex');
+  });
   const output = outputLocation(path.resolve(requestFolder, text(request.output)));
   const file = path.join(output, 'prayer.json');
   const lock = path.join(output, 'prayer.lock');
   let lockFd;
   if (!inspect) {
     fs.mkdirSync(output, { recursive: true, mode: 0o700 });
-    try { lockFd = fs.openSync(lock, 'wx', 0o600); }
-    catch (error) {
-      if (error.code === 'EEXIST') throw Object.assign(new Error('Prayer store is locked; verify the writer stopped before removing this exact lock.'), { code: 'store_locked' });
-      throw error;
-    }
+    lockFd = openLock(lock, () => Object.assign(new Error('Prayer store is locked; verify the writer stopped before removing this exact lock.'), { code: 'store_locked' }));
   }
   try {
     if (!inspect) fs.writeFileSync(lockFd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }) + '\n');
@@ -168,24 +160,25 @@ function prayer(request, requestFolder = process.cwd(), inspect = false) {
     persist(file, state);
     return result();
   } finally {
-    if (lockFd !== undefined) { fs.closeSync(lockFd); fs.unlinkSync(lock); }
+    releaseLock(lock, lockFd);
   }
 }
 if (require.main === module) {
-  try {
+  runCLI(() => {
     const args = process.argv.slice(2);
     requireValue(args.length === 2 && ['--inspect', '--request'].includes(args[0]),
       'Expected --inspect or --request and a synthetic request file.', 'invalid_arguments');
     const file = path.resolve(args[1]);
     const result = prayer(readJSON(file), path.dirname(file), args[0] === '--inspect');
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-    process.exitCode = result.exitCode;
-  } catch (error) {
+    return result.exitCode;
+  }, error => {
     const knownCodes = ['invalid_prayer', 'private_collection_disabled', 'store_locked',
       'unsafe_output', 'status_confirmation_required', 'revision_conflict', 'curated_conflict', 'invalid_arguments'];
     const code = knownCodes.includes(error.code) ? error.code : 'prayer_failed';
     process.stderr.write(`Prayer triage failed [${code}].\n`);
-    process.exitCode = 1;
-  }
+    return 1;
+  });
 }
+
 module.exports = { prayer };

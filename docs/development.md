@@ -8,6 +8,16 @@ exact-final-head review and authorized retained-writer delivery.
 Node.js 20+ and npm are sufficient; the baseline has no package dependencies.
 No install, build, browser, device, private environment or server is required.
 
+Shared contacts infrastructure lives in `scripts/contacts/lib.cjs`: JSON parsing
+with a single leading BOM removed, exact-byte versus serialized-JSON SHA-256,
+output-path guards, exclusive locks, durable atomic replacement, no-clobber
+publication and synchronous/asynchronous CLI error handling. Keep command-specific
+validation, error messages/codes, lock metadata and result formatting in each
+command. The collector's reconciliation-aware `persist` and its existing helper
+exports remain compatible; `local-json.cjs` re-exports the shared persistence API.
+Temporary-file collisions must preserve the other writer's file. Focused
+`lib.test.cjs` regressions run with `test:contacts` and CI; no private data is used.
+
 ```powershell
 npm run test:contacts
 npm run check

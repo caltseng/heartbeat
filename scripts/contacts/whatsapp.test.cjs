@@ -101,7 +101,7 @@ test('four-person group and identical-looking rows retain distinct ordinals with
 });
 
 test('reviewed multiline header lookalikes, BOM, LRM and CRLF do not manufacture events', () => {
-  const f = fixture(`\uFEFF\u200E[24/11/2026, 12:00:00] Peer: A: ${SECRET}\r\n` +
+  const f = fixture(`${String.fromCodePoint(0xfeff)}\u200E[24/11/2026, 12:00:00] Peer: A: ${SECRET}\r\n` +
     `${SECRET}\r\n[24/11/2026, 12:01:00] Lookalike: ${SECRET}\r\n`);
   rejects(f, 'unreviewed_record_boundaries');
   f.manifest.rows[0].endLine = 3;
@@ -145,7 +145,7 @@ test('unsupported layouts, invalid dates/UTF-8, future records and unreviewed bo
     ['[24/11/2026, 12:00] Peer: synthetic\n', 'unsupported_txt_layout'],
     ['[24/11/2026, 01:00:00 PM] Peer: synthetic\n', 'unsupported_txt_layout'],
     ['\u200F[24/11/2026, 12:00:00] Peer: synthetic\n', 'unsupported_txt_layout'],
-    ['\uFEFF\uFEFF[24/11/2026, 12:00:00] Peer: synthetic\n', 'unsupported_txt_layout'],
+    [`${String.fromCodePoint(0xfeff).repeat(2)}[24/11/2026, 12:00:00] Peer: synthetic\n`, 'unsupported_txt_layout'],
     ['[31/2/2026, 12:00:00] Peer: synthetic\n', 'invalid_calendar_time'],
     ['[24/11/2026, 24:00:00] Peer: synthetic\n', 'invalid_calendar_time'],
     ['[24/11/2026, 12:00:00] Peer: A: synthetic\n[bad\n', 'unreviewed_record_boundaries']

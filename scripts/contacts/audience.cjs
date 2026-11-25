@@ -1,15 +1,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
-const { outputLocation } = require('./collect.cjs');
+const { hashJSON: digest, readJSONValue: readJSON, createGuard, persist, openLock, releaseLock, runCLI,
+  outputLocation } = require('./lib.cjs');
 const { curate } = require('./curated.cjs');
 const { review } = require('./identity-review.cjs');
-const { persist } = require('./local-json.cjs');
 
-const digest = value => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
-function requireValue(condition, message, code = 'invalid_audience') {
-  if (!condition) throw Object.assign(new Error(message), { code });
-}
+const requireValue = createGuard('invalid_audience');
 function object(value, fields) {
   requireValue(value && typeof value === 'object' && !Array.isArray(value) &&
     Object.keys(value).every(key => fields.includes(key)), 'Unsupported audience fields.');
@@ -127,7 +123,6 @@ function project(audience, context, identities) {
   if (included.length === 0) addIssue('no_recipients', null, true);
   return { candidates, issues };
 }
-function readJSON(file) { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); }
 function audienceReview(request, requestFolder = process.cwd(), action = 'inspect') {
   object(request, ['schemaVersion', 'dataClass', 'collection', 'mapping', 'curated', 'output',
     'expectedRevision', 'inputsDigest', 'reason', 'audience']);
@@ -155,11 +150,7 @@ function audienceReview(request, requestFolder = process.cwd(), action = 'inspec
   let lockFd;
   if (action !== 'inspect') {
     fs.mkdirSync(output, { recursive: true, mode: 0o700 });
-    try { lockFd = fs.openSync(lock, 'wx', 0o600); }
-    catch (error) {
-      if (error.code === 'EEXIST') throw Object.assign(new Error('Audience store is locked; verify the writer stopped before removing this exact lock.'), { code: 'store_locked' });
-      throw error;
-    }
+    lockFd = openLock(lock, () => Object.assign(new Error('Audience store is locked; verify the writer stopped before removing this exact lock.'), { code: 'store_locked' }));
   }
   try {
     if (lockFd !== undefined) fs.writeFileSync(lockFd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }) + '\n');
@@ -228,21 +219,22 @@ function audienceReview(request, requestFolder = process.cwd(), action = 'inspec
     if (action !== 'inspect') persist(file, state);
     return result;
   } finally {
-    if (lockFd !== undefined) { fs.closeSync(lockFd); fs.unlinkSync(lock); }
+    releaseLock(lock, lockFd);
   }
 }
 if (require.main === module) {
-  try {
+  runCLI(() => {
     const args = process.argv.slice(2);
     requireValue(args.length === 2 && ['--inspect', '--request', '--finalize'].includes(args[0]),
       'Usage: node scripts\\contacts\\audience.cjs --inspect <request.json> | --request <request.json> | --finalize <request.json>', 'invalid_arguments');
     const file = path.resolve(args[1]);
     const result = audienceReview(readJSON(file), path.dirname(file), args[0].slice(2));
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-    process.exitCode = result.exitCode;
-  } catch (error) {
+    return result.exitCode;
+  }, error => {
     process.stderr.write(`Audience review failed [${error.code || 'unexpected_error'}]: ${error.message}\n`);
-    process.exitCode = 1;
-  }
+    return 1;
+  });
 }
+
 module.exports = { audienceReview };

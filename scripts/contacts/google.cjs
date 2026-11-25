@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
-const { outputLocation } = require('./collect.cjs');
+const { readJSONValue, persist, openLock, releaseLock, runCLI, outputLocation } = require('./lib.cjs');
 
 const CONNECTOR = 'google-people-connections-v1';
 const ENDPOINT = 'https://people.googleapis.com/v1/people/me/connections';
@@ -204,17 +204,11 @@ async function acquire(options, { transport, previous = null, now = new Date().t
 }
 
 function readPrivate(file) {
-  return JSON.parse(fs.readFileSync(outputLocation(file), 'utf8').replace(/^\uFEFF/, ''));
+  return readJSONValue(outputLocation(file));
 }
 function writeAtomic(file, value) {
   check(!fs.existsSync(file) || !fs.lstatSync(file).isSymbolicLink(), 'unsafe_output');
-  const temporary = `${file}.${process.pid}.tmp`;
-  try {
-    const fd = fs.openSync(temporary, 'wx', 0o600);
-    try { fs.writeFileSync(fd, JSON.stringify(value, null, 2) + '\n'); fs.fsyncSync(fd); }
-    finally { fs.closeSync(fd); }
-    fs.renameSync(temporary, file);
-  } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
+  persist(file, value);
 }
 async function run(configFile) {
   const config = readPrivate(configFile);
@@ -230,11 +224,7 @@ async function run(configFile) {
   fs.mkdirSync(output, { recursive: true, mode: 0o700 });
   const lock = path.join(output, 'google-acquisition.lock');
   let lockFd;
-  try { lockFd = fs.openSync(lock, 'wx', 0o600); }
-  catch (error) {
-    if (error.code === 'EEXIST') throw new AdapterError('store_locked');
-    throw error;
-  }
+  lockFd = openLock(lock, () => new AdapterError('store_locked'));
   try {
     const file = path.join(output, 'google-acquisition.json');
     const saved = fs.existsSync(file) ? readPrivate(file) : null;
@@ -258,23 +248,21 @@ async function run(configFile) {
     writeAtomic(file, { schemaVersion: 1, state: result.state, report: result.report, handoffFile });
     return result;
   } finally {
-    fs.closeSync(lockFd);
-    fs.unlinkSync(lock);
+    releaseLock(lock, lockFd);
   }
 }
 if (require.main === module) {
-  (async () => {
-    try {
-      const args = process.argv.slice(2);
-      check(args.length === 2 && args[0] === '--config', 'invalid_arguments');
-      const result = await run(path.resolve(args[1]));
-      process.stdout.write(JSON.stringify({ title: result.report.title, status: result.report.status,
-        errors: result.report.errors }) + '\n');
-      process.exitCode = result.exitCode;
-    } catch (error) {
-      process.stderr.write(`Google acquisition failed [${error instanceof AdapterError ? error.code : 'local_io_or_config_failure'}].\n`);
-      process.exitCode = 1;
-    }
-  })();
+  runCLI(async () => {
+    const args = process.argv.slice(2);
+    check(args.length === 2 && args[0] === '--config', 'invalid_arguments');
+    const result = await run(path.resolve(args[1]));
+    process.stdout.write(JSON.stringify({ title: result.report.title, status: result.report.status,
+      errors: result.report.errors }) + '\n');
+    return result.exitCode;
+  }, error => {
+    process.stderr.write(`Google acquisition failed [${error instanceof AdapterError ? error.code : 'local_io_or_config_failure'}].\n`);
+    return 1;
+  });
 }
+
 module.exports = { acquire, run, CONNECTOR, ENDPOINT, PARAMETERS };

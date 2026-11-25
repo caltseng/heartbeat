@@ -1,8 +1,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
-const { outputLocation, resolvePeriod } = require('./collect.cjs');
+const { hash, parseJSON, readJSONValue, writeExclusive, runCLI, outputLocation } = require('./lib.cjs');
+const { resolvePeriod } = require('./collect.cjs');
 
 const CONNECTOR = 'messenger-json-snapshot-v1';
 class MessengerError extends Error {
@@ -16,7 +16,6 @@ function object(value, keys, code = 'invalid_manifest') {
     Object.keys(value).every(key => keys.includes(key)), code);
 }
 const text = value => typeof value === 'string' && value.trim().length > 0;
-const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 function instant(value) {
   requireValue(typeof value === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value) &&
     Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value);
@@ -157,7 +156,7 @@ function convertSnapshot(manifest, readShard) {
       const bytes = readShard(shard.path);
       requireValue(Buffer.isBuffer(bytes) && hash(bytes) === shard.sha256, 'shard_digest_mismatch');
       let native;
-      try { native = JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/, '')); }
+      try { native = parseJSON(bytes.toString('utf8')); }
       catch (failure) {
         if (!(failure instanceof SyntaxError)) throw failure;
         throw new MessengerError('invalid_shard_json');
@@ -226,9 +225,7 @@ function runRequest(request, folder) {
     fs.chmodSync(staging, 0o700);
     for (const [name, value] of Object.entries({ 'report.json': result.report,
       ...(result.handoff ? { 'handoff.json': result.handoff } : {}) })) {
-      const fd = fs.openSync(path.join(staging, name), 'wx', 0o600);
-      try { fs.writeFileSync(fd, JSON.stringify(value, null, 2) + '\n'); fs.fsyncSync(fd); }
-      finally { fs.closeSync(fd); }
+      writeExclusive(path.join(staging, name), JSON.stringify(value, null, 2) + '\n');
     }
     fs.renameSync(staging, output);
   } finally {
@@ -237,17 +234,18 @@ function runRequest(request, folder) {
   return { output, ...result };
 }
 if (require.main === module) {
-  try {
+  runCLI(() => {
     const args = process.argv.slice(2);
     requireValue(args.length === 2 && args[0] === '--synthetic-request', 'invalid_arguments');
     const file = path.resolve(args[1]);
-    const request = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
+    const request = readJSONValue(file);
     const result = runRequest(request, path.dirname(file));
     process.stdout.write(`Heartbeat synthetic Messenger conversion: ${result.report.status}; history is unverified.\n`);
-    process.exitCode = result.exitCode;
-  } catch (failure) {
+    return result.exitCode;
+  }, failure => {
     process.stderr.write(`Messenger conversion failed [${failure instanceof MessengerError ? failure.code : 'input_or_storage_failure'}].\n`);
-    process.exitCode = 1;
-  }
+    return 1;
+  });
 }
+
 module.exports = { convertSnapshot, runRequest };

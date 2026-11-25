@@ -1,10 +1,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
+const { hashJSON, publish, runCLI, readJSON, requireValue, object, outputLocation } = require('./lib.cjs');
 const { aggregate } = require('./aggregate.cjs');
 const { curate } = require('./curated.cjs');
-const { readJSON, requireValue, object, outputLocation } = require('./collect.cjs');
-const { publish } = require('./local-json.cjs');
 
 const DAY = 86400000;
 const TUNING = Object.freeze({ minimumWindowDays: 28, minimumBaselineMessages: 8,
@@ -115,9 +113,9 @@ function run(request, folder = process.cwd()) {
   const report = { heading: 'Heartbeat reconnection opportunities', schemaVersion: 1, dataClass: 'synthetic',
     context: { collectionDigest: collection.digest, identityMappingRevision: request.identityMappingRevision,
       curatedRevision: curated.revision,
-      curatedDigest: crypto.createHash('sha256').update(JSON.stringify({
+      curatedDigest: hashJSON({
         revision: curated.revision, records: curated.records, mappingDigest: curated.mappingDigest
-      })).digest('hex'),
+      }),
       baselinePeriod: before, currentPeriod: now, asOfDate, filters: current.filters,
       status: exitCode === 0 ? 'complete' : 'partial', exitCode,
       tuning: { status: 'engineering_proposal_not_relationship_score', ...TUNING },
@@ -144,17 +142,18 @@ function run(request, folder = process.cwd()) {
   return { heading: report.heading, file, status: report.context.status, exitCode };
 }
 if (require.main === module) {
-  try {
+  runCLI(() => {
     const args = process.argv.slice(2);
     requireValue(args.length === 2 && args[0] === '--request',
       'Usage: node scripts\\contacts\\opportunities.cjs --request <request.json>', 'invalid_arguments');
     const file = path.resolve(args[1]);
     const result = run(readJSON(file).value, path.dirname(file));
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-    process.exitCode = result.exitCode;
-  } catch (error) {
+    return result.exitCode;
+  }, error => {
     process.stderr.write(`Opportunities failed [${error.code || 'unexpected_error'}]: ${error.message}\n`);
-    process.exitCode = 1;
-  }
+    return 1;
+  });
 }
+
 module.exports = { run };
