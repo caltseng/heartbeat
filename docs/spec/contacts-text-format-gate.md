@@ -6,8 +6,16 @@ Select **an owner-operated Android phone, SMS Backup & Restore by SyncTech
 v10.30.009, uncompressed full-backup XML**, with Android 14 as the initial
 reference platform. This is a bounded format selection for CONTACTS-016, not a
 claim that an Android 14 device or that producer version has been tested here.
-No actual device, SIM, backup, account or self number has been selected or read.
+No specific device, SIM, backup, account or self number has been selected or read
+by this task.
 Different Android/producer versions require a separately reviewed profile.
+
+Coordinator-relayed platform fact (2026-11-25): the owner confirmed Android and
+accepted SMS Backup & Restore / SyncTech XML through an existing owner question.
+The platform/format choice therefore has no remaining device-design hold.
+This is relayed selection evidence, not device inspection: Android 14 and producer
+10.30.009 remain unverified reference assumptions. It grants no source/account
+access, raw-content processing or private-run authorization.
 
 Rationale: documented local XML exposes direction, epoch timestamps and MMS
 recipient roles without a hosted integration or pairing. Android 14 is a
@@ -28,15 +36,17 @@ an arbitrary file because it has an `.xml` extension.
 
 | Route | Callable now | Selected next step / limitation |
 | --- | --- | --- |
-| Shared `contacts:collect` metadata handoff | Yes, schemaVersion 1 | Import normalized `text-messages` only; no XML input. |
-| Local SyncTech XML to metadata | No | CONTACTS-016 implements only this selected profile with synthetic fixtures first. Until then native XML is `unsupported`, reason `text_xml_converter_not_implemented`. |
+| Shared `contacts:collect` metadata handoff | Synthetic only, schemaVersion 1 | Import normalized `text-messages` only; no XML input. Private requests fail closed. |
+| Local SyncTech XML to metadata | Synthetic only | [CONTACTS-016](contacts-text-converter.md) implements only this selected profile and synthetic fixtures. Private conversion fails before raw XML inspection with exit 1 / `private_collection_disabled`; no device or actual export is verified. |
 | Device or Android database reader | No | Owner-created local export only; no ADB, root, database probing, bridge, pairing or default-app switch. |
 | RCS, including Google/Samsung messages serialized as SMS/MMS | No | Unsupported in v1; XML container type alone cannot prove transport. Ambiguous protocol must not become SMS/MMS. |
 | iMessage/iOS/macOS databases, Apple/iCloud backups | No | Unsupported; this Android route provides no Apple history. |
 | Cloud/carrier history, linked devices, CSV/HTML, ZIP/encrypted, incremental/archive/split backups | No | Not selected; no cloud login, password acquisition or archive assembly. |
 
-This decision closes format selection only. CONTACTS-010 approval **and**
-source-specific authorization are still required before any real run. No
+This decision closes format selection only. The approved CONTACTS-010 policy
+does not authorize a source or run: verified local controls, exact source/account
+and each-run approval, plus a separate raw-content processing boundary are still
+required before any real run. No
 installation, private-source inspection or acquisition was performed for this
 gate. Preserve the existing single-user local JSON importer; no server or new
 storage/schema family is needed.
@@ -46,10 +56,12 @@ storage/schema family is needed.
 1. Obtain a bounded authorization naming the owner-controlled phone and source
    account/SIM scope, selected conversations/interval, purpose and self identities.
    The owner must have authority to process the participants' metadata under the
-   applicable law; phone possession alone is not blanket permission. Separately
-   approve CONTACTS-010 storage, Windows ACL/encryption, retention, deletion and
-   backup policy. If either approval is absent, report `requires_setup` without
-   opening a device, backup, private browser or account.
+   applicable law; phone possession alone is not blanket permission. Enforce
+   the approved CONTACTS-010 storage, Windows ACL/encryption, retention, deletion
+   and backup policy and obtain separate owner approval for each real run.
+   If approval or verified controls are absent, stop without opening a device,
+   backup, private browser or account. The current CLI rejects private manifests
+   with `private_collection_disabled`; there is no approval override.
 2. The owner, not the agent, selects/installs the legitimate SyncTech app if
    separately approved, confirms Android and producer versions, and reviews its
    permissions. Use a manual, local-only full backup for the approved scope.
@@ -62,14 +74,16 @@ storage/schema family is needed.
    subjects, attachment names and other sensitive content. A metadata-only
    destination does **not** make acquisition metadata-only. Approval must cover
    the raw export and its transient local processing or the route stays blocked.
-4. The owner manually provides the approved local file in ignored `.private/`
-   or an approved external local folder. Keep the immutable original and private
+4. Any future approved real file must stay on this computer outside Git worktrees
+   and cloud-synced folders, with verified Windows-user access restrictions,
+   encryption and backup exclusions. Ignored `.private/` is for synthetic
+   fixtures only, not approved real-data storage. Keep the immutable original and private
    acquisition manifest together: file digest, producer/OS, device/account/SIM
    scope, backup time, filters, protocol evidence, missing history, requested
    interval, IANA reporting zone, as-of, authorization reference and retention.
    These manifests, digests and mappings are private too; never attach them to a
    PR, CI log, public viewer or external processing service.
-5. After CONTACTS-016 exists, convert locally through a strict metadata projection.
+5. After a separately reviewed real-run path exists, convert locally through a strict metadata projection.
    Do not feed XML to the shared importer. Discard bodies/parts/subjects and raw
    vendor fields from normalized output and logs; never execute stylesheets,
    resolve external entities/DTDs or retrieve referenced attachments. Validate
@@ -200,8 +214,10 @@ unavailable/partial/failed sources and 1 for fatal request/storage errors.
 CONTACTS-016 must exercise synthetic direct SMS, four-person MMS, role/direction
 ambiguity, millisecond/DST boundaries, absent IDs/self/thread evidence, RCS
 ambiguity, duplicate-looking rows, exact replay, changed/overlapping archives,
-invalid XML/counts, content exclusion and unavailable outcomes. This gate adds
-no parser, real-data fixture or new test tooling.
+invalid XML/counts, content exclusion and unavailable outcomes. This gate itself adds no parser, real-data fixture or new test tooling.
+The [CONTACTS-016 converter contract](contacts-text-converter.md) records the
+bounded synthetic implementation, manifest, conservative failures and engineering
+decisions; it does not lift the real-run boundary.
 
 ## Public evidence and remaining uncertainty
 

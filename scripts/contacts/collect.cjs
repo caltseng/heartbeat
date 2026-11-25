@@ -230,10 +230,27 @@ function persist(file, state) {
 }
 function importSource(source, requestFolder, request, period, state, file, report) {
   const input = readJSON(path.resolve(requestFolder, source.input));
-  object(input.value, ['schemaVersion', 'dataClass', 'source', 'account', 'connector', 'coverage', 'pages', 'errors'], 'handoff');
+  object(input.value, ['schemaVersion', 'dataClass', 'source', 'account', 'connector', 'coverage', 'pages', 'errors', 'textArchive'], 'handoff');
   const handoff = input.value;
   requireValue(handoff.schemaVersion === 1 && handoff.dataClass === request.dataClass, 'Handoff version/data class does not match the request.');
   requireValue(['source', 'account', 'connector'].every(field => handoff[field] === source[field]), 'Handoff source/account/connector does not match the request.');
+  const archiveKey = JSON.stringify([source.source, source.account]);
+  const previousArchive = state.textArchives?.[archiveKey];
+  if (handoff.textArchive !== undefined) {
+    const archive = handoff.textArchive;
+    object(archive, ['profile', 'archiveRef', 'sha256', 'ledgerDigest'], 'textArchive');
+    requireValue(source.source === 'text-messages' && source.connector === 'synctech-xml-metadata-v1' &&
+      handoff.dataClass === 'synthetic' && archive.profile === source.connector &&
+      typeof archive.archiveRef === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(archive.archiveRef) &&
+      [archive.sha256, archive.ledgerDigest].every(value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)),
+    'Invalid synthetic text archive binding.');
+    requireValue(previousArchive ? isDeepStrictEqual(previousArchive, archive) :
+      !Object.keys(state.records).some(recordKey => {
+        const [family, account, type] = JSON.parse(recordKey);
+        return family === source.source && account === source.account && type === 'event';
+      }), 'A changed, overlapping or unbound text archive requires explicit reconciliation.', 'text_archive_conflict');
+  } else requireValue(!previousArchive && source.connector !== 'synctech-xml-metadata-v1',
+    'This text source/account requires its original archive binding.', 'text_archive_conflict');
   const declaredCoverage = coverage(handoff.coverage, source.source);
   report.upstreamErrors = array(handoff.errors === undefined ? [] : handoff.errors, 'handoff.errors').map(error => {
     object(error, ['code', 'retryable'], 'upstream error');
@@ -267,6 +284,10 @@ function importSource(source, requestFolder, request, period, state, file, repor
         duplicates++;
         if (!existing.provenance.some(item => isDeepStrictEqual(item, addition.provenance))) existing.provenance.push(addition.provenance);
       } else state.records[addition.key] = { record: addition.record, provenance: [addition.provenance] };
+    }
+    if (handoff.textArchive) {
+      state.textArchives ||= {};
+      state.textArchives[archiveKey] = handoff.textArchive;
     }
     processed++;
     report.persistedPages = processed;
@@ -330,7 +351,7 @@ function collect(request, requestFolder = process.cwd()) {
       sources: sources.map(source => ({ source: source.source, account: source.account, connector: source.connector, status: 'pending',
         persistedPages: 0, duplicateRecords: 0, coverage: null, retrievedAt: null, paginationComplete: false, nextCursor: null })),
       unresolvedIdentityKeys: [],
-      limitations: ['Metadata handoff imports only; no live endpoint adapters or native archive parsers.',
+      limitations: ['Metadata handoff imports only; native conversion is separate and no live endpoints are connected.',
         'Provider/account namespaces and local IDs require review before overlapping imports.',
         'Reactions, edits, deletions and membership events are retained separately, not reconciled into message counts.'] };
     persist(file, state);
