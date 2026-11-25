@@ -144,3 +144,12 @@ counts, preserve inactive peers, exact zeros versus unknown/lower bounds,
 cross-channel reviewed identities, DST/skipped-date calendars, 7d/30d/custom
 bounds, standalone view context, immutable CLI output and private-run denial.
 The workflow guard also exercises collection-to-summary without changed inputs.
+
+The [CONTACTS-028 reconnection review](spec/contacts-reconnection-review.md) adds
+`contacts:reconnect`, `check:reconnection` and `reconnection.test.cjs` to CI.
+Synthetic cases cover evidence-category ordering/overflow, due civil-day
+boundaries, unknown/confirmed/observed separation, original notes and prayer
+status, direct/group/passive membership, saved links, thread tombstones,
+follow-up completion, deferral expiry without rhythm changes, stale input/revision,
+atomic rollback, immutable report publication and sanitized CLI 0/2/1 exits.
+No real content, source access, sending or schedules are authorized.

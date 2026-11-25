@@ -22,6 +22,10 @@ editable plans](contacts-prayer-triage.md) over original curated notes in a sepa
 private-local-only JSON overlay. It neither changes collection nor exports outreach.
 CONTACTS-030 adds [synthetic local audience review](contacts-life-update-audience.md)
 over those canonical households, with separate exact-input finalization and no sending.
+CONTACTS-028 adds [synthetic household reconnection review](contacts-reconnection-review.md)
+from current curated records and the shared period dataset, with explicit
+follow-ups, completion, deferral, optional saved prayer context and private
+immutable reports. It does not change collector schemas or create schedules.
 
 Confirmed execution boundary: **one user, local tool, local store in a private
 location**. Prove the flow in Heartbeat before polished design. No hosted

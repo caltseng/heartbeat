@@ -78,7 +78,15 @@ the complete reviewed people cohort, channel counts and coverage-aware daily
 timeline. All views share period/zone/as-of, mapping binding, source freshness,
 coverage and exclusions. See the [reporting contract and decisions](docs/spec/contacts-period-summary.md).
 
-Reconnection signals and Heartbeat's map are **not implemented**. Missing source
+CONTACTS-028 adds `contacts:reconnect` and `contacts-reconnection` for a
+user-invoked synthetic household review: evidence-backed due rhythms and
+commitments, confirmed dates or unknown, original context, existing thread
+references, explicit follow-up completion and rhythm-preserving deferral.
+Optional saved prayer context retains ambiguous status. Reviews can be saved as
+immutable private local reports; nothing sends or schedules. See the
+[workflow and delegated decisions](docs/spec/contacts-reconnection-review.md).
+
+Historical-baseline outlier signals and Heartbeat's map are **not implemented**. Missing source
 data means unknown, not zero. No private accounts, devices, browser sessions,
 credentials or real data are included or authorized by this repository.
 
