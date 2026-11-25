@@ -23,7 +23,8 @@ test('private ignored workflow stays local, including reports and graph files', 
   const f = fixture(t);
   f.write('.gitignore', '.private/\n');
   for (const file of ['config.local.json', 'request.synthetic.json', 'collection.json',
-    'collection.lock', 'identity-map.json', 'aggregates.json', 'report.json', 'graph.html', 'graph.svg']) {
+    'collection.lock', 'identity-review.json', 'identity-review.lock', 'identity-review.json.123.tmp',
+    'aggregates.json', 'report.json', 'graph.html', 'graph.svg']) {
     f.write(path.join('.private', 'contacts', 'synthetic', file));
   }
   f.write(path.join('docs', 'spec', 'contacts-local-workflow.md'));
@@ -52,7 +53,8 @@ test('all public output roots reject docs, tooling, private data, checkpoints an
 test('reserved private handoffs fail outside ignored storage', t => {
   const f = fixture(t);
   for (const name of ['request.json', 'request.synthetic.json', 'collection.json', 'collection.lock',
-    'collection.json.123.tmp', 'config.local.json', 'identity-map.json', 'aggregates.json',
+    'collection.json.123.tmp', 'config.local.json', 'identity-review.json', 'identity-review.lock',
+    'identity-review.json.123.tmp', 'aggregates.json',
     'report.json', 'graph.html', 'graph.svg', '.env.local', 'private.key']) {
     const target = f.write(path.join('accidental', name));
     assert.throws(() => checkBoundary(f.root), /Private operational artifact/);

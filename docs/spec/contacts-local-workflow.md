@@ -68,7 +68,7 @@ An exhausted cursor never proves complete upstream history.
 The implemented configuration is the version-1 collection request itself:
 period/as-of/time zone, output, source/account/connector references, input paths,
 resume and optional page budget. Paths resolve relative to the request file,
-not the shell. Do not put account IDs, paths, self identities or configuration in
+not the shell. Do not put real account IDs, local paths, self identities or configuration in
 package scripts, tracked fixtures, environment examples or skills. There is no
 additional config loader, credential store or product account system.
 
@@ -82,7 +82,9 @@ Example reserved layout; only the collection files are generated today:
     collection.json
     collection.lock                 # during collection only
   reviewed/
-    identity-map.json               # future CONTACTS-022
+    identity-review.json            # CONTACTS-022 handoff
+    identity-review.lock            # only during an identity-review write
+    identity-review.json.<pid>.tmp   # transient atomic-write staging file
   reports/<chosen-run>/
     aggregates.json                 # future CONTACTS-023
     report.json                     # future CONTACTS-024
@@ -93,7 +95,7 @@ Example reserved layout; only the collection files are generated today:
 | --- | --- | --- |
 | Acquisition/demo -> collector | Existing `schemaVersion:1` request and source envelopes | Same data class; explicit source/account/connector, self IDs, roles, period, coverage and provenance. All desired unavailable sources are entries, not omissions. |
 | Collector -> identity review | Existing `schemaVersion:1` `collection.json` | Read records, checkpoints, manifest and history as one atomic generation; retain source keys and unknown coverage. Do not edit source evidence to resolve a person. |
-| Identity review -> reducer | Reserved `identity-map.json`; schema defined by 022 | Explicit mapping revision, reviewed namespaces, reversible decisions and unresolved people. Names/group membership cannot imply merges or households. |
+| Identity review -> reducer | `identity-review.json`; schema defined by 022 | Explicit mapping revision, reviewed namespaces, reversible decisions and unresolved people. Names/group membership cannot imply merges or households. |
 | Collection + mapping -> reducer | Reserved `aggregates.json`; schema defined by 023 | Pin exact collection bytes (SHA-256), data class, mapping revision and resolved half-open period/time zone/as-of. Reconcile source IDs, direct/group roles, exclusions and unknown/lower-bound coverage. |
 | Reducer -> Heartbeat summary | Reserved `report.json`; schema defined by 024 | Versioned shared dataset with the same input references, filters, source freshness/coverage, exclusions, counts and daily timeline. Narrative must not invent numbers. |
 | Shared report -> Heartbeat graph | Reserved private `graph.html` / `graph.svg`; renderer defined by 025 | Same report revision/digest, period and filters in all views; explain group-only/inactive/unknown categories. Offline files, no remote assets, telemetry or hosted service. |
@@ -153,6 +155,10 @@ There is deliberately **no public build or deployment output**.
 - Can audit an additional export destination with
   `npm run check:private -- --output <public-output-directory>`. This is a check,
   never a generator, uploader or deletion command.
+
+For this npm command, `--output` accepts an absolute or repo-relative path
+(npm runs the script from the package root). It does not resolve relative to a
+collection request.
 
 The repository's docs/tooling remain intentionally tracked source; they are not
 a website. Ignored `.private` files remain local and are permitted. Checks do

@@ -4,7 +4,7 @@ const { execFileSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const OUTPUT_ROOTS = ['public', 'dist', 'build', 'out', '_site', '.output'];
-const PRIVATE_FILE = /^(?:collection\.(?:json(?:\.\d+\.tmp)?|lock)|request(?:\.synthetic)?\.json|config\.local\.json|identity-map\.json|aggregates\.json|report\.json|graph\.(?:html|svg))$/i;
+const PRIVATE_FILE = /^(?:(?:collection|identity-review)\.(?:json(?:\.\d+\.tmp)?|lock)|request(?:\.synthetic)?\.json|config\.local\.json|aggregates\.json|report\.json|graph\.(?:html|svg))$/i;
 
 function checkBoundary(root = ROOT, extraOutputs = []) {
   for (const output of [...OUTPUT_ROOTS.map(name => path.join(root, name)), ...extraOutputs]) {
