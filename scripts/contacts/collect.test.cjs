@@ -536,6 +536,29 @@ test('historical membership intervals preserve group rosters and bound direct-th
   assert.equal(events(f.state()).length, 2);
 });
 
+test('same-page revision indexes preserve ancestry, latest references, replay and atomic conflicts', t => {
+  const f = fixture(t), page = f.input.pages[0];
+  const original = structuredClone(page.identities[1]);
+  page.identities.push({ ...original, displayName: 'Synthetic revised peer',
+    revision: { id: 'peer-2', supersedes: '$initial' } });
+  const thread = structuredClone(page.threads[0]);
+  page.threads.push({ ...thread, kind: 'group', revision: { id: 'thread-2', supersedes: '$initial' } },
+    { ...thread, revision: { id: 'thread-3', supersedes: 'thread-2' } });
+  page.events.push(structuredClone(page.events[0]));
+  assert.equal(f.run().exitCode, 0);
+  const before = f.state();
+  const threadKey = JSON.stringify(['email', f.input.account, 'thread', thread.id]);
+  assert.deepEqual(before.records[threadKey].revisions.map(row => row.id), ['$initial', 'thread-2', 'thread-3']);
+  assert.equal(events(before)[0].provenance[0].context.threadRevision, 'thread-3');
+  assert.equal(before.manifest.sources[0].duplicateRecords, 1);
+  assert.equal(f.run().exitCode, 0);
+  assert.deepEqual(f.state().records, before.records);
+  page.identities.push({ ...original, displayName: 'Conflicting same-page revision',
+    revision: { id: 'peer-2', supersedes: '$initial' } });
+  assert.equal(f.run().manifest.sources[0].error.code, 'record_conflict');
+  assert.deepEqual(f.state().records, before.records);
+});
+
 test('calendar presets, DST boundaries, 30 days, custom offsets and invalid dates are explicit', () => {
   const spring = resolvePeriod({ preset: '7d', timeZone: 'America/New_York', asOf: '2026-03-10T16:00:00Z' });
   assert.equal(spring.start, '2026-03-04T05:00:00.000Z');
