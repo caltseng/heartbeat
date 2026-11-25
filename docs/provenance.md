@@ -36,6 +36,7 @@ CONTACTS-001 through CONTACTS-004 identify this inherited runnable baseline,
 not live acquisition. All 23 remaining CONTACTS-010 through CONTACTS-032 items
 remain blocked from execution until this meaningful Heartbeat bootstrap is
 verified merged/checked in. Publication/green CI is not merge evidence.
-Independent exact-head review and owner merge are required; actual PR/head/check
-and merge evidence must be reported separately when observed. No local or remote
+Independent exact-final-head review and an authorized merge under the current
+[delivery rules](development.md#delivery-and-active-execution-adoption) are required;
+actual PR/head/check and merge evidence must be reported separately when observed. No local or remote
 synthetic check establishes access to private endpoints.
