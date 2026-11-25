@@ -125,6 +125,15 @@ with their exact source/account/connector and coverage. Native acquisition
 checkpoints are not collector cursors; use each producer's recovery contract.
 There is no Messenger/WhatsApp converter command or live-source access implied.
 
+`npm run contacts:operate -- --request <operation.synthetic.json>` adds explicit
+synthetic refresh/resync, stale-source reporting, inventoried whole-cache
+retention/deletion and interrupted-purge recovery. Follow its separate
+[CONTACTS-032 managed-store layout and contract](contacts-source-operations.md);
+managed stores use operations refresh/resync rather than direct collection.
+Keep curated overlays separate from cache/derived targets. Operation requests
+are private operational artifacts guarded by `check:private`, too.
+No private source access or recurring schedule is enabled.
+
 ## Local configuration and versioned file handoffs
 
 Collection configuration is its existing version-1 request:
@@ -192,6 +201,11 @@ or invalid inputs block downstream work. Until those consumers exist, stop at
 the reviewed overlay: there is no numerical report, graph or all-in-one command.
 
 ## Recovery without losing source evidence
+
+These replay instructions apply to unpurged, unmanaged stores. In a managed
+CONTACTS-032 store, use its explicit recovery/refresh/resync commands; a pending
+purge must finish before imports, and erased history must not be restored from
+old handoffs or checkpoints.
 
 For replay use the original request and retained handoffs. For interrupted or
 page-budgeted collection, inspect the local manifest and checkpoint; confirm

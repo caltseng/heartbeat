@@ -25,8 +25,11 @@ Skills are instructions, not installed provider connectors. `collect.cjs` uses
 only Node's standard library; `demo.cjs` generates synthetic normalized input.
 The shared importer rejects private requests before reading handoffs or creating
 output; [CONTACTS-010](privacy.md) records approved policy, not source/run consent.
-No Windows protection verifier or operational retention/deletion route ships yet,
-so no private import is enabled.
+No Windows protection verifier ships, so no private import is enabled.
+[CONTACTS-032](spec/contacts-source-operations.md) adds synthetic-only operations,
+inventoried whole-cache retention/deletion and explicit interrupted-purge recovery.
+Managed stores retain non-identifying time fences and use operations refresh/resync
+to check retention at time of use; curated files are opaque and unchanged.
 Acquisition and ingestion are separate. No stage requires a hosted service,
 server, dashboard, product login, multi-tenancy or deployment. Future generated
 HTML/SVG/JSON must remain private local files; no renderer exists yet.

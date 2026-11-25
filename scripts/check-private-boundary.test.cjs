@@ -22,7 +22,7 @@ function fixture(t) {
 test('private ignored workflow stays local, including reports and graph files', t => {
   const f = fixture(t);
   f.write('.gitignore', '.private/\n');
-  for (const file of ['config.local.json', 'request.synthetic.json', 'collection.json',
+  for (const file of ['config.local.json', 'request.synthetic.json', 'operation.synthetic.json', 'collection.json',
     'collection.lock', 'identity-review.json', 'identity-review.lock', 'identity-review.json.123.tmp',
     'identity-review.json.lock', 'identity-review.json.tmp', 'google-acquisition.json',
     'google-acquisition.lock', 'google-acquisition.json.123.tmp', 'google-handoff-synthetic.json',
@@ -56,7 +56,7 @@ test('all public output roots reject docs, tooling, private data, checkpoints an
 
 test('reserved private handoffs fail outside ignored storage', t => {
   const f = fixture(t);
-  for (const name of ['request.json', 'request.synthetic.json', 'collection.json', 'collection.lock',
+  for (const name of ['request.json', 'request.synthetic.json', 'operation.json', 'operation.synthetic.json', 'collection.json', 'collection.lock',
     'collection.json.123.tmp', 'config.local.json', 'identity-review.json', 'identity-review.lock',
     'identity-review.json.123.tmp', 'identity-review.json.lock', 'identity-review.json.tmp',
     'google-acquisition.json', 'google-acquisition.lock', 'google-acquisition.json.123.tmp',

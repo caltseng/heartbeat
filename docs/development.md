@@ -56,6 +56,12 @@ tombstone/collision/missing links, and requires explicit metadata refresh. Its
 integration cases exercise the actual collector's revision/target semantics,
 including informational historical pending targets.
 
+CONTACTS-032 adds `operations.test.cjs` and `check:operations` to `npm run ci`.
+The [source operations contract](spec/contacts-source-operations.md) covers
+synthetic refresh/resync, stale/disconnected sources, calendar retention,
+inventoried cache deletion, replay fences and interrupted-purge recovery.
+All checks remain dependency-free, synthetic and account-free.
+
 The [local workflow](spec/contacts-local-workflow.md) defines current commands,
 future versioned handoffs and recovery. `npm run check:private` rejects nonempty
 public output roots and private operational Git candidates, including force-added

@@ -210,6 +210,15 @@ function preparePage(page, source, state, provenance) {
   cursor(page.cursor); cursor(page.nextCursor);
   requireValue(page.nextCursor === null || page.nextCursor !== page.cursor, 'A page cannot advance to its own cursor.');
   const retrievedAt = instant(page.retrievedAt, 'page.retrievedAt');
+  if (state.operations) {
+    const { cutoff, deletedThrough } = state.operations;
+    requireValue(!deletedThrough || retrievedAt > deletedThrough,
+      'Deleted acquisition metadata cannot be replayed; explicitly acquire a fresh synthetic snapshot.', 'deleted_input');
+    requireValue(retrievedAt > cutoff && array(page.events, 'page.events').every(event =>
+      instant(event.timestamp, 'event.timestamp') > cutoff &&
+      (!deletedThrough || instant(event.timestamp, 'event.timestamp') > deletedThrough)),
+    'This page contains expired or explicitly deleted metadata; prepare a bounded fresh handoff.', 'retention_required');
+  }
   const prefix = (type, id) => {
     const mapping = state.overlapReviews.flatMap(review => review.mappings).find(item => item.source === source.source &&
       item.account === source.account && item.connector === source.connector && item.type === type && item.id === id);
@@ -478,7 +487,7 @@ function importSource(source, requestFolder, request, period, state, file, repor
   if (report.upstreamErrors.length) report.status = 'partial';
   report.observedOnly = report.status !== 'collected';
 }
-function collect(request, requestFolder = process.cwd()) {
+function collect(request, requestFolder = process.cwd(), operationAsOf = null) {
   object(request, ['schemaVersion', 'dataClass', 'period', 'output', 'sources', 'resume', 'maxPages', 'overlapReview'], 'request');
   requireValue(request.schemaVersion === 1, 'Only schemaVersion 1 is supported.');
   requireValue(['synthetic', 'private'].includes(request.dataClass), 'dataClass must be synthetic or private.');
@@ -509,6 +518,10 @@ function collect(request, requestFolder = process.cwd()) {
     const state = fs.existsSync(file) ? readJSON(file).value : { schemaVersion: 1, dataClass: request.dataClass, records: {}, checkpoints: {}, history: [] };
     requireValue(state.schemaVersion === 1 && state.dataClass === request.dataClass && state.records && state.checkpoints && Array.isArray(state.history),
       'Stored schema/data class does not match.');
+    requireValue(!state.operations?.pendingArtifacts,
+      'An interrupted purge must finish with contacts:operate recover before importing.', 'recovery_required');
+    requireValue(!state.operations || operationAsOf === state.operations.asOf,
+      'Use contacts:operate refresh/resync for this managed store so retention is checked at time of use.', 'operation_required');
     state.overlapReviews ||= [];
     if (overlapReview) {
       const previousReview = state.overlapReviews.find(row => row.revision === overlapReview.revision);
@@ -583,4 +596,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { collect, resolvePeriod, outputLocation };
+module.exports = { collect, resolvePeriod, outputLocation, persist, readJSON, instant, requireValue, object };
