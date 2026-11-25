@@ -123,3 +123,11 @@ synthetic-only. Its fixtures cover exact mapping/snapshot binding, half-open
 boundaries, DST date unions, source-ID deduplication, historical thread context,
 direct/group/To/CC/BCC semantics, coverage bounds and immutable CLI output.
 Renderers remain distinct work items.
+
+The [CONTACTS-024 period report](spec/contacts-period-summary.md) adds
+`contacts:summary`, a focused presentation skill, `summary.test.cjs` and
+`check:summary` in CI. Synthetic cases reconcile summary/table/channel/timeline
+counts, preserve inactive peers, exact zeros versus unknown/lower bounds,
+cross-channel reviewed identities, DST/skipped-date calendars, 7d/30d/custom
+bounds, standalone view context, immutable CLI output and private-run denial.
+The workflow guard also exercises collection-to-summary without changed inputs.
