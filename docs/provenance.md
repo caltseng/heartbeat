@@ -20,9 +20,10 @@ merge **`2b222e03ccbe819764eb3a133c318035945f1eac`**, whose final PR head was
   `contacts-google-identities`, `contacts-email-activity`,
   `contacts-text-activity`, `contacts-messenger-activity` and
   `contacts-whatsapp-activity` skills: preserved collection instructions.
-- `scripts/contacts/collect.cjs`, `demo.cjs`, `collect.test.cjs`: exact source
-  implementation, helper/fixture generator and synthetic tests. The importer
-  includes its validators; no missing external helper or package is required.
+- `scripts/contacts/collect.cjs`, `demo.cjs`, `collect.test.cjs`: the bootstrap's
+  source implementation, helper/fixture generator and synthetic tests.
+  Their current TypeScript counterparts use `.ts`; see
+  [development setup](development.md#checks-and-ci) for the pinned toolchain.
 
 The minimal dependency-free `package.json`, GitHub Actions workflow, repository
 rules, README and Heartbeat architecture/privacy/development docs are new.

@@ -8,7 +8,7 @@ Synthetic SyncTech XML -> metadata handoff [IMPLEMENTED: CONTACTS-016]
                          |
 Normalized handoff JSON, or synthetic demo [IMPLEMENTED]
                          |
-Six collection skills -> collect.cjs validation/import [IMPLEMENTED]
+Six collection skills -> collect.ts validation/import [IMPLEMENTED]
                          |
 Private collection.json: records + checkpoints + manifest + history [IMPLEMENTED]
                          |
@@ -22,8 +22,8 @@ Heartbeat baseline/rhythm signals [IMPLEMENTED: CONTACTS-026, SYNTHETIC ONLY]
 Heartbeat local map [PLANNED: CONTACTS-025]
 ```
 
-Skills are instructions, not installed provider connectors. `collect.cjs` uses
-only Node's standard library; `demo.cjs` generates synthetic normalized input.
+Skills are instructions, not installed provider connectors. `collect.ts` uses
+only Node's standard library; `demo.ts` generates synthetic normalized input.
 The shared importer rejects private requests before reading handoffs or creating
 output; [CONTACTS-010](privacy.md) records approved policy, not source/run consent.
 No Windows protection verifier ships, so no private import is enabled.
@@ -35,7 +35,7 @@ Acquisition and ingestion are separate. No stage requires a hosted service,
 server, dashboard, product login, multi-tenancy or deployment. Future generated
 HTML/SVG/JSON must remain private local files; no renderer exists yet.
 
-[CONTACTS-014](spec/contacts-email-adapter.md) adds `email.cjs`: injected native
+[CONTACTS-014](spec/contacts-email-adapter.md) adds `email.ts`: injected native
 Gmail metadata enumeration/conversion with a synthetic-only fixture CLI. A fresh
 private acquisition directory atomically publishes `handoff.json`,
 `checkpoint.json` (native list token and normalized accumulator) and `report.json`.

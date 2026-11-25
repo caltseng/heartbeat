@@ -241,7 +241,7 @@ validation is delivered.
 
 ## CONTACTS-020 operation and delegated decisions
 
-The dependency-free `scripts/contacts/whatsapp.cjs` module and CLI are
+The TypeScript `scripts/contacts/whatsapp.ts` module and CLI are
 **synthetic-only local snapshot conversion**, not an API, linked-device reader
 or ongoing refresh. There is no account, network, credential, pairing, sending,
 browser or scheduler implementation. Real imports remain disabled even if a

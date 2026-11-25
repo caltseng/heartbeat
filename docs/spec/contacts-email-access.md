@@ -138,7 +138,7 @@ because none were issued by a provider. Exhausted pagination deliberately
 coexists with partial history. The fixture's proven direct case must not be
 generalized to real Gmail headers.
 
-Focused cases in `scripts/contacts/collect.test.cjs` import that payload, check
+Focused cases in `scripts/contacts/collect.test.ts` import that payload, check
 one event per message and preserved roles/classes, replay it without duplicates,
 and verify that incomplete/unsupported access stays nonzero. No network, body
 read, account access, credential acquisition or package installation is needed.

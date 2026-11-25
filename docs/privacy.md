@@ -28,7 +28,7 @@ The [selected text XML converter](spec/contacts-text-converter.md) accepts
 synthetic fixtures only. It rejects private manifests with exit 1 / `private_collection_disabled`
 before inspecting the raw archive path; no transient body read is authorized.
 
-`collect.cjs` rejects every `dataClass: private` request with
+`collect.ts` rejects every `dataClass: private` request with
 `private_collection_disabled` before resolving output, reading source handoffs,
 creating directories/locks, or changing snapshots. The CLI exits 1 and prints no
 manifest/account references for this denial. Even an unavailable-only private

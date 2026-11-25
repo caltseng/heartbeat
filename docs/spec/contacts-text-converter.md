@@ -2,7 +2,7 @@
 
 ## Delivered boundary
 
-`scripts/contacts/text-xml.cjs` converts **synthetic fixtures only** for the
+`scripts/contacts/text-xml.ts` converts **synthetic fixtures only** for the
 [CONTACTS-015 selected profile](contacts-text-format-gate.md):
 `synctech-xml-metadata-v1`, Android 14, SyncTech SMS Backup & Restore 10.30.009,
 UTF-8 uncompressed full XML. It is not a device reader, account connector,
@@ -161,4 +161,4 @@ policy**. No decision grants real-source access, external processing or sending.
 | Preserve good metadata alongside ordinal-only setup errors; otherwise fail the bundle before writing. Unknown thread fallback stays unknown; history always unknown. | Dropping gaps silently or asserting complete export history would misrepresent evidence. Local XML is not source-wide history. | Direct/four-person group, outgoing roles, absent self/addresses/thread, exclusions, DST instants and unknown empty archive tested. Revisit when supported source evidence establishes stronger coverage, never from row count alone. |
 
 `npm run ci` runs the existing collection baseline plus synthetic converter tests;
-it requires no dependencies, accounts, browser, device or network.
+after `npm ci`, it requires no accounts, browser, device or network.

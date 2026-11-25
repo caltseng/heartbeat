@@ -2,7 +2,7 @@
 
 ## Delivered boundary
 
-`scripts/contacts/email.cjs` implements the Gmail metadata enumeration/normalization
+`scripts/contacts/email.ts` implements the Gmail metadata enumeration/normalization
 route selected by [CONTACTS-013](contacts-email-access.md), through an injected
 `list/get/now` transport. The callable CLI supplies **only a local synthetic
 fixture transport**. There is no HTTP transport, OAuth setup, credential loading,
@@ -94,7 +94,7 @@ Minimal matching native fixture:
 Fixture pages map native `pageToken` to `response`; responses can contain
 `nextPageToken`. A response/detail of `{"errorStatus": 401}` injects an auth
 failure, without an account. Synthetic cases and transport assertions live in
-`scripts/contacts/email.test.cjs`.
+`scripts/contacts/email.test.ts`.
 
 A successful filesystem publication creates a **fresh, immutable directory**:
 

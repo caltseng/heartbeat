@@ -127,7 +127,7 @@ confirmed meaningful-connection date from observed activity.
 
 ## 1. Repository fit and first vertical slice
 
-Heartbeat uses dependency-free Node.js 20+ CommonJS scripts and skills in
+Heartbeat uses Node.js 20+ TypeScript scripts (run with the pinned `tsx` toolchain) and skills in
 `.github/skills/<name>/SKILL.md`. This bootstrap migrates only the existing
 CONTACTS-001 through CONTACTS-004 baseline from the immutable source merge.
 There is no website, backend, OAuth service or deployment stack. Reuse Node's
@@ -144,7 +144,7 @@ The smallest delivered slice is:
 3. Use a separately authorized, already available tool to produce the metadata
    handoff below, or explicitly record that source as unavailable. Discovery is
    not authorization to connect an account or install a bridge.
-4. Run `scripts/contacts/collect.cjs` to validate and durably import handoff pages.
+4. Run `scripts/contacts/collect.ts` to validate and durably import handoff pages.
 5. Inspect `collection.json`: one machine-readable snapshot containing both its
    manifest and normalized, namespaced records. Any missing source remains visible.
 
