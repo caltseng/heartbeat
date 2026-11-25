@@ -7,10 +7,12 @@ Stable CONTACTS IDs, collection skill names and JSON schema are preserved.
 Remaining CONTACTS execution is blocked until this bootstrap is verified checked in.
 
 Status: architecture with a runnable metadata-handoff slice and synthetic-only
-Google and Gmail acquisition adapters (CONTACTS-012/014). No accounts are
-connected, and no live network transport is implemented.
-CONTACTS-016 adds a separate [synthetic-only selected text XML converter](contacts-text-converter.md),
-not real archive access. See the [product specification](contacts-store-spec.md) and
+Google/Gmail acquisition adapters (CONTACTS-012/014),
+[text XML conversion](contacts-text-converter.md) (CONTACTS-016) and
+[Messenger JSON conversion](contacts-messenger-converter.md) (CONTACTS-018).
+No accounts are connected, and no live network transport or private native
+archive processing is enabled.
+See the [product specification](contacts-store-spec.md) and
 [work items](contacts-work-items.md).
 
 Confirmed execution boundary: **one user, local tool, local store in a private
@@ -79,14 +81,12 @@ file. Every desired source must have an entry, even if it is unavailable.
 | `contacts-google-identities` | Validate/import identities; `contacts:google` exercises the selected People route using synthetic pages | [CONTACTS-011/012](contacts-google-capability.md), with `contacts.readonly` and contact-only fields. No authorized Google tool, network transport or OAuth client ships. Private acquisition is disabled before output access (exit 1); revisions/deletions stay private and partial pending 021. Snapshot completeness is not historical completeness. |
 | `contacts-email-activity` | Validate/import email metadata handoffs; [014 synthetic native Gmail adapter/CLI](contacts-email-adapter.md) | [CONTACTS-013](contacts-email-access.md) selects Gmail API `gmail.metadata` enumeration (no search `q`), not connected access. 014 implements injected metadata transport, list-token paging and conservative role/class normalization; no HTTP/OAuth transport or private runs. Native cursors stay separate and coverage stays partial. |
 | `contacts-text-activity` | Validate/import SMS/MMS/RCS/iMessage handoffs; [synthetic-only selected XML conversion](contacts-text-converter.md) | [CONTACTS-015](contacts-text-format-gate.md) selects Android 14 / SyncTech 10.30.009 full XML v1 for SMS/MMS with explicit protocol evidence. CONTACTS-016 implements that synthetic profile only; no device/actual export is verified. RCS/iMessage/other native backups remain unsupported; private conversion fails closed before XML access. |
-| `contacts-messenger-activity` | Validate/import personal Messenger metadata handoffs | [CONTACTS-017 selects proposed local JSON snapshot conversion](contacts-messenger-capability.md) for 018; no native converter or structured personal reader is available. Export producer version and encrypted-backup layout remain unverified. Page/business APIs and Muse queries do not establish personal-inbox history; no private session reuse or real-data remote AI processing. |
+| `contacts-messenger-activity` | Validate/import metadata handoffs; [018 synthetic-only JSON snapshot converter](contacts-messenger-converter.md) with local IDs and overlap guard | [CONTACTS-017 selects local JSON conversion](contacts-messenger-capability.md), not a structured personal reader. Private conversion is disabled; producer version and encrypted-backup layout remain unverified. Page/business APIs and Muse queries do not establish personal-inbox history; no private session reuse or real-data remote AI processing. |
 | `contacts-whatsapp-activity` | Validate/import WhatsApp metadata handoffs | [CONTACTS-019](contacts-whatsapp-format-gate.md) selects iOS Without Media UTF-8 TXT profile `whatsapp-ios-txt-metadata-v1`, synthetic design only. CONTACTS-020 converter is not implemented; native TXT is unsupported and private imports fail closed. Archive-local IDs, reviewed overlap/identity ledgers and evidenced source zones are required; no producer certified or personal tool connected. Approved metadata policy does not permit raw export/content processing. Business Groups API access does not establish existing personal-group access. |
 
-All five are **synthetic-import-capable**, not live-connected. The selected synthetic text
-converter is separate from ingestion; other native conversion and live acquisition
-remain distinct work items. Beeper and direct API credentials
-are not installed or assumed. Muse UI evidence does not establish structured
-personal Messenger access. Muse/remote-AI acquisition must not process real
+All five are **synthetic-import-capable**, not live-connected. Synthetic conversion
+does not authorize real acquisition or private processing. Beeper and direct API credentials
+are not installed or assumed. Muse/remote-AI acquisition must not process real
 collection data under the approved policy. Separately approved source API
 retrieval is distinct from remote-AI processing; the Heartbeat model and local
 visualization remain here.
@@ -265,6 +265,11 @@ IDs deduplicate with both provenances; different IDs require an explicit private
 not inferred from names, text or timestamps. Separate messages on different
 channels remain separate. Unreviewed different IDs do not certify distinct
 messages or reconciled cross-connector totals.
+The `messenger-json-snapshot-v1` route retains a stricter snapshot gate: changed
+snapshots and other Messenger connectors in the same account are rejected in
+either order. The shared `overlapReview` machinery does not lift that gate;
+reviewed snapshot translation needs a separate route extension. See the
+[converter contract](contacts-messenger-converter.md).
 
 Conflicting metadata under the same ID/revision fails the page without replacing
 the old record. Optional explicit identity/thread/event revisions preserve an
