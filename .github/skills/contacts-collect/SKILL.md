@@ -92,6 +92,9 @@ coverage. Different connector IDs require a private reviewed translation before
 import; never deduplicate by name/text. Saved translations remain active on replay.
 The reconciled current view is `reconciliation.records`; original `records`
 remain evidence, not current-version totals.
+`reconciliation.pendingTargets` separately lists mutations whose original
+messages have not been imported; these informational historical links do not
+make otherwise covered sources/periods partial and resolve on target arrival.
 
 The single `collection.json` snapshot atomically stores manifest, normalized
 records, provenance and checkpoints. Never hand-edit its records or checkpoints.

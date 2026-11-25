@@ -37,8 +37,10 @@ resolution can supersede both:
 `revision: {"id":"reviewed-3","supersedes":["version-2a","version-2b"]}`.
 This keeps both conflicting observations and the resolution's evidence.
 `manifest.reconciliationRequired` makes the overall manifest partial (exit 2)
-while any revision collision or unresolved mutation target remains. Consumers
+while any revision collision or broken mutation target link remains. Consumers
 must honor this flag and must not claim reconciled totals from such a store.
+Absent historical targets are informational `pendingTargets`, not broken links,
+and do not prevent complete collection of an otherwise covered period/source.
 
 Identity and thread tombstones use `deleted:true` on an explicit revision, with
 the normal identity/thread required fields. They never erase source history,
@@ -52,8 +54,13 @@ Edit/deletion events keep their own event ID and require `targetId`, the origina
 message ID in the same source/account namespace. Their normal timestamp is the
 mutation instant, not a replacement of the original message time. Translation
 applies to targets as well as event, thread, sender and recipient references.
-Targets may arrive later: missing, conflicting, non-message, wrong-thread, or
-chronologically impossible targets stay in `reconciliation.unresolvedTargets`.
+Targets may arrive later: targets absent from the store appear in
+`reconciliation.pendingTargets` without setting `reconciliationRequired`. An
+export may legitimately mutate a historical message outside the imported period;
+this must not permanently make unrelated sources/periods partial. Pending links
+resolve automatically if their target arrives. Present but conflicting,
+non-message, wrong-thread/channel or chronologically impossible targets stay in
+`reconciliation.unresolvedTargets` and still require reconciliation.
 Legacy untargeted edits/deletions are retained but likewise unresolved.
 
 The current message exposes `editedBy` and `deletedBy` key arrays. It remains one
@@ -162,7 +169,7 @@ until the relevant overlap review is complete.
 | Decision / rationale | Alternatives and assumptions | Synthetic validation | Revisit condition |
 | --- | --- | --- | --- |
 | Additive schema-v1 revision DAG and separate current projection preserve old consumers' raw evidence without destructive replacement. | Rejected last-retrieved-wins and in-place updates; assumes stable source revision IDs or deliberately assigned local revision IDs. | Changing profile/thread/message, replay, fork and explicit multi-head resolution; original records unchanged. | An adapter cannot supply stable revision ancestry or a versioned downstream consumer needs stricter schema migration. |
-| Target links and tombstone flags retain evidence, not content reconstruction or secure erase. | Rejected replacing/deleting originals or counting mutation events as messages; assumes metadata-only events. | Targeted edit/deletion, missing target and later arrival, profile tombstone, rejected untargeted mutation. | CONTACTS-023 defines deleted-message metrics or CONTACTS-032 implements owner-approved retention. |
+| Target links and tombstone flags retain evidence; absent historical targets are informational pending links, while broken present targets block reconciled output. | Rejected replacing/deleting originals, counting mutations as messages, or making every later period partial until out-of-window history is imported; assumes metadata-only events. | Targeted edit/deletion, pending target/later arrival, unrelated-source and later-period success, broken links, profile tombstone, rejected untargeted mutation. | CONTACTS-023 defines deleted-message metrics or CONTACTS-032 implements owner-approved retention. |
 | Explicit thread evidence is conservative and current-handoff scoped; legacy coverage is labeled inherited. | Rejected upgrading partial threads using a source-wide complete claim; assumes the adapter declares its actual history bounds. | Different/missing/empty thread coverage and later full coverage. | A real adapter needs interval unions, thread enumeration certificates, or source-native resync generations. |
 | Membership intervals are append-only observations and never inferred interactions. | Rejected replacing a current roster and applying it backward; assumes explicit validity evidence when historical membership is claimed. | Earlier/later direct members and retained group roster evidence without new activity. | An adapter needs reviewed correction/retraction of conflicting membership intervals. |
 | Private reviewed translations are immutable, connector-specific and applied before import. | Rejected heuristic fuzzy deduplication and retroactive destructive merging; assumes review establishes exact same upstream records/account. | Two different-ID connectors yield one message with both originals; replay cannot forget saved translations; changed review rejected. | A reversible in-store translation review UI or already-imported alias migration is separately specified. |

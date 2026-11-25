@@ -177,7 +177,7 @@ function reviewTranslations(input) {
   return { ...input, reviewedAt };
 }
 function reconcile(state) {
-  const records = {}, collisions = [], unresolvedTargets = [];
+  const records = {}, collisions = [], unresolvedTargets = [], pendingTargets = [];
   for (const [id, entry] of Object.entries(state.records)) {
     const leaves = heads(entry);
     if (leaves.length !== 1) collisions.push({ key: id, revisions: leaves.map(row => row.id).sort() });
@@ -190,6 +190,10 @@ function reconcile(state) {
     }
     if (!row.record.targetKey) continue;
     const target = records[row.record.targetKey];
+    if (!target && !state.records[row.record.targetKey]) {
+      pendingTargets.push(id);
+      continue;
+    }
     if (!target || target.record.type !== 'event' || target.record.eventType !== 'message' ||
         target.record.threadKey !== row.record.threadKey || target.record.channel !== row.record.channel ||
         target.record.timestamp > row.record.timestamp) {
@@ -197,7 +201,8 @@ function reconcile(state) {
     } else if (row.record.eventType === 'deletion') target.deletedBy.push(id);
     else target.editedBy.push(id);
   }
-  state.reconciliation = { schemaVersion: 1, records, collisions, unresolvedTargets: unresolvedTargets.sort() };
+  state.reconciliation = { schemaVersion: 1, records, collisions,
+    unresolvedTargets: unresolvedTargets.sort(), pendingTargets: pendingTargets.sort() };
   state.manifest.reconciliationRequired = collisions.length > 0 || unresolvedTargets.length > 0;
 }
 function preparePage(page, source, state, provenance) {

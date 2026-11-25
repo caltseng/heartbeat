@@ -332,13 +332,63 @@ test('targeted edits and deletion tombstones retain one message and surface unre
   assert.deepEqual(projected.record, original.record);
   assert.equal(events(f.state()).filter(row => row.record.eventType === 'message').length, 1);
   page.events = [{ ...message, id: 'unknown-delete', eventType: 'deletion', targetId: 'not-yet-imported' }];
-  assert.equal(f.run().exitCode, 2);
-  assert.equal(f.state().reconciliation.unresolvedTargets.length, 1);
+  assert.equal(f.run().exitCode, 0);
+  assert.equal(f.state().reconciliation.pendingTargets.length, 1);
+  assert.equal(f.state().reconciliation.unresolvedTargets.length, 0);
   page.events = [{ ...message, id: 'not-yet-imported' }];
   assert.equal(f.run().exitCode, 0);
   assert.equal(f.state().reconciliation.unresolvedTargets.length, 0);
+  assert.equal(f.state().reconciliation.pendingTargets.length, 0);
   page.events = [{ ...message, id: 'invalid-edit', eventType: 'edit' }];
   assert.equal(f.run().manifest.sources[0].error.code, 'invalid_input');
+});
+
+test('out-of-window mutation targets stay informational across later periods and unrelated sources', t => {
+  const f = fixture(t);
+  const page = f.input.pages[0];
+  page.events[0] = { ...page.events[0], id: 'delete-historical-message', eventType: 'deletion', targetId: 'message-from-2024' };
+  assert.equal(f.run().exitCode, 0);
+  const pending = f.state().reconciliation.pendingTargets;
+  assert.equal(pending.length, 1);
+  assert.equal(f.state().manifest.reconciliationRequired, false);
+  page.events = [];
+  f.request.period = { preset: 'custom', timeZone: period.timeZone, asOf: period.asOf,
+    start: '2026-11-01T00:00:00Z', end: period.asOf };
+  assert.equal(f.run().exitCode, 0);
+  const contacts = handoff('google-contacts', null);
+  Object.assign(f.input, contacts);
+  Object.assign(f.request.sources[0], { source: contacts.source, account: contacts.account, connector: contacts.connector });
+  assert.equal(f.run().exitCode, 0);
+  assert.deepEqual(f.state().reconciliation.pendingTargets, pending);
+  assert.equal(f.state().reconciliation.unresolvedTargets.length, 0);
+});
+
+test('present but invalid mutation targets still require reconciliation', t => {
+  const f = fixture(t);
+  const page = f.input.pages[0];
+  const message = structuredClone(page.events[0]);
+  const mutation = { ...message, id: 'invalid-delete', eventType: 'deletion', targetId: message.id };
+  page.events.push(mutation);
+  mutation.timestamp = '2026-11-22T12:00:00Z';
+  assert.equal(f.run().exitCode, 2);
+  assert.equal(f.state().reconciliation.unresolvedTargets.length, 1);
+  assert.equal(f.state().reconciliation.pendingTargets.length, 0);
+  mutation.timestamp = message.timestamp;
+  mutation.revision = { id: 'fixed-time', supersedes: '$initial' };
+  page.threads.push({ id: 'other-thread', idKind: 'local', kind: 'group' });
+  mutation.threadId = 'other-thread';
+  assert.equal(f.run().exitCode, 2);
+  assert.equal(f.state().reconciliation.unresolvedTargets.length, 1);
+  mutation.threadId = message.threadId;
+  mutation.targetId = 'non-message-target';
+  mutation.revision = { id: 'wrong-type', supersedes: 'fixed-time' };
+  page.events.push({ ...message, id: 'non-message-target', eventType: 'reaction' });
+  assert.equal(f.run().exitCode, 2);
+  assert.equal(f.state().reconciliation.unresolvedTargets.length, 1);
+  mutation.targetId = message.id;
+  mutation.revision = { id: 'fixed-target', supersedes: 'wrong-type' };
+  assert.equal(f.run().exitCode, 0);
+  assert.equal(f.state().reconciliation.records[JSON.stringify(['email', f.input.account, 'event', message.id])].deletedBy.length, 1);
 });
 
 test('reviewed connector ID translations deduplicate all references and retain original source evidence', t => {
