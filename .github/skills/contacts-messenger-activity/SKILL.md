@@ -7,7 +7,10 @@ description: Prepare authorized personal Messenger metadata for contacts collect
 
 Use independently or under [contacts-collect](../contacts-collect/SKILL.md).
 Follow its authorization boundary and the
-[shared contract](../../../docs/spec/contacts-technical-spec.md).
+[shared contract](../../../docs/spec/contacts-technical-spec.md). Read the
+[CONTACTS-017 capability decision](../../../docs/spec/contacts-messenger-capability.md):
+the proposed initial route is local `messenger-json-snapshot-v1` conversion in
+CONTACTS-018, not an available parser or a verified Meta producer version.
 
 1. Establish the explicitly authorized personal account and requested period.
    Inspect actual installed tools/capabilities. A Page/business conversation API
@@ -16,6 +19,8 @@ Follow its authorization boundary and the
    An earlier successful Muse browser query does not install a personal-agent API
    or establish full-history access. Do not inherit its private authenticated browser.
    Any new browser/export acquisition needs separate authorization and verification.
+   Muse/UI-as-remote-acquisition is not a selected real-data route; never process
+   real collected data through remote AI.
 3. If an already authorized tool exposes structured metadata, preserve stable
    thread/message/sender IDs, actual event instants, participant membership,
    explicit self identities and direct/group distinctions in `source: messenger`,
@@ -24,6 +29,11 @@ Follow its authorization boundary and the
 4. Document source pagination, encryption/linked-device/history limits, actual
    retrieval time and partial/unavailable periods. Narratives, inferred totals
    and search snippets are not timestamped observations.
+   Standard JSON exports and encrypted chat backups are distinct formats. The
+   proposed profile covers only declared numbered JSON conversation shards;
+   producer version and encrypted-backup layout remain unverified. Reimports of
+   one immutable snapshot can be stable, but overlapping changed exports need
+   reviewed reconciliation, not name/time deduplication or additive import.
 5. Keep bodies and attachments out of the handoff. Import a valid normalized
    envelope with `contacts:collect`, independently or with the coordinator.
 
