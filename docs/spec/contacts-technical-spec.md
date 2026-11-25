@@ -288,9 +288,12 @@ Source-opening URLs and provider-native payload archives are intentionally defer
 
 No automatic person merge or household inference runs during collection.
 `identityMappingRevision:null` and all non-self `unresolvedIdentityKeys` are explicit.
-The next identity-review stage will persist user-reviewed links to canonical people,
-with reversible splits and separately curated households, without rewriting the
-source evidence.
+CONTACTS-022 now persists user-reviewed links in a separate synthetic-only
+[identity-review overlay](contacts-identity-review.md), with an exact collection
+digest, explicit mapping revision, reversible splits/undo and optional curated
+households. It never rewrites source evidence or source availability. Real runs
+remain blocked pending the separate privacy/source approvals and implementation
+of an approved private-run boundary.
 
 ## 5. Storage, atomicity, and recovery
 
@@ -336,6 +339,11 @@ these controls are implemented and verified. Git ignore and build exclusion are
 not access control. See the policy's engineering decisions and revisit conditions.
 
 ## 6. Manifest and downstream handoff
+
+See the [CONTACTS-031 local workflow](contacts-local-workflow.md) for executable
+synthetic commands, request-as-configuration, recovery and reserved versioned
+handoffs to later identity/reducer/report/graph implementations. Its publication
+guard runs in CI without introducing a public build or changing collection v1.
 
 The manifest records data class, collection time, exact period, each requested
 source/account/connector, status, coverage/basis, retrieval time, pagination state,

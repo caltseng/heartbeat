@@ -39,7 +39,13 @@ It ships no network transport, credential loader or OAuth flow. Private runs
 fail closed with exit 1 (`private_collection_disabled`) before output access,
 without creating directories, locks, reports or manifests.
 
-Canonical identity review, cross-source numerical aggregation, summaries,
+CONTACTS-022 adds the independent `contacts-identity-review` skill and
+`contacts:review` CLI: explicit canonical-person mapping revisions, reviewed
+matches, reversible splits/undo and optional curated household links. It is
+synthetic-only and never rewrites source records or notes. Follow the
+[review workflow and contract](docs/spec/contacts-identity-review.md).
+
+Cross-source numerical aggregation, summaries,
 reconnection signals and Heartbeat's map are **not implemented**. Missing source
 data means unknown, not zero. No private accounts, devices, browser sessions,
 credentials or real data are included or authorized by this repository.
@@ -83,6 +89,7 @@ hide them. A successful import does not independently certify upstream history.
 ## Documentation and delivery
 
 - [Architecture, data flow and local JSON layout](docs/architecture.md)
+- [Local workflow, versioned handoffs and recovery](docs/spec/contacts-local-workflow.md)
 - [Privacy, local data and source approval gates](docs/privacy.md)
 - [Development, CI and adding a collector](docs/development.md)
 - [Product specification](docs/spec/contacts-store-spec.md)

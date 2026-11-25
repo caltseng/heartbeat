@@ -14,11 +14,11 @@ npm run check
 npm run ci
 ```
 
-`test:contacts`/`npm test` run Node's built-in test runner, including
-`email.test.cjs`, `google.test.cjs`, `text-xml.test.cjs` and `messenger.test.cjs`.
-`check` checks the collection/demo, email/Google adapters, text/Messenger
-converters and test CommonJS files' syntax. `ci` runs both.
-Tests generate synthetic fixtures in
+`test:contacts` runs Node's built-in test runner for the collector, email/Google
+adapters, text/Messenger converters and identity review. `npm test` also runs the
+private-boundary tests using temporary Git repositories. `check` checks all
+collection/demo, adapter, converter, review and test CommonJS files' syntax and
+runs `check:private`; `ci` runs checks and tests. Tests generate synthetic fixtures in
 temporary directories and clean them up; they include actual CLI 0/2/1 exits,
 all five families, replay, connector provenance, resume, rollback, record
 conflicts, direct/group roles, missing-versus-empty history, DST/custom intervals,
@@ -47,6 +47,26 @@ and reviewed different-ID connector translations with retained source evidence.
 Text archive binding tests also reject unbound pre-existing text events after
 explicit revisions, without changing their records or reserving an archive.
 See the [revision contract and decision record](spec/contacts-source-revisions.md).
+Identity-review cases additionally exercise conservative reviewed matches,
+same-name separation, cross-namespace identity links, split/undo, stable note
+references, curated household conflicts, revision/digest preconditions, private
+input rejection and transactional rollback. No private notes are read.
+CONTACTS-022 reads current reconciled identities, preserves inactive
+tombstone/collision/missing links, and requires explicit metadata refresh. Its
+integration cases exercise the actual collector's revision/target semantics,
+including informational historical pending targets.
+
+The [local workflow](spec/contacts-local-workflow.md) defines current commands,
+future versioned handoffs and recovery. `npm run check:private` rejects nonempty
+public output roots and private operational Git candidates, including force-added
+ignored files. Synthetic negative tests seed contacts docs/tooling, renamed data,
+checkpoints and graphs into every guarded output root. No public build/deployment
+pipeline is added. Audit any additional public export path explicitly with
+`npm run check:private -- --output <directory>`; new output locations/artifact
+names must extend the guard. This check is not payload scanning or access control.
+A synthetic demo/replay/inspect/review CLI integration case additionally verifies
+the versioned overlay pins an unchanged collection and remains ignored locally;
+force-adding its generated mapping fails the Git delivery guard.
 
 GitHub Actions runs `.github/workflows/ci.yml` for PRs targeting `main` and pushes
 to `main`, on Node 20.11.0. Its stable job/check name is
@@ -80,4 +100,6 @@ not be bypassed. Green checks are not independent review or permission to merge.
 Preserve `contacts-*` skill names, `scripts/contacts/`, schema version and store
 names unless a separately specified compatibility change requires otherwise.
 Heartbeat names the product and future local reports/maps, not a bulk schema
-rename. Future identity review, reducers and renderers are distinct work items.
+rename. Identity review is a separate synthetic-only overlay; see its
+[contract and engineering decisions](spec/contacts-identity-review.md). Future
+reducers, note capture and renderers remain distinct work items.
