@@ -16,9 +16,10 @@ Reviewed canonical people/optional household links [IMPLEMENTED: CONTACTS-022, S
                          |
 Deterministic cross-source aggregation [IMPLEMENTED: CONTACTS-023, SYNTHETIC ONLY]
                          |
-Heartbeat period summaries [PLANNED: CONTACTS-024]
+Heartbeat period summaries [IMPLEMENTED: CONTACTS-024, SYNTHETIC ONLY]
                          |
-Heartbeat local map / baseline signals [PLANNED: CONTACTS-025/026]
+Heartbeat baseline/rhythm signals [IMPLEMENTED: CONTACTS-026, SYNTHETIC ONLY]
+Heartbeat local map [PLANNED: CONTACTS-025]
 ```
 
 Skills are instructions, not installed provider connectors. `collect.cjs` uses
@@ -115,4 +116,11 @@ output preserves half-open intervals, time-zone-aware active-day unions,
 direct/group distinctions, exclusions, uncertainty and provenance.
 Every summary and map must use the same structured aggregate dataset.
 Unknown/unavailable coverage cannot become zero or a reconnection decline.
-No rendered summary or map command exists in this baseline.
+The [CONTACTS-024 summary](spec/contacts-period-summary.md) now emits private JSON;
+no HTML/SVG map renderer is implemented.
+
+[CONTACTS-026 opportunities](spec/contacts-opportunities.md) reduce two adjacent
+equal-duration windows from the same bound collection/mapping. Only sufficient,
+fully covered personal direct history can produce decline. Separate curated
+rhythm rows use explicit confirmed connections, never message activity.
+One immutable private `report.json` holds explanations, tuning and evidence.

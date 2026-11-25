@@ -144,3 +144,9 @@ counts, preserve inactive peers, exact zeros versus unknown/lower bounds,
 cross-channel reviewed identities, DST/skipped-date calendars, 7d/30d/custom
 bounds, standalone view context, immutable CLI output and private-run denial.
 The workflow guard also exercises collection-to-summary without changed inputs.
+
+The [CONTACTS-026 opportunity report](spec/contacts-opportunities.md) adds
+`contacts:opportunities`, `opportunities.test.cjs` and `check:opportunities` to CI.
+Synthetic cases cover threshold boundaries, matched complete versus uncertain/
+asymmetric/absent channel coverage, group-only/no-history suppression, separate
+civil-date rhythms, unchanged inputs, immutable output and CLI 0/2/1.

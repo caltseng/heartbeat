@@ -78,7 +78,11 @@ the complete reviewed people cohort, channel counts and coverage-aware daily
 timeline. All views share period/zone/as-of, mapping binding, source freshness,
 coverage and exclusions. See the [reporting contract and decisions](docs/spec/contacts-period-summary.md).
 
-Reconnection signals and Heartbeat's map are **not implemented**. Missing source
+CONTACTS-026 adds `contacts:opportunities`: explainable own-baseline direct-activity
+declines under complete matched coverage and separate curated household rhythm
+reminders. All thresholds are explicit tuning proposals, not relationship scores.
+See the [synthetic workflow and decisions](docs/spec/contacts-opportunities.md).
+Heartbeat's map is **not implemented**. Missing source
 data means unknown, not zero. No private accounts, devices, browser sessions,
 credentials or real data are included or authorized by this repository.
 
