@@ -8,8 +8,8 @@ Migrated from caltseng/churchtree PR #68, exact merge
 **Global bootstrap prerequisite:** every remaining CONTACTS-010 through
 CONTACTS-032 item is blocked from execution until this Heartbeat bootstrap
 (Phalanx item `1fda16d150ab44ae8313bd455c0240ed`) is verified **checked_in**
-by an owner merge into `main`. This prerequisite applies to every row below in
-addition to its listed dependencies. "Ready" below describes only the original
+by an authorized merge into `main`. This prerequisite applies to every row below
+in addition to its listed dependencies. "Ready" below describes only the original
 bounded task's capability state **after** that prerequisite; it does not permit
 starting it now. Do not resume old Churchtree CONTACTS execution.
 
@@ -98,7 +98,7 @@ account/device setup can lift a real-data execution block.
 | CONTACTS-023 / Cross-source aggregation skill and reducer / Implemented: synthetic only | [Pure reducer, immutable local CLI and focused skill](contacts-aggregation.md) produce per-person/thread/channel/day aggregates from reconciled snapshots and an exact reviewed mapping revision. No UI or source access. | CONTACTS-021, CONTACTS-022 | Synthetic fixtures prove half-open boundaries, DST date unions, one event per source ID, direct versus group-only activity, To/CC/BCC handling, bulk/unclassified disclosure, unknown versus zero and lower-bound totals. All dimension totals reconcile to the source-event ledger and explicit coverage. |
 | CONTACTS-024 / Period summary contract and presentation skill / Implemented: synthetic only | [Shared 7d/30d/custom report contract and decisions](contacts-period-summary.md), `contacts:summary` CLI and focused `contacts-summary` skill persist one dataset with people table, per-channel counts and daily timeline data. | CONTACTS-023 | Fixed-fixture ledger totals reconcile across summary/channel/timeline and person attributions; period, time zone, as-of, mapping revision, exclusions, source freshness and coverage travel with every standalone view; statements use computed metrics, not narrative-generated numbers; known inactive people remain in the cohort. No graph or private run is enabled. |
 | CONTACTS-025 / Local user-centered graph / Blocked: report dataset | Generate a private local Heartbeat hub-and-spoke HTML/SVG view with supporting person-to-thread evidence, not a Muse screen or hosted dashboard. Prove behavior before polished design. | CONTACTS-024, CONTACTS-031 | Synthetic fixtures show user at center, intentional labeled frequency bands, visible recency, group-only and unknown coverage categories, an outer inactive band, explainable selection details, keyboard access and usable mobile portrait/landscape. All views use the same filters; files work locally without a hosted service and do not imply emotional closeness. |
-| CONTACTS-026 / Reconnection opportunity and outlier signals / Blocked: covered history | Compute explainable deviations from each person's own baseline and due curated rhythms, separate from frequency ranking. | CONTACTS-024, CONTACTS-027 | Covered synthetic decline and due-rhythm cases surface with baseline/current/last-contact/reason; insufficient or mismatched coverage cannot become decline; no importance score, guilt ranking, auto-send or meaningful-date reset. Thresholds are explicit proposals/tuning values. |
+| CONTACTS-026 / Reconnection opportunity and outlier signals / Synthetic implementation | [Local opportunities report and delegated decisions](contacts-opportunities.md): own-baseline direct-activity comparisons and separate due curated rhythms, not frequency ranking. | CONTACTS-024, CONTACTS-027 | Covered synthetic decline and due-rhythm cases surface with baseline/current/last-contact/reason; insufficient or mismatched coverage cannot become decline; no importance score, guilt ranking, auto-send or meaningful-date reset. Thresholds are explicit proposals/tuning values. Implementation is not proof of merge or real-source access. |
 | CONTACTS-027 / Curated relationship records and note capture / Implemented: synthetic only | [Curated store and decision record](contacts-curated-records.md): reuse canonical reviewed households; persist groups, unchanged original notes, explicit meaningful connections and curated rhythms independently from observations through `contacts:curate`. | CONTACTS-022 | One household can have one person; one note can involve several households; capture and encounter dates remain separate; observed mail/group activity never resets confirmed connection dates; source changes cannot overwrite curated notes. Private content remains disabled; no source/run authorization or renderer is delivered. |
 | CONTACTS-028 / Weekly reconnection review / Implemented: synthetic only | [Local review and delegated decisions](contacts-reconnection-review.md): `contacts:reconnect` reuses curated records and the period summary for explainable household recommendations, explicit follow-up completion/deferment, optional saved prayer context and immutable private reports. | CONTACTS-024, CONTACTS-027 | Recommendations show evidence, last confirmed connection or unknown, outstanding context and an existing attributed thread with explicit saved source links where available (or a visible missing-thread/link limitation); deferral does not alter long-term rhythm; no automatic sending or schedule creation. Private content remains disabled. |
 | CONTACTS-029 / Prayer triage / Implemented: synthetic only; private content gated | [Local prayer overlay and decisions](contacts-prayer-triage.md): user-invoked editable ordered plans, immutable note-grounded requests and append-only explicitly confirmed status updates through `contacts:prayer`. | CONTACTS-027, CONTACTS-010 | Synthetic requests/updates preserve original text/references, ask for ambiguous status and never infer answered/resolved from elapsed time. All output is private-local-only; no outreach export, real content, account access, sending or schedules. |
@@ -108,11 +108,18 @@ account/device setup can lift a real-data execution block.
 
 ## Dispatch boundary
 
-Only the service owner merges the independently reviewed exact HEAD. Agents must
-not enable auto-merge, schedule a merge, self-merge or execute merge commands.
+For explicitly authorized `checked_in` work, the retained writer may deliver the
+merge after any qualified independent reviewer approves the exact final HEAD,
+required CI passes and GitHub protections permit it. No routine service-owner-only
+or manual merge hop is required; self-review is insufficient and rules/checks
+cannot be bypassed. Explicit ready-only, report and draft ceilings remain binding.
 The stable GitHub Actions check is `Heartbeat synthetic baseline`; the owner must
 configure Heartbeat Phalanx `ready_checks` before merging. Captain coordinates
-independent review and must receive the exact PR/head/green-check evidence.
+independent review and must receive exact PR/head/reviewer/green-check and primary
+merge evidence. Follow the [serialized delivery and active-execution adoption
+rules](../development.md#delivery-and-active-execution-adoption): integrate actual
+conflicting target changes, recheck/review new heads and reconcile immutable
+acceptance explicitly rather than assuming this register amends active executions.
 An open green PR does not lift the global bootstrap execution dependency.
 
 After the prerequisite PR is merged, hand this register and its merged commit to

@@ -22,6 +22,10 @@ editable plans](contacts-prayer-triage.md) over original curated notes in a sepa
 private-local-only JSON overlay. It neither changes collection nor exports outreach.
 CONTACTS-030 adds [synthetic local audience review](contacts-life-update-audience.md)
 over those canonical households, with separate exact-input finalization and no sending.
+CONTACTS-026 adds [synthetic opportunity signals](contacts-opportunities.md):
+coverage-gated own-baseline comparisons and separate civil-date curated rhythms.
+It reuses the reducer and current canonical/curated inspection without source
+access, ranking, sending or changing meaningful connection dates.
 CONTACTS-028 adds [synthetic household reconnection review](contacts-reconnection-review.md)
 from current curated records and the shared period dataset, with explicit
 follow-ups, completion, deferral, optional saved prayer context and private

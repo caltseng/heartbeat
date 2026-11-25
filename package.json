@@ -21,7 +21,8 @@
     "contacts:aggregate": "node scripts/contacts/aggregate.cjs",
     "contacts:summary": "node scripts/contacts/summary.cjs",
     "contacts:reconnect": "node scripts/contacts/reconnection.cjs",
-    "test:contacts": "node --test scripts/contacts/collect.test.cjs scripts/contacts/email.test.cjs scripts/contacts/google.test.cjs scripts/contacts/text-xml.test.cjs scripts/contacts/identity-review.test.cjs scripts/contacts/messenger.test.cjs scripts/contacts/operations.test.cjs scripts/contacts/whatsapp.test.cjs scripts/contacts/curated.test.cjs scripts/contacts/aggregate.test.cjs scripts/contacts/prayer.test.cjs scripts/contacts/summary.test.cjs scripts/contacts/audience.test.cjs scripts/contacts/reconnection.test.cjs",
+    "contacts:opportunities": "node scripts/contacts/opportunities.cjs",
+    "test:contacts": "node --test scripts/contacts/collect.test.cjs scripts/contacts/email.test.cjs scripts/contacts/google.test.cjs scripts/contacts/text-xml.test.cjs scripts/contacts/identity-review.test.cjs scripts/contacts/messenger.test.cjs scripts/contacts/operations.test.cjs scripts/contacts/whatsapp.test.cjs scripts/contacts/curated.test.cjs scripts/contacts/aggregate.test.cjs scripts/contacts/prayer.test.cjs scripts/contacts/summary.test.cjs scripts/contacts/audience.test.cjs scripts/contacts/reconnection.test.cjs scripts/contacts/opportunities.test.cjs",
     "test": "npm run test:contacts && node --test scripts/check-private-boundary.test.cjs",
     "check:private": "node scripts/check-private-boundary.cjs",
     "check": "node --check scripts/contacts/collect.cjs && node --check scripts/contacts/demo.cjs && node --check scripts/contacts/collect.test.cjs && node --check scripts/contacts/email.cjs && node --check scripts/contacts/email.test.cjs && node --check scripts/contacts/google.cjs && node --check scripts/contacts/google.test.cjs && node --check scripts/contacts/text-xml.cjs && node --check scripts/contacts/text-xml.test.cjs && node --check scripts/contacts/identity-review.cjs && node --check scripts/contacts/identity-review.test.cjs && node --check scripts/contacts/messenger.cjs && node --check scripts/contacts/messenger.test.cjs && node --check scripts/contacts/whatsapp.cjs && node --check scripts/contacts/whatsapp.test.cjs && node --check scripts/contacts/local-json.cjs && node --check scripts/contacts/curated.cjs && node --check scripts/contacts/curated.test.cjs && node --check scripts/contacts/aggregate.cjs && node --check scripts/contacts/aggregate.test.cjs && node --check scripts/check-private-boundary.cjs && node --check scripts/check-private-boundary.test.cjs && npm run check:private",
@@ -30,6 +31,7 @@
     "check:prayer": "node --check scripts/contacts/prayer.cjs && node --check scripts/contacts/prayer.test.cjs",
     "check:audience": "node --check scripts/contacts/audience.cjs && node --check scripts/contacts/audience.test.cjs",
     "check:reconnection": "node --check scripts/contacts/reconnection.cjs && node --check scripts/contacts/reconnection.test.cjs",
-    "ci": "npm run check && npm run check:operations && npm run check:prayer && npm run check:summary && npm run check:audience && npm run check:reconnection && npm test"
+    "check:opportunities": "node --check scripts/contacts/opportunities.cjs && node --check scripts/contacts/opportunities.test.cjs",
+    "ci": "npm run check && npm run check:operations && npm run check:prayer && npm run check:summary && npm run check:audience && npm run check:reconnection && npm run check:opportunities && npm test"
   }
 }

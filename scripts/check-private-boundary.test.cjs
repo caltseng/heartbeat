@@ -78,7 +78,7 @@ test('reserved private handoffs fail outside ignored storage', t => {
     'request.synthetic.json.12345678-abcd.tmp',
     'handoff.json', 'checkpoint.json', 'aggregates.json', 'aggregate.json', 'aggregate.synthetic.json',
     'aggregates.12345678-1234-1234-1234-123456789abc.tmp',
-    'report.json', 'summary.json', 'summary.synthetic.json',
+    'report.json', 'summary.json', 'summary.synthetic.json', 'opportunities.json', 'opportunities.synthetic.json',
     'report.12345678-1234-1234-1234-123456789abc.tmp', 'graph.html', 'graph.svg', '.env.local', 'private.key']) {
     const target = f.write(path.join('accidental', name));
     assert.throws(() => checkBoundary(f.root), /Private operational artifact/);

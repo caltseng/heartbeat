@@ -78,6 +78,11 @@ the complete reviewed people cohort, channel counts and coverage-aware daily
 timeline. All views share period/zone/as-of, mapping binding, source freshness,
 coverage and exclusions. See the [reporting contract and decisions](docs/spec/contacts-period-summary.md).
 
+CONTACTS-026 adds `contacts:opportunities`: explainable own-baseline direct-activity
+declines under complete matched coverage and separate curated household rhythm
+reminders. All thresholds are explicit tuning proposals, not relationship scores.
+See the [synthetic workflow and decisions](docs/spec/contacts-opportunities.md).
+
 CONTACTS-028 adds `contacts:reconnect` and `contacts-reconnection` for a
 user-invoked synthetic household review: evidence-backed due rhythms and
 commitments, confirmed dates or unknown, original context, existing thread
@@ -86,7 +91,7 @@ Optional saved prayer context retains ambiguous status. Reviews can be saved as
 immutable private local reports; nothing sends or schedules. See the
 [workflow and delegated decisions](docs/spec/contacts-reconnection-review.md).
 
-Historical-baseline outlier signals and Heartbeat's map are **not implemented**. Missing source
+Heartbeat's map is **not implemented**. Missing source
 data means unknown, not zero. No private accounts, devices, browser sessions,
 credentials or real data are included or authorized by this repository.
 
@@ -147,10 +152,14 @@ hide them. A successful import does not independently certify upstream history.
 - [Stable CONTACTS work-item register](docs/spec/contacts-work-items.md)
 - [Exact migration provenance](docs/provenance.md)
 - [Approved branding assets and crop decision](docs/spec/heartbeat-branding.md)
-- [Repository rules: topic branches, PRs to main, OWNER MERGE](AGENTS.md)
+- [Repository rules: topic branches, PRs to main, authorized delivery](AGENTS.md)
 
 The bootstrap must be independently reviewed at its exact HEAD, pass the
-`Heartbeat synthetic baseline` GitHub Actions check, and be merged by the owner.
+`Heartbeat synthetic baseline` GitHub Actions check, and have an authorized merge.
+For explicitly authorized `checked_in` work the retained writer may merge after
+qualified independent exact-final-head review, required CI and GitHub protections;
+explicit ready-only/report targets and draft ceilings remain unchanged. See
+[delivery and active-execution adoption](docs/development.md#delivery-and-active-execution-adoption).
 The owner configures Heartbeat's Phalanx `ready_checks` before merging. An open
 green PR is not checked in; remaining CONTACTS execution stays blocked until the
 bootstrap's merge into `main` is verified. There is no deployment step.
