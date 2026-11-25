@@ -20,6 +20,8 @@ households from CONTACTS-022. Observation records and collection schemas are unc
 CONTACTS-029 layers [synthetic-only prayer requests, explicit status updates and
 editable plans](contacts-prayer-triage.md) over original curated notes in a separate
 private-local-only JSON overlay. It neither changes collection nor exports outreach.
+CONTACTS-030 adds [synthetic local audience review](contacts-life-update-audience.md)
+over those canonical households, with separate exact-input finalization and no sending.
 
 Confirmed execution boundary: **one user, local tool, local store in a private
 location**. Prove the flow in Heartbeat before polished design. No hosted

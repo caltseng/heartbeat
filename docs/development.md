@@ -130,6 +130,13 @@ boundaries, DST date unions, source-ID deduplication, historical thread context,
 direct/group/To/CC/BCC semantics, coverage bounds and immutable CLI output.
 Renderers remain distinct work items.
 
+The [CONTACTS-030 audience CLI](spec/contacts-life-update-audience.md) adds
+`check:audience` and synthetic `audience.test.cjs` to `npm run ci`. Cases cover
+household-to-person editing, inclusion/exclusion reasons, explicit wording,
+missing/invalid/ambiguous/duplicate email addresses, stale exact-input review,
+unavailable sources, unchanged notes, atomic rollback and actual CLI 0/2/1 exits.
+No real contacts, beliefs inference, sending or donation records are introduced.
+
 The [CONTACTS-024 period report](spec/contacts-period-summary.md) adds
 `contacts:summary`, a focused presentation skill, `summary.test.cjs` and
 `check:summary` in CI. Synthetic cases reconcile summary/table/channel/timeline

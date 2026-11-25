@@ -17,6 +17,8 @@ CONTACTS-027 adds [synthetic-only curated records and note capture](contacts-cur
 CONTACTS-029 adds [synthetic-only prayer triage and editable plans](contacts-prayer-triage.md),
 not permission to process private notes.
 CONTACTS-023 adds a synthetic-only [cross-source reducer and skill](contacts-aggregation.md).
+CONTACTS-030 adds [synthetic audience selection and reviewed lists](contacts-life-update-audience.md);
+real wording/preferences, private runs and sending remain unauthorized/disabled.
 CONTACTS-024 adds a synthetic-only [shared period dataset and summary skill](contacts-period-summary.md).
 Live acquisition, private note capture and the map are not implemented. Remaining CONTACTS
 execution is blocked until the Heartbeat bootstrap is verified checked in.

@@ -61,6 +61,11 @@ original notes. Ambiguous status asks for confirmation; age never implies an
 answered/resolved request. All output is private-local-only, with no outreach
 export. See the [workflow and decisions](docs/spec/contacts-prayer-triage.md).
 
+CONTACTS-030 adds `contacts:audience` for editable synthetic household/member
+selections, explicit reasons and wording preferences, visible address issues and
+a separately reviewed recipient list. It never sends or records donations.
+See the [audience workflow and decisions](docs/spec/contacts-life-update-audience.md).
+
 CONTACTS-023 adds the independent `contacts-aggregate` skill and
 `contacts:aggregate` CLI: deterministic synthetic snapshot reduction with
 explicit mapping revision, per-person/thread/channel/day counts, coverage and

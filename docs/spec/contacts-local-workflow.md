@@ -167,6 +167,7 @@ shape and prerequisites rather than constructing requests from real accounts.
 | `npm run contacts:messenger -- --synthetic-request <request.json>` | [Selected synthetic JSON snapshot profile](contacts-messenger-converter.md); local IDs, overlap guard and unknown history, not a personal API. |
 | `npm run contacts:whatsapp -- --txt <fixture.txt> --manifest <manifest.json> --output <synthetic-store>` | [Selected synthetic iOS TXT profile](contacts-whatsapp-format-gate.md#contacts-020-operation-and-delegated-decisions); immutable registry, acquisition handoff/request and unknown snapshot history. |
 | `npm run contacts:curate -- --inspect <request.json>` / `--request <request.json>` | [Curated records](contacts-curated-records.md); synthetic `curated.json`, canonical household/person references, original notes and explicit connections. Real note content is unauthorized. |
+| `npm run contacts:audience -- --inspect <request.json>` / `--request <request.json>` / `--finalize <request.json>` | [Life-update audience review](contacts-life-update-audience.md); editable synthetic household/member selections, explicit reasons/preferences and exact-input reviewed lists in private `audience.json`. No sending. |
 
 Feed successful/explicitly partial normalized handoffs into `contacts:collect`
 with their exact source/account/connector and coverage. Native acquisition
