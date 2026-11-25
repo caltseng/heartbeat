@@ -267,9 +267,223 @@ test('conflicting source events are not overwritten or advanced; edits stay sepa
   assert.deepEqual(events(f.state())[0].record, original);
   f.input.pages[0].events[0].id = 'edit-1';
   f.input.pages[0].events[0].eventType = 'edit';
+  f.input.pages[0].events[0].targetId = 'message-1';
+  f.input.pages[0].events[0].timestamp = original.timestamp;
   assert.equal(f.run().exitCode, 0);
   assert.equal(events(f.state()).filter(value => value.record.eventType === 'message').length, 1);
   assert.equal(events(f.state()).filter(value => value.record.eventType === 'edit').length, 1);
+});
+
+test('explicit profile, thread and message revisions retain evidence, replay, branch and resolve without replacement', t => {
+  const f = fixture(t);
+  assert.equal(f.run().exitCode, 0);
+  const page = f.input.pages[0];
+  const original = structuredClone(f.state().records);
+  page.identities[1].displayName = 'Synthetic renamed peer';
+  page.identities[1].revision = { id: 'profile-2', supersedes: '$initial' };
+  page.threads[0].title = 'Synthetic renamed thread';
+  page.threads[0].revision = { id: 'thread-2', supersedes: '$initial' };
+  page.events[0].classification = 'unclassified';
+  page.events[0].revision = { id: 'message-2', supersedes: '$initial' };
+  assert.equal(f.run().exitCode, 0);
+  assert.equal(f.run().exitCode, 0);
+  let state = f.state();
+  for (const [id, row] of Object.entries(original)) {
+    assert.deepEqual(state.records[id].record, row.record);
+    if (['thread', 'event'].includes(row.record.type) || row.record.isSelf === false) {
+      assert.equal(state.records[id].revisions.length, 2);
+    }
+  }
+  const peerKey = Object.keys(state.records).find(id => state.records[id].record.isSelf === false);
+  assert.equal(state.reconciliation.records[peerKey].record.displayName, 'Synthetic renamed peer');
+  page.identities[1].displayName = 'Synthetic competing profile';
+  page.identities[1].revision = { id: 'profile-branch', supersedes: '$initial' };
+  page.threads = []; page.memberships = []; page.events = [];
+  assert.equal(f.run().exitCode, 2);
+  state = f.state();
+  assert.equal(state.reconciliation.collisions.length, 1);
+  assert.equal(state.reconciliation.records[peerKey], undefined);
+  page.identities[1].revision = { id: 'profile-reviewed', supersedes: ['profile-2', 'profile-branch'] };
+  assert.equal(f.run().exitCode, 0);
+  assert.equal(f.state().records[peerKey].revisions.length, 4);
+  assert.equal(f.state().reconciliation.records[peerKey].revision, 'profile-reviewed');
+  assert.equal(f.run().exitCode, 0);
+  page.identities[1].revision.supersedes.reverse();
+  assert.equal(f.run().exitCode, 0);
+  assert.equal(f.state().records[peerKey].revisions.length, 4);
+  page.identities[1].deleted = true;
+  page.identities[1].revision = { id: 'profile-deleted', supersedes: 'profile-reviewed' };
+  assert.equal(f.run().exitCode, 0);
+  assert.equal(f.state().reconciliation.records[peerKey].record.deleted, true);
+  assert.deepEqual(f.state().records[peerKey].record, original[peerKey].record);
+});
+
+test('targeted edits and deletion tombstones retain one message and surface unresolved targets', t => {
+  const f = fixture(t);
+  const page = f.input.pages[0];
+  const message = structuredClone(page.events[0]);
+  page.events.push({ ...message, id: 'edit-1', eventType: 'edit', targetId: message.id },
+    { ...message, id: 'delete-1', eventType: 'deletion', targetId: message.id });
+  assert.equal(f.run().exitCode, 0);
+  const original = events(f.state()).find(row => row.record.eventType === 'message');
+  const projected = Object.values(f.state().reconciliation.records).find(row => row.record.eventType === 'message');
+  assert.equal(projected.deletedBy.length, 1);
+  assert.equal(projected.editedBy.length, 1);
+  assert.deepEqual(projected.record, original.record);
+  assert.equal(events(f.state()).filter(row => row.record.eventType === 'message').length, 1);
+  page.events = [{ ...message, id: 'unknown-delete', eventType: 'deletion', targetId: 'not-yet-imported' }];
+  assert.equal(f.run().exitCode, 2);
+  assert.equal(f.state().reconciliation.unresolvedTargets.length, 1);
+  page.events = [{ ...message, id: 'not-yet-imported' }];
+  assert.equal(f.run().exitCode, 0);
+  assert.equal(f.state().reconciliation.unresolvedTargets.length, 0);
+  page.events = [{ ...message, id: 'invalid-edit', eventType: 'edit' }];
+  assert.equal(f.run().manifest.sources[0].error.code, 'invalid_input');
+});
+
+test('reviewed connector ID translations deduplicate all references and retain original source evidence', t => {
+  const f = fixture(t);
+  for (const row of [...f.input.pages[0].identities, ...f.input.pages[0].threads, ...f.input.pages[0].events]) row.idKind = 'provider';
+  assert.equal(f.run().exitCode, 0);
+  const page = f.input.pages[0];
+  const connector = 'second-export';
+  const mappings = [];
+  for (const [type, rows] of [['identity', page.identities], ['thread', page.threads], ['event', page.events]]) {
+    for (const row of rows) {
+      mappings.push({ source: 'email', account: f.input.account, connector, type, id: `other-${row.id}`, targetId: row.id });
+      row.id = `other-${row.id}`;
+      row.idKind = 'local';
+    }
+  }
+  for (const row of page.memberships) {
+    row.threadId = `other-${row.threadId}`; row.identityId = `other-${row.identityId}`;
+  }
+  for (const row of page.events) {
+    row.threadId = `other-${row.threadId}`; row.senderId = `other-${row.senderId}`;
+    row.recipients.forEach(recipient => { recipient.identityId = `other-${recipient.identityId}`; });
+  }
+  f.request.overlapReview = { revision: 'synthetic-review-1', reviewedAt: period.asOf,
+    basis: 'Synthetic exact provider ID translation reviewed locally.', mappings };
+  f.input.connector = connector; f.request.sources[0].connector = connector;
+  assert.equal(f.run().exitCode, 0);
+  assert.equal(events(f.state()).length, 1);
+  const evidence = events(f.state())[0].provenance.find(row => row.connector === connector);
+  assert.equal(evidence.originalId, 'other-message-1');
+  assert.equal(evidence.sourceRecord.threadId, 'other-thread-1');
+  assert.equal(evidence.sourceRecord.idKind, 'local');
+  assert.equal(events(f.state())[0].record.idKind, 'provider');
+  assert.equal(evidence.overlapReview, 'synthetic-review-1');
+  assert.equal(f.state().overlapReviews.length, 1);
+  assert.equal(f.run().exitCode, 0);
+  const review = f.request.overlapReview;
+  delete f.request.overlapReview;
+  assert.equal(f.run().exitCode, 0);
+  assert.equal(events(f.state()).length, 1);
+  f.request.overlapReview = review;
+  f.request.overlapReview.basis = 'Changed immutable review';
+  assert.throws(f.run, /cannot be changed/);
+});
+
+test('per-thread coverage cannot promote incomplete or omitted thread histories to complete', t => {
+  const f = fixture(t);
+  const page = f.input.pages[0];
+  page.threads.push({ id: 'group-2', idKind: 'local', kind: 'group' });
+  page.threadCoverage = [{ threadId: 'thread-1', ...f.input.coverage },
+    { threadId: 'group-2', start: null, end: null, completeness: 'unknown', basis: 'Synthetic unavailable history.' }];
+  assert.equal(f.run().exitCode, 2);
+  assert.equal(f.state().manifest.sources[0].threadCoverage.length, 2);
+  page.threadCoverage.pop();
+  assert.equal(f.run().exitCode, 2);
+  page.threadCoverage.push({ threadId: 'group-2', ...f.input.coverage });
+  assert.equal(f.run().exitCode, 0);
+  assert.ok(Object.values(f.state().records).filter(row => row.record.type === 'threadCoverage').length >= 3);
+  page.threadCoverage = [];
+  assert.equal(f.run().exitCode, 2);
+  delete page.threadCoverage;
+  assert.equal(f.run().exitCode, 2);
+  assert.equal(f.state().manifest.sources[0].threadCoverageMode, 'per-thread');
+});
+
+test('legacy snapshots upgrade additively and retain unresolved untargeted mutation evidence', t => {
+  const f = fixture(t);
+  f.run();
+  const legacy = f.state();
+  delete legacy.reconciliation;
+  delete legacy.overlapReviews;
+  for (const row of Object.values(legacy.records)) {
+    delete row.revisions;
+    row.provenance.forEach(item => { delete item.sourceRecord; delete item.originalId; delete item.context; delete item.overlapReview; });
+  }
+  const messageKey = Object.keys(legacy.records).find(id => legacy.records[id].record.type === 'event');
+  const editKey = JSON.stringify(['email', f.input.account, 'event', 'legacy-edit']);
+  legacy.records[editKey] = structuredClone(legacy.records[messageKey]);
+  legacy.records[editKey].record.eventType = 'edit';
+  fs.writeFileSync(path.join(f.request.output, 'collection.json'), JSON.stringify(legacy));
+  assert.equal(f.run().exitCode, 2);
+  let state = f.state();
+  assert.deepEqual(state.reconciliation.unresolvedTargets, [editKey]);
+  assert.deepEqual(state.records[messageKey].provenance[0], legacy.records[messageKey].provenance[0]);
+  f.input.pages[0].events = [{ ...f.input.pages[0].events[0], id: 'legacy-edit', eventType: 'edit',
+    targetId: 'message-1', revision: { id: 'target-reviewed', supersedes: '$initial' } }];
+  assert.equal(f.run().exitCode, 0);
+  state = f.state();
+  assert.equal(state.records[editKey].record.targetKey, undefined);
+  assert.equal(state.reconciliation.records[messageKey].editedBy.length, 1);
+});
+
+test('invalid revision ancestry and conflicting translations roll back pages without losing source evidence', t => {
+  const f = fixture(t);
+  f.run();
+  const before = f.state();
+  const page = f.input.pages[0];
+  page.identities[1].revision = { id: 'bad-revision', supersedes: 'missing-version' };
+  page.identities[1].displayName = 'Synthetic rejected update';
+  assert.equal(f.run().manifest.sources[0].error.code, 'revision_conflict');
+  assert.deepEqual(f.state().records, before.records);
+  delete page.identities[1].revision;
+  page.identities[1].displayName = 'Synthetic person A';
+  page.events[0].id = 'unreviewed-other-message';
+  assert.equal(f.run().exitCode, 0);
+  assert.equal(events(f.state()).length, 2);
+  f.request.overlapReview = { revision: 'too-late', reviewedAt: period.asOf, basis: 'Synthetic review after alias import.',
+    mappings: [{ source: 'email', account: f.input.account, connector: f.input.connector, type: 'event',
+      id: 'unreviewed-other-message', targetId: 'message-1' }] };
+  assert.throws(f.run, /already imported/);
+  assert.equal(events(f.state()).length, 2);
+  f.request.overlapReview.mappings[0].id = 'new-alias';
+  page.events[0].id = 'new-alias';
+  page.events[0].classification = 'bulk';
+  assert.equal(f.run().manifest.sources[0].error.code, 'record_conflict');
+  assert.equal(events(f.state()).length, 2);
+  f.request.overlapReview = { revision: 'chain-review', reviewedAt: period.asOf, basis: 'Synthetic invalid chain.',
+    mappings: [{ source: 'email', account: f.input.account, connector: f.input.connector, type: 'event',
+      id: 'message-1', targetId: 'third-id' }] };
+  assert.throws(f.run, /chains or cycles/);
+});
+
+test('historical membership intervals preserve group rosters and bound direct-thread validation', t => {
+  const f = fixture(t);
+  const page = f.input.pages[0];
+  page.identities.push({ id: 'former-peer', idKind: 'local', isSelf: false });
+  page.memberships[1].validFrom = '2026-11-20T00:00:00Z';
+  page.memberships.push({ threadId: 'thread-1', identityId: 'former-peer',
+    validFrom: null, validUntil: '2026-11-20T00:00:00Z' });
+  assert.equal(f.run().exitCode, 0);
+  const previous = structuredClone(page.events[0]);
+  previous.id = 'historical-message'; previous.senderId = 'former-peer'; previous.timestamp = '2026-11-19T12:00:00Z';
+  page.events.push(previous);
+  assert.equal(f.run().exitCode, 0);
+  assert.equal(events(f.state()).length, 2);
+  page.events = [{ ...previous, id: 'outside-membership', timestamp: '2026-11-23T12:00:00Z' }];
+  assert.equal(f.run().manifest.sources[0].status, 'failed');
+  page.threads[0].kind = 'group';
+  page.threads[0].revision = { id: 'group-kind', supersedes: '$initial' };
+  page.events = [];
+  assert.equal(f.run().exitCode, 0);
+  const memberships = Object.values(f.state().records).filter(row => row.record.type === 'membership');
+  assert.equal(memberships.length, 3);
+  assert.equal(memberships.find(row => row.record.validUntil).record.validUntil, '2026-11-20T00:00:00.000Z');
+  assert.equal(events(f.state()).length, 2);
 });
 
 test('calendar presets, DST boundaries, 30 days, custom offsets and invalid dates are explicit', () => {

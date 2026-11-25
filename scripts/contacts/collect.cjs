@@ -138,53 +138,154 @@ function coverage(input, source) {
     start, end, completeness: input.completeness, basis: text(input.basis, 'coverage.basis') };
 }
 function identifier(record, fields, label) {
-  object(record, ['id', 'idKind', ...fields], label);
+  object(record, ['id', 'idKind', 'revision', ...fields], label);
   text(record.id, `${label}.id`);
   requireValue(['provider', 'local'].includes(record.idKind), `${label}.idKind must distinguish provider and local IDs.`);
 }
+function versions(entry) {
+  return entry.revisions || [{ id: '$initial', supersedes: null, record: entry.record, provenance: entry.provenance }];
+}
+function heads(entry) {
+  const rows = versions(entry);
+  const replaced = new Set(rows.flatMap(row => row.supersedes === null ? [] : [row.supersedes].flat()));
+  return rows.filter(row => !replaced.has(row.id));
+}
+function current(entry) {
+  if (!entry) return undefined;
+  const leaves = heads(entry);
+  requireValue(leaves.length === 1, 'Referenced source record has unresolved revision branches.', 'revision_collision');
+  return { record: leaves[0].record, revision: { id: leaves[0].id } };
+}
+function reviewTranslations(input) {
+  if (input === undefined) return null;
+  object(input, ['revision', 'reviewedAt', 'basis', 'mappings'], 'overlapReview');
+  text(input.revision, 'overlapReview.revision');
+  const reviewedAt = instant(input.reviewedAt, 'overlapReview.reviewedAt');
+  text(input.basis, 'overlapReview.basis');
+  const mappings = array(input.mappings, 'overlapReview.mappings');
+  const seen = new Set();
+  for (const mapping of mappings) {
+    object(mapping, ['source', 'account', 'connector', 'type', 'id', 'targetId'], 'mapping');
+    requireValue(SOURCES.includes(mapping.source) && ['identity', 'thread', 'event'].includes(mapping.type), 'Invalid translation namespace/type.');
+    ['account', 'connector', 'id', 'targetId'].forEach(field => text(mapping[field], `mapping.${field}`));
+    const locator = JSON.stringify([mapping.source, mapping.account, mapping.connector, mapping.type, mapping.id]);
+    requireValue(!seen.has(locator) && mapping.id !== mapping.targetId, 'Duplicate or self translation.');
+    seen.add(locator);
+  }
+  requireValue(!mappings.some(a => mappings.some(b => a.source === b.source && a.account === b.account &&
+    a.type === b.type && a.targetId === b.id)), 'Translations must point directly to untranslated canonical source IDs.');
+  return { ...input, reviewedAt };
+}
+function reconcile(state) {
+  const records = {}, collisions = [], unresolvedTargets = [];
+  for (const [id, entry] of Object.entries(state.records)) {
+    const leaves = heads(entry);
+    if (leaves.length !== 1) collisions.push({ key: id, revisions: leaves.map(row => row.id).sort() });
+    else records[id] = { revision: leaves[0].id, record: leaves[0].record, editedBy: [], deletedBy: [] };
+  }
+  for (const [id, row] of Object.entries(records)) {
+    if (['edit', 'deletion'].includes(row.record.eventType) && !row.record.targetKey) {
+      unresolvedTargets.push(id);
+      continue;
+    }
+    if (!row.record.targetKey) continue;
+    const target = records[row.record.targetKey];
+    if (!target || target.record.type !== 'event' || target.record.eventType !== 'message' ||
+        target.record.threadKey !== row.record.threadKey || target.record.channel !== row.record.channel ||
+        target.record.timestamp > row.record.timestamp) {
+      unresolvedTargets.push(id);
+    } else if (row.record.eventType === 'deletion') target.deletedBy.push(id);
+    else target.editedBy.push(id);
+  }
+  state.reconciliation = { schemaVersion: 1, records, collisions, unresolvedTargets: unresolvedTargets.sort() };
+  state.manifest.reconciliationRequired = collisions.length > 0 || unresolvedTargets.length > 0;
+}
 function preparePage(page, source, state, provenance) {
-  object(page, ['cursor', 'nextCursor', 'retrievedAt', 'identities', 'threads', 'memberships', 'events'], 'page');
+  object(page, ['cursor', 'nextCursor', 'retrievedAt', 'identities', 'threads', 'memberships', 'events', 'threadCoverage'], 'page');
   cursor(page.cursor); cursor(page.nextCursor);
   requireValue(page.nextCursor === null || page.nextCursor !== page.cursor, 'A page cannot advance to its own cursor.');
   const retrievedAt = instant(page.retrievedAt, 'page.retrievedAt');
-  const prefix = (type, id) => key(source.source, source.account, type, id);
+  const prefix = (type, id) => {
+    const mapping = state.overlapReviews.flatMap(review => review.mappings).find(item => item.source === source.source &&
+      item.account === source.account && item.connector === source.connector && item.type === type && item.id === id);
+    return key(source.source, source.account, type, mapping ? mapping.targetId : id);
+  };
   const additions = [];
-  const known = (type, id) => state.records[prefix(type, id)] || additions.find(item => item.key === prefix(type, id));
-  const add = (type, id, record) => {
+  const known = (type, id) => [...additions].reverse().find(item => item.key === prefix(type, id)) || current(state.records[prefix(type, id)]);
+  const add = (type, id, record, evidence, revision, context) => {
     const recordKey = prefix(type, id);
-    const existing = state.records[recordKey] || additions.find(item => item.key === recordKey);
-    requireValue(!existing || isDeepStrictEqual(existing.record, record), 'An existing source ID has conflicting metadata; resolve it explicitly before retrying.', 'record_conflict');
-    additions.push({ key: recordKey, record, provenance: { ...provenance, pageCursor: page.cursor, retrievedAt } });
+    if (recordKey !== key(source.source, source.account, type, id)) {
+      const target = state.records[recordKey] || additions.find(item => item.key === recordKey);
+      requireValue(target, 'Import canonical target evidence before translated aliases.', 'translation_target_missing');
+      record.idKind = target.record.idKind;
+    }
+    const rows = [...(state.records[recordKey] ? versions(state.records[recordKey]) : []),
+      ...additions.filter(item => item.key === recordKey).map(item => ({ ...item.revision, record: item.record }))];
+    if (revision !== undefined) {
+      object(revision, ['id', 'supersedes'], 'revision');
+      text(revision.id, 'revision.id');
+      requireValue(revision.id !== '$initial', 'Reserved revision ID.');
+      const predecessors = revision.supersedes === null ? [] : [revision.supersedes].flat();
+      requireValue((revision.supersedes === null || typeof revision.supersedes === 'string' || Array.isArray(revision.supersedes)) &&
+        predecessors.every(id => typeof id === 'string' && id.length > 0) &&
+        (!Array.isArray(revision.supersedes) || predecessors.length > 0) && new Set(predecessors).size === predecessors.length,
+      'revision.supersedes must be an ID, a nonempty distinct ID list, or null.');
+      requireValue(predecessors.every(id => id !== revision.id && rows.some(row => row.id === id)),
+        'Revision predecessor must already exist.', 'revision_conflict');
+      revision = { id: revision.id, supersedes: Array.isArray(revision.supersedes) ? [...revision.supersedes].sort() : revision.supersedes };
+    } else revision = { id: '$initial', supersedes: null };
+    const existing = rows.find(row => row.id === revision.id);
+    requireValue(!existing || (isDeepStrictEqual(existing.supersedes, revision.supersedes) && isDeepStrictEqual(existing.record, record)),
+      'An existing source ID/revision has conflicting metadata; supply an explicit new revision.', 'record_conflict');
+    additions.push({ key: recordKey, record, revision, provenance: { ...provenance,
+      overlapReview: state.overlapReviews.find(review => review.mappings.some(item => item.source === source.source &&
+        item.account === source.account && item.connector === source.connector && item.type === type && item.id === id))?.revision || null, originalId: id,
+      sourceRecord: evidence, ...(context ? { context } : {}), pageCursor: page.cursor, retrievedAt } });
   };
   for (const identity of array(page.identities, 'page.identities')) {
-    identifier(identity, ['displayName', 'addresses', 'isSelf'], 'identity');
+    identifier(identity, ['displayName', 'addresses', 'isSelf', 'deleted'], 'identity');
     requireValue(typeof identity.isSelf === 'boolean', 'identity.isSelf must be explicit.');
     const record = { type: 'identity', idKind: identity.idKind, isSelf: identity.isSelf };
+    if (identity.deleted !== undefined) {
+      requireValue(typeof identity.deleted === 'boolean' && identity.revision !== undefined, 'Identity tombstones require explicit revisions and boolean deleted.');
+      record.deleted = identity.deleted;
+    }
     if (identity.displayName !== undefined) record.displayName = text(identity.displayName, 'identity.displayName');
     if (identity.addresses !== undefined) record.addresses = array(identity.addresses, 'identity.addresses').map(address => {
       object(address, ['type', 'value'], 'address');
       requireValue(['email', 'phone'].includes(address.type), 'Unknown address type.');
       return { type: address.type, value: text(address.value, 'address.value') };
     }).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
-    add('identity', identity.id, record);
+    add('identity', identity.id, record, identity, identity.revision);
   }
   for (const thread of array(page.threads, 'page.threads')) {
-    identifier(thread, ['kind', 'title'], 'thread');
+    identifier(thread, ['kind', 'title', 'deleted'], 'thread');
     requireValue(['direct', 'group', 'broadcast', 'unknown'].includes(thread.kind), 'Invalid thread kind.');
     const record = { type: 'thread', idKind: thread.idKind, kind: thread.kind };
+    if (thread.deleted !== undefined) {
+      requireValue(typeof thread.deleted === 'boolean' && thread.revision !== undefined, 'Thread tombstones require explicit revisions and boolean deleted.');
+      record.deleted = thread.deleted;
+    }
     if (thread.title !== undefined) record.title = text(thread.title, 'thread.title');
-    add('thread', thread.id, record);
+    add('thread', thread.id, record, thread, thread.revision);
   }
   for (const membership of array(page.memberships, 'page.memberships')) {
-    object(membership, ['threadId', 'identityId'], 'membership');
+    object(membership, ['threadId', 'identityId', 'validFrom', 'validUntil'], 'membership');
     text(membership.threadId, 'membership.threadId'); text(membership.identityId, 'membership.identityId');
     requireValue(known('thread', membership.threadId) && known('identity', membership.identityId), 'Membership references an unknown identity or thread.');
-    add('membership', JSON.stringify([membership.threadId, membership.identityId]),
-      { type: 'membership', threadKey: prefix('thread', membership.threadId), identityKey: prefix('identity', membership.identityId) });
+    const validFrom = membership.validFrom == null ? null : instant(membership.validFrom, 'membership.validFrom');
+    const validUntil = membership.validUntil == null ? null : instant(membership.validUntil, 'membership.validUntil');
+    requireValue(validFrom === null || validUntil === null || validFrom < validUntil, 'Invalid membership validity interval.');
+    const threadKey = prefix('thread', membership.threadId), identityKey = prefix('identity', membership.identityId);
+    const temporal = membership.validFrom !== undefined || membership.validUntil !== undefined;
+    const id = temporal ? JSON.stringify([threadKey, identityKey, validFrom, validUntil]) :
+      JSON.stringify([JSON.parse(threadKey)[3], JSON.parse(identityKey)[3]]);
+    add('membership', id, { type: 'membership', threadKey, identityKey,
+      ...(temporal ? { validFrom, validUntil } : {}) }, membership);
   }
   const memberships = [...Object.values(state.records), ...additions].map(item => item.record).filter(record => record.type === 'membership');
   for (const event of array(page.events, 'page.events')) {
-    identifier(event, ['threadId', 'senderId', 'timestamp', 'channel', 'eventType', 'recipients', 'classification'], 'event');
+    identifier(event, ['threadId', 'senderId', 'timestamp', 'channel', 'eventType', 'recipients', 'classification', 'targetId'], 'event');
     requireValue(known('thread', text(event.threadId, 'event.threadId')), 'Event references an unknown thread.');
     requireValue(event.senderId === null || known('identity', text(event.senderId, 'event.senderId')), 'Event references an unknown sender.');
     requireValue(CHANNELS[source.source].includes(event.channel), 'Event channel does not match the source.');
@@ -197,27 +298,43 @@ function preparePage(page, source, state, provenance) {
       requireValue(['to', 'cc', 'bcc', 'recipient'].includes(recipient.role), 'Unknown recipient role.');
       return { identityKey: prefix('identity', recipient.identityId), role: recipient.role };
     }).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
-    const thread = known('thread', event.threadId).record;
+    const observedThread = known('thread', event.threadId);
+    const thread = observedThread.record;
     if (thread.kind === 'direct') {
-      const people = new Set(memberships.filter(record => record.threadKey === prefix('thread', event.threadId)).map(record => record.identityKey));
-      requireValue(people.size === 2 && [...people].filter(id => (state.records[id] || additions.find(item => item.key === id)).record.isSelf).length === 1 &&
+      const time = instant(event.timestamp, 'event.timestamp');
+      const people = new Set(memberships.filter(record => record.threadKey === prefix('thread', event.threadId) &&
+        (!record.validFrom || record.validFrom <= time) && (!record.validUntil || time < record.validUntil)).map(record => record.identityKey));
+      requireValue(people.size === 2 && [...people].filter(id => ([...additions].reverse().find(item => item.key === id) || current(state.records[id])).record.isSelf).length === 1 &&
         (event.senderId === null || people.has(prefix('identity', event.senderId))) && recipients.every(recipient => people.has(recipient.identityKey)),
       'A direct event requires exactly two known members including self, with sender and recipients in that thread.');
     }
     const timestamp = instant(event.timestamp, 'event.timestamp');
     requireValue(timestamp <= retrievedAt, 'An observation cannot occur after its retrieval timestamp.');
+    requireValue(event.targetId === undefined || ['edit', 'deletion'].includes(event.eventType), 'Only edits/deletions can specify targetId.');
+    requireValue(!['edit', 'deletion'].includes(event.eventType) || event.targetId !== undefined, 'Edits/deletions require an explicit targetId.');
+    const targetKey = event.targetId === undefined ? undefined : prefix('event', text(event.targetId, 'event.targetId'));
+    requireValue(targetKey !== prefix('event', event.id), 'An event cannot target itself.');
     add('event', event.id, {
       type: 'event', idKind: event.idKind, threadKey: prefix('thread', event.threadId),
       senderKey: event.senderId === null ? null : prefix('identity', event.senderId),
       timestamp, channel: event.channel,
-      eventType: event.eventType, recipients, classification: event.classification
-    });
+      eventType: event.eventType, recipients, classification: event.classification,
+      ...(targetKey ? { targetKey } : {})
+    }, event, event.revision, { threadRevision: observedThread.revision.id, threadKind: thread.kind });
+  }
+  for (const item of array(page.threadCoverage === undefined ? [] : page.threadCoverage, 'page.threadCoverage')) {
+    object(item, ['threadId', 'start', 'end', 'completeness', 'basis'], 'threadCoverage');
+    requireValue(known('thread', text(item.threadId, 'threadCoverage.threadId')), 'Coverage references an unknown thread.');
+    const { threadId, ...bounds } = item;
+    const record = { type: 'threadCoverage', threadKey: prefix('thread', threadId), ...coverage(bounds, source.source) };
+    add('threadCoverage', hash(JSON.stringify([record, source.connector, provenance.inputDigest, page.cursor])), record, item);
   }
   requireValue(source.source !== 'google-contacts' || (page.threads.length === 0 && page.memberships.length === 0 && page.events.length === 0),
     'Google contact presence cannot create communication activity.');
   return additions;
 }
 function persist(file, state) {
+  reconcile(state);
   state.manifest.unresolvedIdentityKeys = Object.entries(state.records)
     .filter(([, value]) => value.record.type === 'identity' && !value.record.isSelf).map(([id]) => id).sort();
   const temporary = `${file}.${process.pid}.tmp`;
@@ -279,11 +396,17 @@ function importSource(source, requestFolder, request, period, state, file, repor
     requireValue(page.nextCursor === null || !visited.has(page.nextCursor), 'Pagination contains a cursor cycle.', 'pagination_error');
     let duplicates = 0;
     for (const addition of additions) {
-      const existing = state.records[addition.key];
-      if (existing) {
+      let existing = state.records[addition.key];
+      if (!existing) {
+        existing = { record: addition.record, provenance: [], revisions: [] };
+        state.records[addition.key] = existing;
+      } else if (!existing.revisions) existing.revisions = structuredClone(versions(existing));
+      const version = existing.revisions.find(row => row.id === addition.revision.id);
+      if (version) {
         duplicates++;
-        if (!existing.provenance.some(item => isDeepStrictEqual(item, addition.provenance))) existing.provenance.push(addition.provenance);
-      } else state.records[addition.key] = { record: addition.record, provenance: [addition.provenance] };
+        if (!version.provenance.some(item => isDeepStrictEqual(item, addition.provenance))) version.provenance.push(addition.provenance);
+      } else existing.revisions.push({ ...addition.revision, record: addition.record, provenance: [addition.provenance] });
+      if (!existing.provenance.some(item => isDeepStrictEqual(item, addition.provenance))) existing.provenance.push(addition.provenance);
     }
     if (handoff.textArchive) {
       state.textArchives ||= {};
@@ -304,7 +427,24 @@ function importSource(source, requestFolder, request, period, state, file, repor
       break;
     }
   }
-  const covered = declaredCoverage.completeness === 'complete' && (source.source === 'google-contacts' ||
+  const imported = Object.entries(state.records).filter(([id, row]) =>
+    JSON.parse(id)[0] === source.source && JSON.parse(id)[1] === source.account && row.provenance.some(item =>
+      item.connector === source.connector && item.inputDigest === input.digest));
+  report.threadCoverage = imported.filter(([, row]) => row.record.type === 'threadCoverage').map(([, row]) => row.record);
+  const coversPeriod = row => row.completeness === 'complete' && row.start !== null && row.end !== null &&
+    row.start <= period.start && row.end >= period.end && row.end <= lastRetrieval;
+  const sourceRecords = Object.entries(state.records).filter(([id, row]) =>
+    JSON.parse(id)[0] === source.source && JSON.parse(id)[1] === source.account &&
+      row.provenance.some(item => item.connector === source.connector));
+  const threadKeys = [...new Set(sourceRecords.flatMap(([id, row]) => row.record.type === 'thread' ? [id] :
+    row.record.threadKey ? [row.record.threadKey] : []))];
+  const explicitThreadCoverage = pages.some(page => page.threadCoverage !== undefined) ||
+    sourceRecords.some(([, row]) => row.record.type === 'threadCoverage');
+  report.threadCoverageMode = explicitThreadCoverage ? 'per-thread' : 'inherited-source-declaration';
+  const threadsCovered = !explicitThreadCoverage || threadKeys.every(threadKey =>
+    report.threadCoverage.some(row => row.threadKey === threadKey && coversPeriod(row)) &&
+    report.threadCoverage.filter(row => row.threadKey === threadKey).every(coversPeriod));
+  const covered = threadsCovered && declaredCoverage.completeness === 'complete' && (source.source === 'google-contacts' ||
     (declaredCoverage.start <= period.start && declaredCoverage.end >= period.end && declaredCoverage.end <= lastRetrieval));
   Object.assign(report, { status: terminal && covered ? 'collected' : 'partial', coverage: declaredCoverage,
     retrievedAt: lastRetrieval, paginationComplete: terminal, nextCursor: expected,
@@ -313,7 +453,7 @@ function importSource(source, requestFolder, request, period, state, file, repor
   report.observedOnly = report.status !== 'collected';
 }
 function collect(request, requestFolder = process.cwd()) {
-  object(request, ['schemaVersion', 'dataClass', 'period', 'output', 'sources', 'resume', 'maxPages'], 'request');
+  object(request, ['schemaVersion', 'dataClass', 'period', 'output', 'sources', 'resume', 'maxPages', 'overlapReview'], 'request');
   requireValue(request.schemaVersion === 1, 'Only schemaVersion 1 is supported.');
   requireValue(['synthetic', 'private'].includes(request.dataClass), 'dataClass must be synthetic or private.');
   requireValue(request.dataClass === 'synthetic',
@@ -322,6 +462,7 @@ function collect(request, requestFolder = process.cwd()) {
   requireValue(request.resume === undefined || typeof request.resume === 'boolean', 'resume must be boolean.');
   requireValue(request.maxPages === undefined || (Number.isSafeInteger(request.maxPages) && request.maxPages > 0), 'maxPages must be a positive integer.');
   const period = resolvePeriod(request.period);
+  const overlapReview = reviewTranslations(request.overlapReview);
   const sources = array(request.sources, 'sources');
   requireValue(sources.length > 0, 'Request at least one source.');
   sources.forEach(validateSource);
@@ -342,6 +483,22 @@ function collect(request, requestFolder = process.cwd()) {
     const state = fs.existsSync(file) ? readJSON(file).value : { schemaVersion: 1, dataClass: request.dataClass, records: {}, checkpoints: {}, history: [] };
     requireValue(state.schemaVersion === 1 && state.dataClass === request.dataClass && state.records && state.checkpoints && Array.isArray(state.history),
       'Stored schema/data class does not match.');
+    state.overlapReviews ||= [];
+    if (overlapReview) {
+      const previousReview = state.overlapReviews.find(row => row.revision === overlapReview.revision);
+      requireValue(!previousReview || isDeepStrictEqual(previousReview, overlapReview), 'An overlap review revision cannot be changed.', 'review_conflict');
+      const allMappings = [...state.overlapReviews.flatMap(review => review.mappings), ...overlapReview.mappings];
+      requireValue(!allMappings.some(a => allMappings.some(b => a.source === b.source && a.account === b.account &&
+        a.type === b.type && a.targetId === b.id)), 'Saved and new translations must not form chains or cycles.', 'review_conflict');
+      for (const mapping of overlapReview.mappings) {
+        requireValue(!state.records[key(mapping.source, mapping.account, mapping.type, mapping.id)],
+          'Translation alias was already imported; retain this store and replay into a fresh store with the review.', 'review_conflict');
+        requireValue(!state.overlapReviews.some(review => review.mappings.some(row =>
+          ['source', 'account', 'connector', 'type', 'id'].every(field => row[field] === mapping[field]) && row.targetId !== mapping.targetId)),
+        'An imported translation cannot be retargeted; preserve the store and replay with a corrected review.', 'review_conflict');
+      }
+      if (!previousReview) state.overlapReviews.push(overlapReview);
+    }
     if (state.manifest) {
       const { collectedAt, period: previousPeriod, status, sources: previousSources } = state.manifest;
       state.history.push({ collectedAt, period: previousPeriod, status, sources: previousSources });
@@ -352,8 +509,9 @@ function collect(request, requestFolder = process.cwd()) {
         persistedPages: 0, duplicateRecords: 0, coverage: null, retrievedAt: null, paginationComplete: false, nextCursor: null })),
       unresolvedIdentityKeys: [],
       limitations: ['Metadata handoff imports only; native conversion is separate and no live endpoints are connected.',
-        'Provider/account namespaces and local IDs require review before overlapping imports.',
-        'Reactions, edits, deletions and membership events are retained separately, not reconciled into message counts.'] };
+        'Provider/account namespaces and local IDs require review before overlapping imports; unreviewed different IDs remain distinct.',
+        'Use reconciliation.records for unique current revisions; raw records retain original evidence.',
+        'Edits, deletions and membership events are not messages; deletedBy marks message tombstones.'] };
     persist(file, state);
     for (const [index, source] of sources.entries()) {
       const report = state.manifest.sources[index];
@@ -367,7 +525,8 @@ function collect(request, requestFolder = process.cwd()) {
       }
       persist(file, state);
     }
-    state.manifest.status = state.manifest.sources.every(source => source.status === 'collected') ? 'collected' : 'partial';
+    state.manifest.status = state.manifest.sources.every(source => source.status === 'collected') &&
+      !state.manifest.reconciliationRequired ? 'collected' : 'partial';
     persist(file, state);
     return { file, manifest: state.manifest, exitCode: state.manifest.status === 'collected' ? 0 : 2 };
   } finally {

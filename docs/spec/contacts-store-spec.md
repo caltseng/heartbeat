@@ -9,8 +9,9 @@ Migrated from caltseng/churchtree PR #68, exact merge
 `2b222e03ccbe819764eb3a133c318035945f1eac`; see
 [provenance](../provenance.md). Heartbeat in `caltseng/heartbeat` is authoritative.
 This remains a product specification, not a claim that its full roadmap exists.
-Only CONTACTS-001 through CONTACTS-004's metadata-handoff collection, six skills
-and synthetic tests are implemented. Live acquisition, identity review, numerical
+CONTACTS-001 through CONTACTS-004's metadata-handoff collection, six skills,
+synthetic tests and [CONTACTS-021 source reconciliation](contacts-source-revisions.md)
+are implemented. Live acquisition, canonical identity review, numerical
 aggregation, summaries and the map are not implemented. Remaining CONTACTS
 execution is blocked until the Heartbeat bootstrap is verified checked in.
 
