@@ -6,6 +6,7 @@ const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { collect, resolvePeriod, outputLocation } = require('./collect.cjs');
 const { handoff, writeDemo, period } = require('./demo.cjs');
+const { readCollection } = require('./collection-store.cjs');
 
 function fixture(t) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'contacts-synthetic-'));
@@ -15,10 +16,53 @@ function fixture(t) {
     sources: [{ source: 'email', account: input.account, connector: input.connector, mode: 'metadata-import', input: 'input.json' }] };
   function write() { fs.writeFileSync(path.join(folder, 'input.json'), JSON.stringify(input)); }
   function run() { write(); return collect(request, folder); }
-  function state() { return JSON.parse(fs.readFileSync(path.join(request.output, 'collection.json'), 'utf8')); }
+  function state() { return readCollection(path.join(request.output, 'collection.json')).value; }
   return { folder, input, request, write, run, state };
 }
 const events = state => Object.values(state.records).filter(value => value.record.type === 'event');
+
+test('compact collection stores each revision once and cuts matched bytes per event by at least half', t => {
+  const f = fixture(t);
+  const template = f.input.pages[0].events[0];
+  f.input.pages[0].events = Array.from({ length: 1000 }, (_, index) =>
+    ({ ...template, id: `synthetic-size-${index}` }));
+  const result = f.run();
+  assert.equal(result.exitCode, 0);
+  const raw = fs.readFileSync(result.file);
+  const stored = JSON.parse(raw);
+  const expanded = f.state();
+  const baseline = Buffer.byteLength(JSON.stringify(expanded, null, 2) + '\n');
+  assert.equal(events(expanded).length, 1000);
+  assert.ok(raw.length <= baseline / 2, `${raw.length} bytes exceeds half of ${baseline}`);
+  for (const [key, entry] of Object.entries(stored.records)) {
+    assert.deepEqual(Object.keys(entry), ['revisions']);
+    assert.equal(entry.revisions.length, 1);
+    assert.equal(Object.hasOwn(stored.reconciliation.records[key], 'record'), false);
+  }
+  const { hash } = require('./lib.cjs');
+  assert.equal(readCollection(result.file).digest, hash(raw));
+  t.diagnostic(`Matched 1000 synthetic events: legacy ${baseline / 1000} bytes/event; compact ${raw.length / 1000} bytes/event; reduction ${(100 * (1 - raw.length / baseline)).toFixed(2)}%.`);
+  assert.equal(f.run().manifest.sources[0].duplicateRecords, Object.keys(stored.records).length);
+  assert.equal(events(f.state()).length, 1000);
+});
+
+test('legacy collections remain readable and compact on the next atomic collection write', t => {
+  const f = fixture(t);
+  const result = f.run();
+  const legacy = f.state();
+  fs.writeFileSync(result.file, JSON.stringify(legacy, null, 2) + '\n');
+  assert.equal(readCollection(result.file).value.recordStorage, undefined);
+  assert.equal(f.run().exitCode, 0);
+  assert.equal(JSON.parse(fs.readFileSync(result.file)).recordStorage, 'revision-references-v1');
+  assert.deepEqual(f.state().records, legacy.records);
+  assert.deepEqual(f.state().reconciliation, legacy.reconciliation);
+  const broken = JSON.parse(fs.readFileSync(result.file));
+  Object.values(broken.reconciliation.records)[0].revision = 'missing-revision';
+  fs.writeFileSync(result.file, JSON.stringify(broken));
+  const before = fs.readFileSync(result.file);
+  assert.throws(() => f.run(), error => error.code === 'invalid_store');
+  assert.deepEqual(fs.readFileSync(result.file), before);
+});
 
 for (const [source, channel, connector] of [
   ['text-messages', 'sms', 'synctech-xml-metadata-v1'],
@@ -175,14 +219,14 @@ test('all five synthetic sources persist metadata, not inferred cross-source peo
   const demo = writeDemo(path.join(f.folder, 'demo'));
   const result = collect(demo.request, demo.folder);
   assert.equal(result.exitCode, 0);
-  const file = JSON.parse(fs.readFileSync(result.file, 'utf8'));
+  const file = readCollection(result.file).value;
   assert.equal(events(file).length, 4);
   assert.equal(result.manifest.unresolvedIdentityKeys.length, 5);
   assert.equal(result.manifest.identityMappingRevision, null);
   assert.equal(result.manifest.sources[0].coverage.kind, 'identity-snapshot');
   collect(demo.request, demo.folder);
-  assert.equal(events(JSON.parse(fs.readFileSync(result.file, 'utf8'))).length, 4);
-  const replayed = JSON.parse(fs.readFileSync(result.file, 'utf8'));
+  assert.equal(events(readCollection(result.file).value).length, 4);
+  const replayed = readCollection(result.file).value;
   assert.equal(replayed.history.length, 1);
   assert.equal(replayed.history[0].status, 'collected');
   assert.equal(replayed.history[0].sources.length, 5);

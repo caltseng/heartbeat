@@ -1,4 +1,5 @@
 const fs = require('node:fs');
+const { readCollection } = require('./collection-store.cjs');
 const path = require('node:path');
 const { hashJSON, publish, runCLI, readJSON, requireValue, object, outputLocation } = require('./lib.cjs');
 const { aggregate } = require('./aggregate.cjs');
@@ -27,7 +28,7 @@ function run(request, folder = process.cwd()) {
   requireValue(['collection', 'mapping', 'curated', 'output'].every(field =>
     typeof request[field] === 'string' && request[field].trim().length > 0),
   'Explicit collection, mapping directory, curated directory and output paths are required.');
-  const collection = readJSON(path.resolve(folder, request.collection));
+  const collection = readCollection(path.resolve(folder, request.collection));
   requireValue(collection.value.dataClass === 'synthetic', 'Private opportunities are disabled.',
     'private_collection_disabled');
   const mapping = readJSON(path.resolve(folder, request.mapping, 'identity-review.json'));

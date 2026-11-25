@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { readCollection } = require('./collection-store.cjs');
 const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
@@ -62,7 +63,7 @@ function importResult(dir, handoff, connector = handoff.connector, overlapReview
       connector, mode: 'metadata-import', input: 'handoff.json' }] }, dir);
 }
 function stored(dir) {
-  return JSON.parse(fs.readFileSync(path.join(dir, 'store', 'collection.json'), 'utf8'));
+  return readCollection(path.join(dir, 'store', 'collection.json')).value;
 }
 test('direct and four-member group shards preserve one sender/event, metadata, UTC milliseconds and replay', t => {
   for (const layout of ['messages-inbox', 'activity-messages-inbox']) {

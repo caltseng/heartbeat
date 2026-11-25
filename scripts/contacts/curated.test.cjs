@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { readCollection } = require('./collection-store.cjs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
@@ -100,7 +101,7 @@ test('source changes and unavailable activity cannot overwrite curated notes or 
   const f = fixture(t);
   f.apply([f.note, f.connection]);
   const bytes = fs.readFileSync(f.file);
-  const collection = JSON.parse(fs.readFileSync(f.collection));
+  const collection = readCollection(f.collection).value;
   const identity = Object.values(collection.reconciliation.records).find(entry => entry.record.type === 'identity');
   identity.record.displayName = 'Changed synthetic source name';
   collection.manifest.status = 'partial';
@@ -125,7 +126,7 @@ test('alias merge, split and undo retain original note references and text', t =
   const mapping = JSON.parse(fs.readFileSync(mappingFile));
   const keys = Object.keys(mapping.view.assignments);
   // Two synthetic source identities explicitly reviewed as the same person.
-  const collection = JSON.parse(fs.readFileSync(f.collection));
+  const collection = readCollection(f.collection).value;
   for (const key of keys) {
     collection.reconciliation.records[key].record.isSelf = false;
     collection.reconciliation.records[key].record.idKind = 'provider';
@@ -245,7 +246,7 @@ test('private denial precedes all path access; unsafe output fails and actual CL
   const success = run({ ...f.request, operations: [f.note], expectedRevision: 0, mappingDigest: current.mappingDigest }, '--request');
   assert.equal(success.status, 0, success.stderr);
   assert.equal(JSON.parse(success.stdout).heading, 'Heartbeat curated relationships');
-  const collection = JSON.parse(fs.readFileSync(f.collection));
+  const collection = readCollection(f.collection).value;
   collection.manifest.status = 'partial';
   fs.writeFileSync(f.collection, JSON.stringify(collection));
   assert.equal(run(f.request).status, 2);

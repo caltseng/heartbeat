@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { readCollection } = require('./collection-store.cjs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -63,7 +64,7 @@ function importer(folder, f) {
       fs.writeFileSync(path.join(folder, 'handoff.json'), JSON.stringify(handoff));
       return collect(request, folder);
     },
-    state() { return JSON.parse(fs.readFileSync(path.join(folder, 'collection.json'))); }
+    state() { return readCollection(path.join(folder, 'collection.json')).value; }
   };
 }
 

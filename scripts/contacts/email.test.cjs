@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { readCollection } = require('./collection-store.cjs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
@@ -90,7 +91,7 @@ test('native pages normalize one event per message, preserve roles/classes, and 
   const dir = folder(t);
   assert.equal(importResult(dir, result.handoff).exitCode, 2);
   assert.equal(importResult(dir, result.handoff).exitCode, 2);
-  const stored = JSON.parse(fs.readFileSync(path.join(dir, 'store', 'collection.json'), 'utf8'));
+  const stored = readCollection(path.join(dir, 'store', 'collection.json')).value;
   assert.equal(Object.values(stored.records).filter(row => row.record.type === 'event').length, 6);
 });
 test('budget cursor resumes independently of a terminal immutable handoff and binds account/period/policy', async () => {
@@ -168,7 +169,7 @@ test('single-page synthetic imports preserve 2000 and 4000 ordered events across
     assert.ok(result.checkpoint.messages.every(row => row.classification === 'interpersonal'));
     assert.equal(result.handoff.pages[0].threads.length, count / 40);
     assert.equal(result.handoff.pages[0].memberships.length, count / 20);
-    const stored = JSON.parse(fs.readFileSync(imported.file, 'utf8'));
+    const stored = readCollection(imported.file).value;
     const rows = Object.values(stored.records).filter(row => row.record.type === 'event');
     assert.equal(rows.length, count);
     assert.deepEqual(rows.map(row => row.provenance[0].originalId), config.interpersonalIds);

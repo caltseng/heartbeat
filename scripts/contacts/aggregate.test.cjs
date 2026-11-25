@@ -8,6 +8,7 @@ const { handoff } = require('./demo.cjs');
 const { review } = require('./identity-review.cjs');
 const { tempFolder, mappingFixture } = require('./fixtures.cjs');
 const { aggregate, run } = require('./aggregate.cjs');
+const { readCollection } = require('./collection-store.cjs');
 
 const period = { preset: 'custom', timeZone: 'America/Los_Angeles',
   start: '2026-10-31T07:00:00Z', end: '2026-11-03T08:00:00Z', asOf: '2026-11-03T08:00:00Z' };
@@ -69,7 +70,7 @@ function fixture(t, change = () => {}) {
   collect(request, folder);
   // Replay to prove source-event IDs, not import attempts or connector observations, are counted.
   const collected = collect(request, folder);
-  const collection = JSON.parse(fs.readFileSync(collected.file, 'utf8'));
+  const collection = readCollection(collected.file).value;
   const identityMapping = mappingFixture(folder, collected.file, 'review', 'Synthetic explicit registration.');
   const inspected = identityMapping.inspect();
   identityMapping.apply([]);
