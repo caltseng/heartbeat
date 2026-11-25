@@ -5,10 +5,9 @@ reducer in `scripts/contacts/aggregate.cjs`, a local `contacts:aggregate` CLI,
 and the independent `contacts-aggregate` skill. It consumes snapshots; it never
 collects, connects, edits source/mapping records, renders UI, sends, or schedules.
 The [product](contacts-store-spec.md), [revision](contacts-source-revisions.md),
-[identity-review](contacts-identity-review.md), and [privacy](../privacy.md)
-contracts remain authoritative. Only synthetic requests and snapshots work.
-CONTACTS-010 policy approval is not account/source or each-run authorization.
-There is no private-run flag or protection/retention bypass.
+[identity-review](contacts-identity-review.md), and
+[shared operating rules](contacts-technical-spec.md#shared-operating-rules)
+remain authoritative.
 
 ## Input and local invocation
 

@@ -6,9 +6,9 @@ dataset drives the summary, people table, per-channel counts and daily timeline.
 It calls the [CONTACTS-023 reducer](contacts-aggregation.md) directly; it does not
 reimport, mutate collection/mapping data, collect, connect, rank relationships or
 render a graph. CONTACTS-025 still owns the offline graph. The product, technical,
-identity-review and [privacy](../privacy.md) contracts remain authoritative.
-Only synthetic snapshots are supported. These engineering decisions grant no
-source/account/run access or additional privacy consent.
+identity-review and
+[shared operating rules](contacts-technical-spec.md#shared-operating-rules)
+remain authoritative.
 
 ## Invocation and period
 

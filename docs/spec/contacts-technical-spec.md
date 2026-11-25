@@ -31,11 +31,99 @@ from current curated records and the shared period dataset, with explicit
 follow-ups, completion, deferral, optional saved prayer context and private
 immutable reports. It does not change collector schemas or create schedules.
 
-Confirmed execution boundary: **one user, local tool, local store in a private
-location**. Prove the flow in Heartbeat before polished design. No hosted
-website/dashboard, cloud backend, multi-tenancy, deployment, or product account
-system is in scope. Authorized source-account reads remain part of eventual
-collection; local-only describes this tool's execution/storage/presentation.
+## Shared operating rules
+
+Every `contacts-*` skill and companion specification incorporates this section.
+Read it before using any workflow, including an independently invoked source
+skill. Skills contain task-specific procedures, not separate policy grants.
+[AGENTS.md](../../AGENTS.md) governs repository delivery;
+[CONTACTS-010 privacy policy](../privacy.md) is the authoritative privacy boundary.
+Source contracts describe implementation and enforcement, not additional consent.
+
+### Privacy and scope
+
+Apply the complete [approved policy and synthetic-only enforcement](../privacy.md):
+permitted source categories and metadata fields, excluded content, separate
+first-source/account and EACH-run approvals (including replay/resume/changed
+bounds), verified Windows-user ACLs/encryption, this-computer storage outside Git/
+sync, backup exclusion and 12-month deletion of all inputs/derived artifacts.
+No current workflow enables private requests; no flag, asserted approval or
+engineering decision bypasses the guard. Never relabel real data synthetic.
+Raw exports can contain excluded content: metadata projection or "Without Media"
+does not authorize even transient processing of real content. Curated notes and
+prayer content require their own separately approved boundary and remain disabled.
+
+Do not implicitly access accounts, other participants' accounts, devices, backups
+or authenticated browser sessions; acquire/request credentials, cookies or backup
+passwords; pair devices; install bridges; send; write sources; schedule work; or
+create automations. No Muse/remote-AI processing of real data. Separately authorized source API
+retrieval is distinct from remote-AI processing, not a currently enabled route.
+
+Use synthetic fixtures for development, examples, validation and review.
+Operational requests/configuration, exports, metadata, logs, manifests, cursors,
+mapping histories, notes and generated reports/maps must stay untracked; never
+paste identifiers/manifests/configuration into PRs, issues, chats or remote tools.
+Ignored `.private/contacts/` or an external local synthetic folder is suitable
+for fixtures only, not verified real-data storage. Never force-add ignored
+artifacts or copy another checkout's data.
+
+Heartbeat is one user's local tool/store/presentation, not a hosted website,
+dashboard, backend, deployment, multi-tenant or product-account system. Prove the
+flow before polished design. Collection, review, reduction and rendering remain
+separate; preserve stable skills, CONTACTS IDs and storage/schema names.
+
+### Source workflow
+
+Establish source/account namespace, requested interval, IANA zone/as-of, output
+and applicable checkpoint scope. Inspect actual tool capabilities before claiming
+access. A provider name, skill, narrative/browser answer, Page/business API or
+discovered integration is not a callable authorized personal-source route.
+No live transport/account connection is supplied. Use the source's implemented
+fixture adapter/converter or a contract-conforming normalized handoff.
+
+Preserve stable namespaced source/account/message/thread/sender IDs, actual
+timestamps and recipient roles, explicit self identities, historical membership,
+retrieval times, provenance, pagination and coverage. Missing IDs require a
+reviewed labeled local-ID strategy, never fabricated provider IDs. Stop a source
+if required evidence cannot be preserved. Narratives, search snippets and
+estimated counts are not observations. One message is one event, not recipient
+fan-out; group membership is not direct interaction or credit for another sender.
+Unknown thread kind stays unknown.
+
+Return the versioned handoff to collection, or import that source alone through
+`contacts:collect` for an independent refresh. Missing access must produce
+`mode: unavailable`, `status: requires_setup` and a reason; unsupported formats/
+unresolved format evidence use `unsupported`. Never omit a requested source or
+manufacture an empty successful page. Snapshot/export/linked-device history and
+cursor exhaustion do not prove complete upstream history or ongoing sync.
+Exact immutable replay is distinct from changed/overlapping exports, which need
+[reviewed reconciliation](contacts-source-revisions.md). Different connectors
+require reviewed upstream namespaces/ID translations, not name/text/time deduplication.
+
+### Local execution and interpretation
+
+Request paths resolve relative to the request file. Use the
+[period contract](#period-semantics) for 7d/30d/custom bounds. Downstream mapping
+revisions must explicitly bind exact collection bytes; changed snapshots require
+review/rebinding, not latest-revision fallback. Keep source/review inputs unchanged.
+Reports are immutable: choose a fresh output rather than editing/replacing one.
+Never weaken validation to retry. For lock conflicts/interruption, verify the
+recorded writer/PID stopped before removing only the exact stale lock/temp file.
+
+Preserve CLI exits: **0** means complete declared evidence for that workflow,
+not live access; **2** retains a usable partial result and its limits; **1** is
+fatal failure, never usable empty success. Inspect source errors and saved status.
+Missing/auth-limited/unsupported/failed history is unknown, not zero. Exact zero
+requires `certainty:"exact"` and `total:0`; incomplete positive observations are
+lower bounds, and absent daily/thread buckets are not known-zero history.
+
+Retain resolved bounds, zone/as-of/current-day state, filters, collection digest,
+mapping revision, exclusions/audit, source freshness/coverage/status/errors and
+unresolved references with downstream outputs. Retrieval after as-of is not
+historical reconstruction. Preserve inactive/unassigned identities and ambiguity;
+never merge people by display name, infer couples/households from chats, infer
+neglect/importance/beliefs from volume, score relationship quality, or reset a
+confirmed meaningful-connection date from observed activity.
 
 ## 1. Repository fit and first vertical slice
 
@@ -100,12 +188,8 @@ file. Every desired source must have an entry, even if it is unavailable.
 | `contacts-messenger-activity` | Validate/import metadata handoffs; [018 synthetic-only JSON snapshot converter](contacts-messenger-converter.md) with local IDs and overlap guard | [CONTACTS-017 selects local JSON conversion](contacts-messenger-capability.md), not a structured personal reader. Private conversion is disabled; producer version and encrypted-backup layout remain unverified. Page/business APIs and Muse queries do not establish personal-inbox history; no private session reuse or real-data remote AI processing. |
 | `contacts-whatsapp-activity` | Validate/import WhatsApp metadata; `contacts:whatsapp` converts the selected synthetic TXT snapshot | [CONTACTS-019/020](contacts-whatsapp-format-gate.md) implement only iOS Without Media UTF-8 profile `whatsapp-ios-txt-metadata-v1`, with immutable archive-local IDs/registry, reviewed identity/boundary/time ledgers and unknown history. Private conversion fails before native reads/registry/output. No real producer certified, personal tool connected or live refresh implemented. Approved metadata policy does not permit real raw export/content processing. Business Groups API access does not establish existing personal-group access. |
 
-All five are **synthetic-import-capable**, not live-connected. Synthetic conversion
-does not authorize real acquisition or private processing. Beeper and direct API credentials
-are not installed or assumed. Muse/remote-AI acquisition must not process real
-collection data under the approved policy. Separately approved source API
-retrieval is distinct from remote-AI processing; the Heartbeat model and local
-visualization remain here.
+All five are **synthetic-import-capable**, not live-connected, under the
+[shared operating rules](#shared-operating-rules).
 
 ## 3. Request contract
 

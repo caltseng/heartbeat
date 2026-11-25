@@ -32,8 +32,8 @@ The collection must expose CONTACTS-021's version-1 `reconciliation` projection.
 Legacy synthetic snapshots must be replayed through the current collector; review
 never substitutes immutable first observations for current identity metadata.
 Private requests fail with `private_collection_disabled` before reading any
-collection path, consistent with the approved CONTACTS-010 policy. Policy approval
-does not authorize any source/account or run, nor verify required local controls.
+collection path, including inspection. Apply the
+[shared operating rules](contacts-technical-spec.md#shared-operating-rules).
 
 All keys below are synthetic symbolic placeholders: replace them with exact
 inspection values. Person IDs are `person-<full SHA-256 of namespaced key>` at

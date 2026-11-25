@@ -1,51 +1,22 @@
 ---
 name: contacts-text-activity
-description: Prepare authorized SMS, MMS, RCS or iMessage metadata while exposing device, archive-format and history limits for contacts collection.
+description: Prepare SMS/MMS/RCS/iMessage metadata with explicit protocol, archive identity and device-history limits.
 ---
 
-# Text-message activity collection
+# Text activity
 
-Use independently or under [contacts-collect](../contacts-collect/SKILL.md).
-Follow its authorization boundary and the
-[shared contract](../../../docs/spec/contacts-technical-spec.md). The executable
-accepts normalized handoffs, not raw XML. A separate
-[CONTACTS-016 converter](../../../docs/spec/contacts-text-converter.md) handles
-synthetic XML fixtures only.
-Private manifests fail with exit 1 / `private_collection_disabled` before the
-converter inspects the raw XML path; do not relabel real data as synthetic.
-The [CONTACTS-015 format gate](../../../docs/spec/contacts-text-format-gate.md)
-selects owner-operated Android 14 / SyncTech SMS Backup & Restore 10.30.009
-full XML (`synctech-xml-metadata-v1`) for that bounded converter.
-This is not a device reader, real-data authorization or verified device. RCS and
-iMessage are unsupported by that initial profile; even SMS/MMS transport needs
-explicit evidence because RCS can use the same XML containers.
+Required: [shared operating rules and source workflow](../../../docs/spec/contacts-technical-spec.md#shared-operating-rules),
+[CONTACTS-015 format gate](../../../docs/spec/contacts-text-format-gate.md) and
+[CONTACTS-016 converter](../../../docs/spec/contacts-text-converter.md).
 
-1. Establish the user's explicitly selected device/account/protocol source and
-   requested interval/time zone/as-of. Do not inspect devices, backups, messages
-   or pairing sessions just because this skill is invoked for planning.
-2. Inspect a separately authorized existing tool or supplied normalized handoff.
-   Live access, local database access and imported snapshots are different capabilities.
-   No SMS/MMS/RCS/iMessage endpoint or real-export conversion is enabled here.
-   For invented XML only, follow the converter contract's `contacts:text-xml`
-   command and explicit manifest/transport/SIM/thread ledger. Keep its generated
-   bundle private, inspect exit 2/unknown coverage, then use its collection request.
-3. Preserve actual protocols (`sms/mms/rcs/imessage`), sender identities, timestamps,
-   thread IDs and group participants using `source: text-messages`. Missing IDs
-   require an explicitly labeled, reviewed stable local-ID strategy, never a name
-   or participant-set-only merge. Preserve threads that share the same participants.
-   For the selected XML profile use archive-scoped row IDs and a reviewed thread
-   ledger, not invented provider IDs. Exact synthetic archive replay is supported;
-   changed/overlapping exports need separate reconciliation before import.
-4. Keep one group message as one observation from its actual sender. Group
-   membership, reactions, system events, edits and deletions are not direct messages.
-   If group identity cannot be established, retain `kind: unknown`, not direct.
-5. Disclose device/export range, unsupported protocols, missing participants,
-   unavailable cloud history and retrieval time. Do not label an export as live
-   synchronization or complete history.
-6. Import a valid metadata handoff through `contacts:collect` for this source only
-   or return it to the coordinator.
-
-If there is no verified reader, report `requires_setup`; if a supplied native
-format lacks a converter, report `unsupported` and name that missing parser.
-Do not install a bridge, request a backup password, pair a device, or access another
-participant's account. Use synthetic checks (`npm run test:contacts`) for validation.
+1. Select device/account/protocol scope. The XML profile is Android 14 /
+   SyncTech SMS Backup & Restore 10.30.009 full XML,
+   `synctech-xml-metadata-v1`; RCS/iMessage are unsupported by this profile.
+   SMS/MMS need transport evidence because RCS can share XML containers.
+2. Follow the converter's `contacts:text-xml` command and explicit manifest,
+   transport/SIM/thread ledger. Inspect its generated bundle and collection request.
+3. Normalize `source: text-messages` and actual `sms/mms/rcs/imessage` channels.
+   XML uses archive-scoped row IDs and reviewed thread ledgers, not provider IDs.
+   Preserve distinct threads even when participants match.
+4. Disclose device/export range, missing participants and unavailable cloud
+   history. Reactions, system events, edits and deletions are not direct messages.
