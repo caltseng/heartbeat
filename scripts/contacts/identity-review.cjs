@@ -3,6 +3,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
 const { outputLocation } = require('./collect.cjs');
+const { persist } = require('./local-json.cjs');
 
 const SOURCES = ['google-contacts', 'email', 'text-messages', 'messenger', 'whatsapp'];
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -189,15 +190,6 @@ function applyOperations(view, operations, identities, retainedKeys) {
     } else requireValue(false, 'Unknown operation; undo must be the sole operation.');
     validateView(view, identities, retainedKeys);
   }
-}
-function persist(file, state) {
-  const temporary = `${file}.${process.pid}.tmp`;
-  try {
-    const fd = fs.openSync(temporary, 'wx', 0o600);
-    try { fs.writeFileSync(fd, JSON.stringify(state, null, 2) + '\n'); fs.fsyncSync(fd); }
-    finally { fs.closeSync(fd); }
-    fs.renameSync(temporary, file);
-  } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
 }
 function review(request, requestFolder = process.cwd(), inspect = false) {
   object(request, ['schemaVersion', 'dataClass', 'collection', 'output', 'expectedRevision', 'collectionDigest', 'reason', 'operations'], 'request');

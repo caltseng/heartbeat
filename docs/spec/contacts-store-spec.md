@@ -13,7 +13,8 @@ CONTACTS-001 through CONTACTS-004's metadata-handoff collection, six collection 
 synthetic tests and [CONTACTS-021 source reconciliation](contacts-source-revisions.md)
 are implemented. CONTACTS-022 adds a separate synthetic-only
 [identity-review skill and overlay](contacts-identity-review.md).
-Live acquisition, note capture, numerical
+CONTACTS-027 adds [synthetic-only curated records and note capture](contacts-curated-records.md).
+Live acquisition, private note capture, numerical
 aggregation, summaries and the map are not implemented. Remaining CONTACTS
 execution is blocked until the Heartbeat bootstrap is verified checked in.
 

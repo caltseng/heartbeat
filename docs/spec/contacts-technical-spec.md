@@ -14,6 +14,9 @@ No accounts are connected, and no live network transport or private native
 archive processing is enabled.
 See the [product specification](contacts-store-spec.md) and
 [work items](contacts-work-items.md).
+CONTACTS-027 adds an independent [synthetic curated JSON store](contacts-curated-records.md)
+for original notes, groups, meaningful connections and rhythms, reusing canonical
+households from CONTACTS-022. Observation records and collection schemas are unchanged.
 
 Confirmed execution boundary: **one user, local tool, local store in a private
 location**. Prove the flow in Heartbeat before polished design. No hosted
