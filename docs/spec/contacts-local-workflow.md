@@ -8,6 +8,13 @@ period report and summary presentation skill. CONTACTS-025 adds the pinned
 synthetic-only private local HTML/SVG graph.
 [CONTACTS-027](contacts-curated-records.md) adds separate synthetic note capture,
 curated groups, explicit connections and rhythms using reviewed households.
+[CONTACTS-028](contacts-reconnection-review.md) composes those saved records with
+the shared period summary for a manual household review, explicit follow-ups and
+completion, rhythm-preserving deferral and optional saved prayer context:
+`npm run contacts:reconnect -- --inspect <synthetic-request-file>`.
+Its separate `--request` updates the local review overlay; `--report` publishes
+an immutable private `report.json` with inspected exact-input preconditions.
+Record meaningful connections through `contacts:curate`, never observed activity.
 This workflow composes those stages without claiming future delivery. The
 [technical contract](contacts-technical-spec.md), [product contract](contacts-store-spec.md)
 and [register](contacts-work-items.md) remain authoritative.

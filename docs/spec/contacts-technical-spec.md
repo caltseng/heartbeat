@@ -26,6 +26,10 @@ CONTACTS-026 adds [synthetic opportunity signals](contacts-opportunities.md):
 coverage-gated own-baseline comparisons and separate civil-date curated rhythms.
 It reuses the reducer and current canonical/curated inspection without source
 access, ranking, sending or changing meaningful connection dates.
+CONTACTS-028 adds [synthetic household reconnection review](contacts-reconnection-review.md)
+from current curated records and the shared period dataset, with explicit
+follow-ups, completion, deferral, optional saved prayer context and private
+immutable reports. It does not change collector schemas or create schedules.
 
 Confirmed execution boundary: **one user, local tool, local store in a private
 location**. Prove the flow in Heartbeat before polished design. No hosted
