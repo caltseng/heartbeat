@@ -317,70 +317,123 @@ function persist(file, state) {
     .filter(([, value]) => value.record.type === 'identity' && !value.record.isSelf).map(([id]) => id).sort();
   persistJSON(file, state);
 }
-function guardMessengerSnapshot(source, pages, state) {
-  if (source.source !== 'messenger') return;
-  const connector = 'messenger-json-snapshot-v1';
+const SNAPSHOT_PROFILES = [
+  {
+    source: 'text-messages', connector: 'synctech-xml-metadata-v1',
+    field: 'textArchive', store: 'textArchives',
+    scope: source => JSON.stringify([source.source, source.account]),
+    bindings: (state, source) => Object.entries(state.textArchives || {})
+      .filter(([id]) => id === JSON.stringify([source.source, source.account])),
+    read(handoff) {
+      const archive = handoff.textArchive;
+      object(archive, ['profile', 'archiveRef', 'sha256', 'ledgerDigest'], 'textArchive');
+      requireValue(typeof archive.archiveRef === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(archive.archiveRef) &&
+        [archive.sha256, archive.ledgerDigest].every(value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)),
+      'Invalid synthetic text archive binding.', 'snapshot_conflict');
+      return archive;
+    },
+    accepts: ([id]) => JSON.parse(id)[2] !== 'event',
+    touches: () => true,
+    disjoint: () => true
+  },
+  {
+    source: 'messenger', connector: 'messenger-json-snapshot-v1',
+    scope: source => JSON.stringify([source.source, source.account]),
+    namespace: id => typeof id === 'string' && /^messenger-json-snapshot-v1:([a-f0-9]{64}):[a-f0-9]{64}$/.exec(id)?.[1],
+    bindings(state, source, existing) {
+      return existing.filter(([, row]) => row.provenance.some(item => item.connector === this.connector))
+        .map(([id]) => [this.scope(source), { profile: this.connector, snapshot: this.namespace(JSON.parse(id)[3]) }]);
+    },
+    read(handoff) {
+      const ids = handoff.pages.flatMap(page => ['identities', 'threads', 'events'].flatMap(kind =>
+        array(page[kind], `page.${kind}`).map(row => row.id)));
+      const snapshot = this.namespace(ids[0]);
+      requireValue(snapshot && ids.every(id => this.namespace(id) === snapshot),
+        'Snapshot IDs must share one labeled immutable namespace.', 'snapshot_conflict');
+      return { profile: this.connector, snapshot };
+    },
+    accepts([id, row], binding) {
+      return row.provenance.every(item => item.connector === this.connector) &&
+        (row.record.type === 'membership' || this.namespace(JSON.parse(id)[3]) === binding.snapshot);
+    },
+    touches: () => true,
+    disjoint: () => true
+  },
+  {
+    source: 'whatsapp', connector: 'whatsapp-ios-txt-metadata-v1',
+    field: 'whatsappArchive', store: 'whatsappArchives',
+    scope: (source, archive) => JSON.stringify([source.account, archive.threadId]),
+    validatePages(handoff) {
+      for (const page of handoff.pages) {
+        object(page, ['cursor', 'nextCursor', 'retrievedAt', 'identities', 'threads', 'memberships', 'events',
+          'threadCoverage'], 'page');
+        array(page.threads, 'page.threads');
+        array(page.events, 'page.events');
+      }
+    },
+    bindings: (state, source) => Object.entries(state.whatsappArchives || {})
+      .filter(([id]) => JSON.parse(id)[0] === source.account),
+    read(handoff) {
+      const archive = handoff.whatsappArchive;
+      object(archive, ['profile', 'threadId', 'archiveRef', 'sha256', 'ledgerDigest', 'metadataDigest'], 'whatsappArchive');
+      const { whatsappArchive, ...metadata } = handoff;
+      requireValue([archive.threadId, archive.archiveRef].every(value =>
+        typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(value)) &&
+        [archive.sha256, archive.ledgerDigest, archive.metadataDigest].every(value =>
+          typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)) &&
+        archive.metadataDigest === hash(JSON.stringify(metadata)), 'Invalid synthetic archive binding.', 'snapshot_conflict');
+      requireValue(handoff.pages.length === 1 && handoff.pages[0].cursor === null && handoff.pages[0].nextCursor === null &&
+        handoff.pages[0].threads.length === 1 && handoff.pages[0].threads[0]?.id === archive.threadId &&
+        handoff.pages[0].events.every(row => row?.threadId === archive.threadId && row.idKind === 'local' &&
+          typeof row.id === 'string' && row.id.startsWith(`${archive.archiveRef}:record:`)) &&
+        handoff.coverage.completeness === 'unknown', 'Invalid snapshot scope.', 'snapshot_conflict');
+      return archive;
+    },
+    accepts([id, entry], archive, source) {
+      const [, , type, recordId] = JSON.parse(id);
+      return type !== 'event' || versions(entry).every(({ record }) =>
+        record.threadKey !== key(source.source, source.account, 'thread', archive.threadId) &&
+        !recordId.startsWith(`${archive.archiveRef}:record:`));
+    },
+    touches: (handoff, archive) => handoff.pages.some(page =>
+      page.threads.some(row => row?.id === archive.threadId) ||
+      page.events.some(row => row?.threadId === archive.threadId ||
+        (typeof row?.id === 'string' && row.id.startsWith(`${archive.archiveRef}:record:`)))),
+    disjoint: (left, right) => left.archiveRef !== right.archiveRef && left.sha256 !== right.sha256
+  }
+];
+
+function snapshotBinding(handoff, source, state) {
   const existing = Object.entries(state.records).filter(([id]) => {
     const [family, account] = JSON.parse(id);
     return family === source.source && account === source.account;
   });
-  const priorSnapshot = existing.some(([, row]) => row.provenance.some(item => item.connector === connector));
-  if (source.connector !== connector && !priorSnapshot) return;
-  requireValue(source.connector === connector, 'Messenger snapshot overlap requires reviewed translation before importing another route.', 'snapshot_overlap');
-  const ids = pages.flatMap(page => ['identities', 'threads', 'events'].flatMap(kind =>
-    array(page[kind], `page.${kind}`).map(row => row.id)));
-  const binding = id => typeof id === 'string' && /^messenger-json-snapshot-v1:([a-f0-9]{64}):[a-f0-9]{64}$/.exec(id)?.[1];
-  const snapshot = binding(ids[0]);
-  requireValue(snapshot && ids.every(id => binding(id) === snapshot),
-    'Messenger snapshot IDs must share one labeled immutable namespace.', 'snapshot_overlap');
-  requireValue(existing.every(([id, row]) => row.provenance.every(item => item.connector === connector) &&
-    (row.record.type === 'membership' || binding(JSON.parse(id)[3]) === snapshot)),
-  'Changed or overlapping Messenger snapshots require reviewed translation; use the same account, not an alias.', 'snapshot_overlap');
-}
-
-function whatsappBinding(handoff, source, state) {
-  const pages = array(handoff.pages, 'handoff.pages');
-  for (const page of pages) {
-    object(page, ['cursor', 'nextCursor', 'retrievedAt', 'identities', 'threads', 'memberships', 'events',
-      'threadCoverage'], 'page');
-    array(page.threads, 'page.threads');
-    array(page.events, 'page.events');
+  let reservation = null;
+  for (const profile of SNAPSHOT_PROFILES) {
+    const declared = profile.field && handoff[profile.field] !== undefined;
+    requireValue(!declared || (source.source === profile.source && source.connector === profile.connector),
+      'Snapshot binding does not match the source/connector.', 'snapshot_conflict');
+    if (source.source !== profile.source) continue;
+    profile.validatePages?.(handoff);
+    const bindings = profile.bindings(state, source, existing);
+    if (source.connector !== profile.connector) {
+      requireValue(bindings.every(([, binding]) => !profile.touches(handoff, binding)),
+        'This source scope requires its original snapshot binding.', 'snapshot_conflict');
+      continue;
+    }
+    requireValue(!profile.field || declared, 'This converter requires its snapshot binding.', 'snapshot_conflict');
+    const binding = profile.read(handoff);
+    requireValue(handoff.dataClass === 'synthetic' && binding.profile === source.connector,
+      'Invalid synthetic snapshot profile.', 'snapshot_conflict');
+    const scope = profile.scope(source, binding);
+    const previous = profile.store ? bindings.find(([id]) => id === scope)?.[1] : undefined;
+    requireValue((!previous || isDeepStrictEqual(previous, binding)) &&
+      (previous || existing.every(row => profile.accepts(row, binding, source))) &&
+      bindings.every(([id, other]) => id === scope || profile.disjoint(other, binding)),
+    'Changed, overlapping or unbound snapshot history requires explicit reconciliation.', 'snapshot_conflict');
+    if (profile.store) reservation = { store: profile.store, scope, binding };
   }
-  const bindings = Object.entries(state.whatsappArchives || {}).filter(([id]) => JSON.parse(id)[0] === source.account);
-  const archive = handoff.whatsappArchive;
-  const profile = 'whatsapp-ios-txt-metadata-v1';
-  if (archive === undefined) {
-    requireValue(source.connector !== profile && !handoff.pages.some(page =>
-      bindings.some(([, binding]) => page.threads.some(row => row?.id === binding.threadId) ||
-        page.events.some(row => row?.threadId === binding.threadId ||
-          (typeof row?.id === 'string' && row.id.startsWith(`${binding.archiveRef}:record:`))))),
-    'This WhatsApp thread requires its original archive binding.', 'whatsapp_archive_conflict');
-    return null;
-  }
-  object(archive, ['profile', 'threadId', 'archiveRef', 'sha256', 'ledgerDigest', 'metadataDigest'], 'whatsappArchive');
-  const { whatsappArchive, ...metadata } = handoff;
-  requireValue(source.source === 'whatsapp' && source.connector === profile && archive.profile === profile &&
-    [archive.threadId, archive.archiveRef].every(value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(value)) &&
-    [archive.sha256, archive.ledgerDigest, archive.metadataDigest].every(value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)) &&
-    archive.metadataDigest === hash(JSON.stringify(metadata)), 'Invalid synthetic WhatsApp archive binding.');
-  requireValue(handoff.pages.length === 1 && handoff.pages[0].cursor === null && handoff.pages[0].nextCursor === null &&
-    handoff.pages[0].threads.length === 1 && handoff.pages[0].threads[0]?.id === archive.threadId &&
-    handoff.pages[0].events.every(row => row?.threadId === archive.threadId && row.idKind === 'local' &&
-      typeof row.id === 'string' && row.id.startsWith(`${archive.archiveRef}:record:`)) &&
-    handoff.coverage.completeness === 'unknown', 'Invalid WhatsApp snapshot scope.');
-  const bindingKey = JSON.stringify([source.account, archive.threadId]);
-  const previous = state.whatsappArchives?.[bindingKey];
-  requireValue(previous ? isDeepStrictEqual(previous, archive) :
-    !Object.entries(state.records).some(([recordKey, entry]) => {
-      const [family, account, type, recordId] = JSON.parse(recordKey);
-      return family === 'whatsapp' && account === source.account && versions(entry).some(({ record }) =>
-        type === 'event' && (record.threadKey === key('whatsapp', source.account, 'thread', archive.threadId) ||
-          recordId.startsWith(`${archive.archiveRef}:record:`)));
-    }), 'Changed, overlapping or unbound WhatsApp history requires reconciliation.', 'whatsapp_archive_conflict');
-  requireValue(bindings.every(([id, binding]) => id === bindingKey ||
-    (binding.archiveRef !== archive.archiveRef && binding.sha256 !== archive.sha256)),
-  'An archive cannot be rebound to another WhatsApp thread.', 'whatsapp_archive_conflict');
-  return bindingKey;
+  return reservation;
 }
 
 function importSource(source, requestFolder, request, period, state, file, report) {
@@ -389,26 +442,7 @@ function importSource(source, requestFolder, request, period, state, file, repor
   const handoff = input.value;
   requireValue(handoff.schemaVersion === 1 && handoff.dataClass === request.dataClass, 'Handoff version/data class does not match the request.');
   requireValue(['source', 'account', 'connector'].every(field => handoff[field] === source[field]), 'Handoff source/account/connector does not match the request.');
-  const archiveKey = JSON.stringify([source.source, source.account]);
-  const previousArchive = state.textArchives?.[archiveKey];
-  if (handoff.textArchive !== undefined) {
-    const archive = handoff.textArchive;
-    object(archive, ['profile', 'archiveRef', 'sha256', 'ledgerDigest'], 'textArchive');
-    requireValue(source.source === 'text-messages' && source.connector === 'synctech-xml-metadata-v1' &&
-      handoff.dataClass === 'synthetic' && archive.profile === source.connector &&
-      typeof archive.archiveRef === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(archive.archiveRef) &&
-      [archive.sha256, archive.ledgerDigest].every(value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)),
-    'Invalid synthetic text archive binding.');
-    requireValue(previousArchive ? isDeepStrictEqual(previousArchive, archive) :
-      !Object.keys(state.records).some(recordKey => {
-        const [family, account, type] = JSON.parse(recordKey);
-        return family === source.source && account === source.account && type === 'event';
-      }), 'A changed, overlapping or unbound text archive requires explicit reconciliation.', 'text_archive_conflict');
-  } else requireValue(!previousArchive && source.connector !== 'synctech-xml-metadata-v1',
-    'This text source/account requires its original archive binding.', 'text_archive_conflict');
   const declaredCoverage = coverage(handoff.coverage, source.source);
-  const whatsappKey = source.source === 'whatsapp' ? whatsappBinding(handoff, source, state) : null;
-  requireValue(source.source === 'whatsapp' || handoff.whatsappArchive === undefined, 'WhatsApp binding requires WhatsApp source.');
   report.upstreamErrors = array(handoff.errors === undefined ? [] : handoff.errors, 'handoff.errors').map(error => {
     object(error, ['code', 'retryable'], 'upstream error');
     requireValue(typeof error.retryable === 'boolean', 'Upstream errors need explicit retryability.');
@@ -416,7 +450,7 @@ function importSource(source, requestFolder, request, period, state, file, repor
   });
   const pages = array(handoff.pages, 'handoff.pages');
   requireValue(pages.length > 0, 'At least one page is required, including for a verified empty result.');
-  guardMessengerSnapshot(source, pages, state);
+  const binding = snapshotBinding(handoff, source, state);
   const checkpointKey = sourceKey(source);
   const signature = hash(JSON.stringify(period));
   const previous = state.checkpoints[checkpointKey];
@@ -457,13 +491,9 @@ function importSource(source, requestFolder, request, period, state, file, repor
       }
       if (!existing.provenance.some(item => isDeepStrictEqual(item, addition.provenance))) existing.provenance.push(addition.provenance);
     }
-    if (handoff.textArchive) {
-      state.textArchives ||= {};
-      state.textArchives[archiveKey] = handoff.textArchive;
-    }
-    if (whatsappKey) {
-      state.whatsappArchives ||= {};
-      state.whatsappArchives[whatsappKey] = handoff.whatsappArchive;
+    if (binding) {
+      state[binding.store] ||= {};
+      state[binding.store][binding.scope] = binding.binding;
     }
     processed++;
     report.persistedPages = processed;

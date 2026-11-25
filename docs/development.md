@@ -65,6 +65,13 @@ mutation targets/tombstones, historical membership, thread-specific coverage,
 and reviewed different-ID connector translations with retained source evidence.
 Text archive binding tests also reject unbound pre-existing text events after
 explicit revisions, without changing their records or reserving an archive.
+Text, Messenger and WhatsApp snapshot imports use one profile-driven
+`snapshotBinding` function and the shared `snapshot_conflict` error code.
+Profile adapters retain their existing handoff fields, account/thread scopes,
+namespace checks and persisted archive formats; no store migration is required.
+Bindings are reserved only with a validated page. The shared importer tests run
+the same replay, overlap, alternate-route, namespace and rollback cases for text
+and Messenger; converter-local errors remain separate.
 See the [revision contract and decision record](spec/contacts-source-revisions.md).
 Identity-review cases additionally exercise conservative reviewed matches,
 same-name separation, cross-namespace identity links, split/undo, stable note

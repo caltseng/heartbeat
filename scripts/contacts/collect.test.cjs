@@ -20,6 +20,57 @@ function fixture(t) {
 }
 const events = state => Object.values(state.records).filter(value => value.record.type === 'event');
 
+for (const [source, channel, connector] of [
+  ['text-messages', 'sms', 'synctech-xml-metadata-v1'],
+  ['messenger', 'messenger', 'messenger-json-snapshot-v1']
+]) {
+  test(`${source} shares snapshot replay, overlap, namespace and rollback enforcement`, t => {
+    const f = fixture(t);
+    const make = digest => {
+      let input = handoff(source, channel);
+      input.connector = connector;
+      if (source === 'text-messages') {
+        input.textArchive = { profile: connector, archiveRef: 'fixture-archive', sha256: digest, ledgerDigest: 'c'.repeat(64) };
+      } else {
+        const ids = new Map(['self', 'person-a', 'thread-1', 'message-1'].map((id, index) =>
+          [id, `${connector}:${digest}:${String(index).padStart(64, '0')}`]));
+        input = JSON.parse(JSON.stringify(input, (field, value) => ids.get(value) || value));
+      }
+      return input;
+    };
+    const run = input => {
+      Object.assign(f.request.sources[0], { source, account: input.account, connector: input.connector });
+      fs.writeFileSync(path.join(f.folder, 'input.json'), JSON.stringify(input));
+      return collect(f.request, f.folder).manifest.sources[0];
+    };
+    const first = make('a'.repeat(64));
+    const invalid = structuredClone(first);
+    invalid.pages[0].events[0].body = 'Synthetic rejected content';
+    assert.equal(run(invalid).status, 'failed');
+    assert.deepEqual(f.state().records, {});
+    assert.deepEqual(f.state().checkpoints, {});
+    assert.equal(f.state().textArchives, undefined);
+    assert.equal(run(first).status, 'collected');
+    assert.equal(run(first).status, 'collected');
+    assert.equal(events(f.state()).length, 1);
+    const before = f.state();
+    const rejected = [
+      make('b'.repeat(64)),
+      { ...first, connector: 'alternate-route', textArchive: undefined },
+      source === 'text-messages' ? { ...first, textArchive: undefined } :
+        { ...first, pages: [{ ...first.pages[0], events: [{ ...first.pages[0].events[0], id: 'unlabeled-event' }] }] }
+    ];
+    for (const input of rejected) {
+      assert.equal(run(input).error.code, 'snapshot_conflict');
+      assert.deepEqual(f.state().records, before.records);
+      assert.deepEqual(f.state().checkpoints, before.checkpoints);
+      assert.deepEqual(f.state().textArchives, before.textArchives);
+    }
+    assert.equal(run({ ...make('b'.repeat(64)), account: 'different-fixture-account' }).status, 'collected');
+    assert.equal(events(f.state()).length, 2);
+  });
+}
+
 test('email gate payload preserves messages, roles and classes without promoting terminal pages to complete history', t => {
   const f = fixture(t);
   f.input = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'email-gate.synthetic.json'), 'utf8'));

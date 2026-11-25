@@ -74,7 +74,7 @@ deduplicate through the existing importer. Repackaging, resharding, adding/remov
 declared files or changing bytes changes the namespace. The importer, under its
 existing store lock and before record/cursor mutation, rejects a different
 snapshot or another connector in that same Messenger account in either import
-order (`snapshot_overlap`). This deliberately rejects even apparently disjoint
+order (`snapshot_conflict`). This deliberately rejects even apparently disjoint
 snapshots until reviewed snapshot translations are integrated for this route.
 CONTACTS-021's shared `overlapReview` machinery does not lift the stricter
 Messenger snapshot gate. Do not change the account to evade overlap.

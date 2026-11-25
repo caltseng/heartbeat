@@ -352,7 +352,7 @@ automatic replacement.
 thread/archive references, original byte SHA-256, reviewed-ledger digest and
 normalized metadata digest. No raw fields enter existing records. The importer
 validates the metadata digest/single-thread scope, commits this binding with
-the first validated page and rejects changed/overlapping acquisitions,
+the first validated page and rejects changed/overlapping acquisitions (`snapshot_conflict`),
 archive rebinding and unbound alternate connectors for that thread. Existing
 unbound events block first native binding. Distinct verified chats can share
 an account but cannot reuse an archive reference/digest. Do not change
