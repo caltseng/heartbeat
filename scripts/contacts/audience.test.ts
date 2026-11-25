@@ -9,6 +9,7 @@ import { handoff, period } from './demo.ts';
 import { tempFolder, mappingFixture } from './fixtures.ts';
 import { curate } from './curated.ts';
 import { audienceReview } from './audience.ts';
+import { readCollection } from './collection-store.ts';
 
 const preference = { text: 'Use the explicitly requested neutral version.', reason: 'Synthetic stated wording preference, not a belief classification.' };
 function fixture(t) {
@@ -123,7 +124,7 @@ test('exact revisions and inputs prevent stale review; unavailable sources stay 
   const current = f.inspect();
   const request = { ...f.request, reason: 'Synthetic stale review', expectedRevision: current.revision, inputsDigest: current.inputsDigest };
   assert.throws(() => audienceReview({ ...request, expectedRevision: 0 }, f.folder, 'finalize'), { code: 'revision_conflict' });
-  const collection = JSON.parse(fs.readFileSync(f.collection, 'utf8'));
+  const collection = readCollection(f.collection).value;
   collection.manifest.status = 'partial';
   collection.manifest.sources.push({ source: 'messenger', status: 'requires_setup', reason: 'Synthetic auth-limited source; no access authorized.' });
   fs.writeFileSync(f.collection, JSON.stringify(collection));
@@ -154,7 +155,7 @@ test('changed identities and household memberships invalidate reviewed output wi
   assert.ok(f.inspect().issues.some(issue => issue.code === 'household_membership_changed'));
   assert.equal(f.inspect().finalRecipients, null);
   assert.throws(f.finalize, { code: 'audience_unresolved' });
-  const collection = JSON.parse(fs.readFileSync(f.collection, 'utf8'));
+  const collection = readCollection(f.collection).value;
   const identity = Object.values<RecordEntry>(collection.reconciliation.records).find(entry => entry.record.displayName === 'Synthetic B');
   identity.record.addresses = [{ type: 'email', value: 'changed@example.invalid' }];
   fs.writeFileSync(f.collection, JSON.stringify(collection));
@@ -198,7 +199,7 @@ test('inactive identities, reconciliation gaps, self recipients and an empty sel
   const f = fixture(t);
   f.apply(f.clean());
   f.finalize();
-  const original = JSON.parse(fs.readFileSync(f.collection, 'utf8'));
+  const original = readCollection(f.collection).value;
   const changed = structuredClone(original);
   const identity = Object.values<RecordEntry>(changed.reconciliation.records).find(entry => entry.record.displayName === 'Synthetic A');
   identity.record.deleted = true;

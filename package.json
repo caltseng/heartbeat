@@ -5,7 +5,7 @@
   "type": "commonjs",
   "description": "Single-user local relationship and interaction graph tooling",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.11.0"
   },
   "devDependencies": {
     "@types/node": "20.19.9",

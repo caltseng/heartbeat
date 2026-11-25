@@ -8,6 +8,7 @@ import { handoff, period } from './demo.ts';
 import { tempFolder, mappingFixture } from './fixtures.ts';
 import { curate } from './curated.ts';
 import { prayer } from './prayer.ts';
+import { readCollection } from './collection-store.ts';
 
 function fixture(t) {
   const folder = tempFolder(t, 'contacts-prayer-synthetic-');
@@ -158,7 +159,7 @@ test('CLI reports complete/partial/fatal explicitly and private denial never tou
   const current = f.inspect();
   result = run({ ...f.request, expectedRevision: current.revision, curatedDigest: current.curatedDigest, operations: [f.creation] }, '--request');
   assert.equal(result.status, 0, result.stderr);
-  const collection = JSON.parse(fs.readFileSync(f.collection, 'utf8'));
+  const collection = readCollection(f.collection).value;
   collection.manifest.status = 'partial';
   collection.manifest.sources[0].status = 'requires_setup';
   collection.manifest.sources[0].errors = [{ code: 'auth_required', message: 'Synthetic unavailable source' }];

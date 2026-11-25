@@ -107,7 +107,7 @@ are preserved; no private access or recurring job is enabled.
 
 ## Install and run
 
-Install Node.js 20+ (CI uses 20.11.0, npm 10.2.4) and Git. Repository-local
+Install Node.js 20.11.0+ (CI uses 20.11.0, npm 10.2.4) and Git. Repository-local
 TypeScript, Node types and the `tsx` source runtime are pinned in the lockfile:
 
 ```powershell

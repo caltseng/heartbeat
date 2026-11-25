@@ -8,6 +8,7 @@ import { handoff } from './demo.ts';
 import { review } from './identity-review.ts';
 import { tempFolder, mappingFixture } from './fixtures.ts';
 import { summary, selectView, run } from './summary.ts';
+import { readCollection } from './collection-store.ts';
 
 const period: import('./collect.ts').PeriodRequest = { preset: 'custom', timeZone: 'America/Los_Angeles',
   start: '2026-10-31T07:00:00Z', end: '2026-11-03T08:00:00Z', asOf: '2026-11-03T08:00:00Z' };
@@ -53,7 +54,7 @@ function fixture(t, change: (inputs: import('./types.ts').Handoff[], request: im
   identityMapping.apply([]);
   const mappingFile = path.join(folder, 'mapping', 'identity-review.json');
   const mapping = JSON.parse(fs.readFileSync(mappingFile, 'utf8'));
-  const collection = JSON.parse(fs.readFileSync(collected.file, 'utf8'));
+  const collection = readCollection(collected.file).value;
   assert.ok(collection.manifest.sources.filter(source => source.connector === 'synthetic-handoff')
     .every(source => source.status === 'collected' || source.status === 'partial'), JSON.stringify(collection.manifest.sources));
   const options = { period, channels: ['email', 'sms'], collectionDigest: inspection.collectionDigest, identityMappingRevision: 1 };

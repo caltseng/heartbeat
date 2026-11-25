@@ -10,6 +10,7 @@ import { review } from './identity-review.ts';
 import { curate } from './curated.ts';
 import { prayer } from './prayer.ts';
 import { reconnection } from './reconnection.ts';
+import { readCollection } from './collection-store.ts';
 
 function fixture(t, kind = 'direct') {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'contacts-reconnection-synthetic-'));
@@ -138,7 +139,7 @@ test('prayer context is original-note grounded with ambiguous status explicit an
       noteIds: ['note-a'], status: 'resolved', statusConfirmed: true }
   ] }, f.folder);
   assert.equal(f.inspect({ prayer: request.output }).recommendations[0].prayerRequests.length, 0);
-  const snapshot = JSON.parse(fs.readFileSync(f.collection, 'utf8'));
+  const snapshot = readCollection(f.collection).value;
   const eventKey = Object.keys(snapshot.records).find(key => JSON.parse(key)[2] === 'event');
   snapshot.reconciliation.records[eventKey].record.senderKey = JSON.stringify(['email', 'fixture-account', 'identity', 'self']);
   fs.writeFileSync(f.collection, JSON.stringify(snapshot));
@@ -168,7 +169,7 @@ test('tombstoned or missing threads never offer an actionable existing conversat
   const f = fixture(t);
   const threadKey = f.inspect().recommendations[0].nextAction.threadKey;
   f.apply([{ type: 'thread-link', threadKey, url: 'https://example.invalid/synthetic/thread' }]);
-  const collection = JSON.parse(fs.readFileSync(f.collection, 'utf8'));
+  const collection = readCollection(f.collection).value;
   collection.reconciliation.records[threadKey].record.deleted = true;
   fs.writeFileSync(f.collection, JSON.stringify(collection));
   f.applyMapping([]);
@@ -236,7 +237,7 @@ test('CLI retains unavailable sources and 0/2/1 exits; private denial precedes a
   const current = JSON.parse(result.stdout);
   result = run({ ...f.request, expectedRevision: current.revision, evidenceDigest: current.evidenceDigest, operations: [f.followup] }, '--request');
   assert.equal(result.status, 0, result.stderr);
-  const collection = JSON.parse(fs.readFileSync(f.collection, 'utf8'));
+  const collection = readCollection(f.collection).value;
   collection.manifest.status = 'partial';
   collection.manifest.sources[0].status = 'requires_setup';
   collection.manifest.sources[0].errors = [{ code: 'auth_required', message: 'Synthetic unavailable source' }];

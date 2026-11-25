@@ -48,10 +48,25 @@ export interface Provenance {
 export interface RecordEntry {
   record: SourceRecord;
   provenance?: Provenance[];
-  revisions?: (Revision & { record: SourceRecord; provenance: Provenance[] })[];
+  revisions?: StoredRevision[];
   revision?: string;
   editedBy?: string[];
   deletedBy?: string[];
+}
+
+export interface StoredRevision extends Revision {
+  record: SourceRecord;
+  provenance: Provenance[];
+}
+
+export interface CompactRecordEntry {
+  revisions: StoredRevision[];
+}
+
+export interface ReconciliationReference {
+  revision: string;
+  editedBy: string[];
+  deletedBy: string[];
 }
 
 export interface CanonicalPerson {

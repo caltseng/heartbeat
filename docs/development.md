@@ -5,10 +5,11 @@ exact-final-head review and authorized retained-writer delivery.
 
 ## Checks and CI
 
-Use Node.js 20+ and run `npm ci` to restore the pinned TypeScript compiler,
+Use Node.js 20.11.0+ and run `npm ci` to restore the pinned TypeScript compiler,
 Node types and `tsx` runtime. Source and tests are TypeScript; `tsx` runs them
 directly without emitting JavaScript into the checkout. No browser, device,
 private environment or server is required.
+The minimum matches CI and supports the `--import tsx` loader registration.
 
 The migration checks every source and test with TypeScript, using shared
 interfaces for handoffs, stored records, review results and acquisition
@@ -24,6 +25,10 @@ publication and synchronous/asynchronous CLI error handling. Keep command-specif
 validation, error messages/codes, lock metadata and result formatting in each
 command. The collector's reconciliation-aware `persist` and its existing helper
 exports remain compatible; `local-json.ts` re-exports the shared persistence API.
+Collection snapshots use `collection-store.ts` for compact revision-reference
+storage and legacy expansion; use `readCollection` when inspecting record
+payloads, and keep digests bound to the exact on-disk bytes. Generic JSON readers
+do not expand collection references.
 Temporary-file collisions must preserve the other writer's file. Focused
 `lib.test.ts` regressions run with `test:contacts` and CI; no private data is used.
 

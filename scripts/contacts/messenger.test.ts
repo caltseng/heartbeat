@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { convertSnapshot, runRequest } from './messenger.ts';
 import { collect } from './collect.ts';
+import { readCollection } from './collection-store.ts';
 
 const at = '2026-11-24T20:00:00.000Z';
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -63,7 +64,7 @@ function importResult(dir, handoff, connector = handoff.connector, overlapReview
       connector, mode: 'metadata-import', input: 'handoff.json' }] }, dir);
 }
 function stored(dir) {
-  return JSON.parse(fs.readFileSync(path.join(dir, 'store', 'collection.json'), 'utf8'));
+  return readCollection(path.join(dir, 'store', 'collection.json')).value;
 }
 test('direct and four-member group shards preserve one sender/event, metadata, UTC milliseconds and replay', t => {
   for (const layout of ['messages-inbox', 'activity-messages-inbox']) {
@@ -105,7 +106,7 @@ test('equal timestamps within a shard remain distinct, and excluded records keep
   assert.equal(result.report.excludedEvents, 2);
   assert.equal(result.handoff.pages[0].events.length, 4);
   assert.equal(new Set(result.handoff.pages[0].events.map(event => event.id)).size, 4);
-  assert.ok(result.report.errors.some(error => error instanceof Error && 'code' in error && error.code === 'excluded_event_types'));
+  assert.ok(result.report.errors.some(error => error.code === 'excluded_event_types'));
 });
 test('changed or overlapping snapshots and other routes cannot be added to the same account in either order', t => {
   const fixture = scenario();
@@ -133,19 +134,19 @@ test('interruption, digest mismatch, missing shard numbers and truncated/encrypt
   assert.equal(interrupted.report.convertedShards, 2);
   assert.equal(interrupted.handoff.pages[0].events.length, 2);
   for (const code of ['truncated_history', 'encrypted_history_omitted', 'shard_unreadable']) {
-    assert.ok(interrupted.report.errors.some(error => error instanceof Error && 'code' in error && error.code === code));
+    assert.ok(interrupted.report.errors.some(error => error.code === code));
   }
   assert.ok(!JSON.stringify(interrupted).includes('SYNTHETIC PRIVATE PATH'));
   const restored = scenario();
   assert.equal(convertSnapshot(restored.manifest, restored.read).report.convertedShards, 3);
   fixture.files.set(fixture.manifest.shards[1].path, Buffer.from('{}'));
-  assert.ok(convertSnapshot(fixture.manifest, fixture.read).report.errors.some(error => error instanceof Error && 'code' in error && error.code === 'shard_digest_mismatch'));
+  assert.ok(convertSnapshot(fixture.manifest, fixture.read).report.errors.some(error => error.code === 'shard_digest_mismatch'));
   const gap = scenario();
   const shard = gap.manifest.shards[2];
   const bytes = gap.files.get(shard.path);
   shard.path = shard.path.replace('message_2', 'message_3');
   gap.files.set(shard.path, bytes);
-  assert.ok(convertSnapshot(gap.manifest, gap.read).report.errors.some(error => error instanceof Error && 'code' in error && error.code === 'missing_shards'));
+  assert.ok(convertSnapshot(gap.manifest, gap.read).report.errors.some(error => error.code === 'missing_shards'));
 });
 test('shared overlap reviews do not bypass the Messenger immutable snapshot gate', t => {
   const fixture = scenario(), dir = temp(t);
@@ -175,7 +176,7 @@ test('retrying interrupted conversion into the same store adds only missing even
   assert.equal(Object.values<RecordEntry>(stored(dir).records).filter(row => row.record.type === 'event').length, 3);
   mutateShard(fixture, 2, native => { native.participants.pop(); });
   const conflict = convertSnapshot(fixture.manifest, fixture.read);
-  assert.ok(conflict.report.errors.some(error => error instanceof Error && 'code' in error && error.code === 'shard_roster_conflict'));
+  assert.ok(conflict.report.errors.some(error => error.code === 'shard_roster_conflict'));
   assert.equal(conflict.report.convertedShards, 2);
 });
 test('unsupported profiles/layouts and encrypted backup wrappers never become successful empty handoffs', () => {
@@ -280,13 +281,13 @@ test('redirected export directories are not followed; malformed JSON and empty s
   const request = { manifest: fixture.manifest, inputRoot: redirected, output: 'redirect-rejected' };
   const result = runRequest(request, dir);
   assert.equal(result.report.status, 'unsupported');
-  assert.ok(result.report.errors.some(error => error instanceof Error && 'code' in error && error.code === 'redirected_input'));
+  assert.ok(result.report.errors.some(error => error.code === 'redirected_input'));
   assert.ok(!fs.existsSync(path.join(dir, request.output, 'handoff.json')));
   const broken = scenario();
   const shard = broken.manifest.shards[0], invalid = Buffer.from('{"messages":[');
   broken.files.set(shard.path, invalid);
   shard.sha256 = digest(invalid);
-  assert.ok(convertSnapshot(broken.manifest, broken.read).report.errors.some(error => error instanceof Error && 'code' in error && error.code === 'invalid_shard_json'));
+  assert.ok(convertSnapshot(broken.manifest, broken.read).report.errors.some(error => error.code === 'invalid_shard_json'));
   const empty = scenario();
   for (let index = 0; index < 3; index++) mutateShard(empty, index, native => { native.messages = []; });
   const converted = convertSnapshot(empty.manifest, empty.read);
@@ -314,6 +315,6 @@ test('trusted OS aliases above inputRoot are allowed without permitting redirect
   const rejected = runRequest({ manifest: fixture.manifest, inputRoot: redirected,
     output: 'rejected-descendant-alias' }, dir);
   assert.equal(rejected.report.status, 'unsupported');
-  assert.ok(rejected.report.errors.some(error => error instanceof Error && 'code' in error && error.code === 'redirected_input'));
+  assert.ok(rejected.report.errors.some(error => error.code === 'redirected_input'));
   assert.equal(rejected.handoff, null);
 });

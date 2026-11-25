@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { convert } from './text-xml.ts';
 import { collect } from './collect.ts';
+import { readCollection } from './collection-store.ts';
 
 const SECRET = 'SYNTHETIC_CONTENT_MUST_NOT_SURVIVE';
 const sms = (extra = '', date = '1795478400000') =>
@@ -183,7 +184,7 @@ test('imported archive replay is idempotent and changed exports or ledgers canno
   };
   assert.equal(run().exitCode, 2);
   assert.equal(run().exitCode, 2);
-  const state = () => JSON.parse(fs.readFileSync(path.join(folder, 'collection.json'), 'utf8'));
+  const state = () => readCollection(path.join(folder, 'collection.json')).value;
   const events = () => Object.values<RecordEntry>(state().records).filter(row => row.record.type === 'event');
   assert.equal(events().length, 2);
   assert.ok(!JSON.stringify(state()).includes(SECRET));

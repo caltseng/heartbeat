@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { hash, readJSONWithDigest as readJSON, createGuard, publish, runCLI, outputLocation } from './lib.ts';
 import { resolvePeriod } from './collect.ts';
+import { expandCollection } from './collection-store.ts';
 
 const CHANNELS = {
   email: ['email'], 'text-messages': ['sms', 'mms', 'rcs', 'imessage'],
@@ -67,6 +68,7 @@ function aggregate(collection, mapping, options) {
   requireValue(collection?.dataClass === 'synthetic' && mapping?.dataClass === 'synthetic',
     'Private aggregation is disabled; source/run authorization and verified local controls remain required.',
     'private_collection_disabled');
+  collection = expandCollection(collection);
   object(options, ['collectionDigest', 'identityMappingRevision', 'period', 'channels'], 'options');
   const period = resolvePeriod(options.period);
   requireValue(typeof options.collectionDigest === 'string' && /^[a-f0-9]{64}$/.test(options.collectionDigest),

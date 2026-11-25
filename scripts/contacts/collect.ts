@@ -4,7 +4,8 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { writeDemo } from './demo.ts';
 import { CollectionError, requireValue, object, text, array, instant, hash, readJSON, within,
-  outputLocation, persist as persistJSON, openLock, releaseLock, runCLI } from './lib.ts';
+  outputLocation, openLock, releaseLock, runCLI } from './lib.ts';
+import { readCollection, persistCollection } from './collection-store.ts';
 
 const SOURCES = ['google-contacts', 'email', 'text-messages', 'messenger', 'whatsapp'];
 const CHANNELS = {
@@ -341,7 +342,7 @@ function persist(file, state) {
   reconcile(state);
   state.manifest.unresolvedIdentityKeys = Object.entries<RecordEntry>(state.records)
     .filter(([, value]) => value.record.type === 'identity' && !value.record.isSelf).map(([id]) => id).sort();
-  persistJSON(file, state);
+  persistCollection(file, state);
 }
 interface SnapshotBinding {
   profile: string;
@@ -610,7 +611,7 @@ function collect(request, requestFolder = process.cwd(), operationAsOf = null) {
     fs.writeFileSync(lockFd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }) + '\n');
     const file = path.join(output, 'collection.json');
     requireValue(!fs.existsSync(file) || !fs.lstatSync(file).isSymbolicLink(), 'Collection snapshot must not be a symbolic link.', 'unsafe_output');
-    const state = fs.existsSync(file) ? readJSON(file).value : { schemaVersion: 1, dataClass: request.dataClass, records: {}, checkpoints: {}, history: [] };
+    const state = fs.existsSync(file) ? readCollection(file).value : { schemaVersion: 1, dataClass: request.dataClass, records: {}, checkpoints: {}, history: [] };
     requireValue(state.schemaVersion === 1 && state.dataClass === request.dataClass && state.records && state.checkpoints && Array.isArray(state.history),
       'Stored schema/data class does not match.');
     requireValue(!state.operations?.pendingArtifacts,

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { openLock, releaseLock, CollectionError, runCLI, outputLocation, readJSON, instant, requireValue,
   object } from './lib.ts';
 import { collect, persist } from './collect.ts';
+import { readCollection } from './collection-store.ts';
 
 function retentionCutoff(now) {
   const date = new Date(instant(now, 'now'));
@@ -139,7 +140,7 @@ function operate(request, requestFolder = process.cwd()) {
   let collectionRequest, previousHistory;
   try {
     fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, startedAt: now }));
-    const state = readJSON(file).value;
+    const state = readCollection(file).value;
     requireValue(state.schemaVersion === 1 && state.dataClass === 'synthetic' && state.records &&
       state.checkpoints && Array.isArray(state.history) && state.manifest, 'Invalid synthetic collection store.');
     requireValue(!state.operations || now >= state.operations.asOf, 'Operation clock cannot move backwards.');

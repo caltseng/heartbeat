@@ -7,6 +7,7 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { acquire, run, CONNECTOR, ENDPOINT, PARAMETERS } from './google.ts';
 import { collect } from './collect.ts';
+import { readCollection } from './collection-store.ts';
 
 const now = '2026-11-24T20:00:00.000Z';
 const options: import('./google.ts').GoogleOptions = { account: 'fixture-google', dataClass: 'synthetic' };
@@ -81,7 +82,7 @@ test('selected endpoint paginates fixed fields, deduplicates IDs, projects metad
   assert.equal(result.state.current['people/a'].evidence.sources[0].id, 'fixture-source-a');
   const imported = importHandoff(f.folder, result.handoff);
   assert.equal(imported.exitCode, 0);
-  const store = JSON.parse(fs.readFileSync(imported.file, 'utf8'));
+  const store = readCollection(imported.file).value;
   assert.equal(Object.keys(store.records).length, 2);
   assert.ok(Object.values<RecordEntry>(store.records).every(value => value.record.type === 'identity'));
   assert.ok(Object.values<RecordEntry>(store.records).every(value => value.provenance[0].inputDigest.length === 64));
@@ -119,7 +120,7 @@ test('changed profiles, aliases, tombstones and full-snapshot absence stay parti
   fs.writeFileSync(curated, curatedBytes);
   const first = await cycle([terminal([person(), person('b'), person('c')])]);
   const imported = importHandoff(f.folder, first.handoff);
-  const before = JSON.parse(fs.readFileSync(imported.file, 'utf8')).records;
+  const before = readCollection(imported.file).value.records;
   const alias = person('d');
   alias.metadata.previousResourceNames = ['people/old-d'];
   const next = await cycle([terminal([person('a', 'Changed fixture'),
@@ -130,7 +131,7 @@ test('changed profiles, aliases, tombstones and full-snapshot absence stay parti
     ['identity_revision_unsupported', 'resource_alias_review', 'source_tombstone']);
   assert.deepEqual(next.handoff.pages[0].identities.map(value => value.id), ['people/c', 'people/e']);
   assert.equal(importHandoff(f.folder, next.handoff).exitCode, 2);
-  const after = JSON.parse(fs.readFileSync(imported.file, 'utf8')).records;
+  const after = readCollection(imported.file).value.records;
   for (const [id, row] of Object.entries<RecordEntry>(before)) assert.deepEqual(after[id].record, row.record);
   assert.equal(fs.readFileSync(curated, 'utf8'), curatedBytes);
   const replay = await cycle([terminal()], { previous: next.state });

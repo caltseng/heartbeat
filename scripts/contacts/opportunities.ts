@@ -4,6 +4,7 @@ import path from 'node:path';
 import { hashJSON, publish, runCLI, readJSON, requireValue, object, outputLocation } from './lib.ts';
 import { aggregate } from './aggregate.ts';
 import { curate } from './curated.ts';
+import { readCollection } from './collection-store.ts';
 
 const DAY = 86400000;
 const TUNING = Object.freeze({ minimumWindowDays: 28, minimumBaselineMessages: 8,
@@ -28,7 +29,7 @@ function run(request, folder = process.cwd()) {
   requireValue(['collection', 'mapping', 'curated', 'output'].every(field =>
     typeof request[field] === 'string' && request[field].trim().length > 0),
   'Explicit collection, mapping directory, curated directory and output paths are required.');
-  const collection = readJSON(path.resolve(folder, request.collection));
+  const collection = readCollection(path.resolve(folder, request.collection));
   requireValue(collection.value.dataClass === 'synthetic', 'Private opportunities are disabled.',
     'private_collection_disabled');
   const mapping = readJSON(path.resolve(folder, request.mapping, 'identity-review.json'));

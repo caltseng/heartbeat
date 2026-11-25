@@ -7,6 +7,7 @@ import { hashJSON as digest, createGuard, persist, publish, openLock, releaseLoc
 import { summary } from './summary.ts';
 import { curate } from './curated.ts';
 import { prayer } from './prayer.ts';
+import { readCollection } from './collection-store.ts';
 
 const requireValue = createGuard('invalid_reconnection');
 function object(value, fields) {
@@ -38,7 +39,7 @@ function safeLink(value) {
 }
 function validateRecords(records, curated) {
   object(records, ['followups', 'deferrals', 'threadLinks']);
-  for (const dictionary of Object.values(records)) {
+  for (const dictionary of Object.values<RecordEntry>(records)) {
     requireValue(dictionary && typeof dictionary === 'object' && !Array.isArray(dictionary), 'Invalid record dictionary.');
   }
   const household = id => requireValue(Object.hasOwn(curated.canonical.households, id), 'Unknown household.');
@@ -139,7 +140,7 @@ function reconnection(request, folder = process.cwd(), mode = '--inspect') {
   requireValue(Number.isSafeInteger(limit) && limit > 0, 'Limit must be a positive safe integer.');
   const curated = curate({ schemaVersion: 1, dataClass: request.dataClass, collection: request.collection,
     mapping: request.mapping, output: text(request.curated) }, folder, true);
-  const collection = readJSON(path.resolve(folder, text(request.collection)));
+  const collection = readCollection(path.resolve(folder, text(request.collection)));
   const mapping = readJSON(path.join(path.resolve(folder, text(request.mapping)), 'identity-review.json'));
   requireValue(collection.digest === curated.collectionDigest &&
     digest({ revision: mapping.value.revision, view: mapping.value.view }) === curated.mappingDigest,

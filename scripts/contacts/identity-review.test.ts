@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { collect } from './collect.ts';
 import { handoff, period } from './demo.ts';
 import { review } from './identity-review.ts';
+import { readCollection } from './collection-store.ts';
 
 function fixture(t, group = false) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'contacts-review-synthetic-'));
@@ -108,7 +109,7 @@ test('reviewed email, phone and provider evidence combine transitively without c
 
 test('cross-source/account namespaces combine only on reviewed evidence, not identical IDs', t => {
   const f = fixture(t);
-  const collection = JSON.parse(fs.readFileSync(f.collection, 'utf8'));
+  const collection = readCollection(f.collection).value;
   const otherKey = JSON.stringify(['whatsapp', 'other-synthetic-account', 'identity', 'peer']);
   collection.records[otherKey] = structuredClone(collection.records[f.key('peer')]);
   collection.reconciliation.records[otherKey] = structuredClone(collection.reconciliation.records[f.key('peer')]);
@@ -146,7 +147,7 @@ test('invalid name/address/disconnected evidence and mixed self matches fail ato
 test('conservative normalization rejects regional phones and email local-part/alias guesses', t => {
   for (const [type, value] of [['phone', '2025550101'], ['email', 'Alex@example.invalid'], ['email', 'alex+tag@example.invalid']]) {
     const f = fixture(t);
-    const collection = JSON.parse(fs.readFileSync(f.collection, 'utf8'));
+    const collection = readCollection(f.collection).value;
     const alias = type === 'phone' ? 'phone-alias' : 'mail-alias';
     collection.reconciliation.records[f.key(alias)].record.addresses = [{ type, value }];
     fs.writeFileSync(f.collection, JSON.stringify(collection));
@@ -169,7 +170,7 @@ test('new snapshots can explicitly reaffirm existing mappings or register new id
   f.apply([f.merge(['peer', 'mail-alias'])]);
   const previous = f.state().view;
   assert.throws(() => f.apply([]), /no mapping changes/);
-  const collection = JSON.parse(fs.readFileSync(f.collection, 'utf8'));
+  const collection = readCollection(f.collection).value;
   collection.manifest.collectedAt = '2026-11-25T01:00:00.000Z';
   fs.writeFileSync(f.collection, JSON.stringify(collection));
   f.apply([]);
@@ -238,7 +239,7 @@ test('stale reviews, changed identities, lock conflicts, unsafe output and priva
   assert.throws(() => review({ ...f.request, output: unsafe }, f.folder), { code: 'unsafe_output' });
   assert.throws(() => review({ ...f.request, dataClass: 'private', collection: 'unreadable.synthetic.json' }, f.folder),
     { code: 'private_collection_disabled' });
-  const collection = JSON.parse(fs.readFileSync(f.collection, 'utf8'));
+  const collection = readCollection(f.collection).value;
   fs.writeFileSync(f.collection, JSON.stringify({ ...collection, dataClass: 'private' }));
   assert.throws(() => f.inspect(), { code: 'private_collection_disabled' });
   collection.reconciliation.records[f.key('peer')].record.displayName = 'Changed synthetic profile';
@@ -254,7 +255,7 @@ test('review reads current identity revisions, never first-observed evidence, an
   identity.revision = { id: 'profile-2', supersedes: '$initial' };
   identity.addresses = [{ type: 'email', value: 'different@example.invalid' }];
   assert.equal(f.runCollection().exitCode, 0);
-  const source = JSON.parse(fs.readFileSync(f.collection, 'utf8'));
+  const source = readCollection(f.collection).value;
   assert.equal(source.records[f.key('mail-alias')].record.addresses[0].value, 'alex@EXAMPLE.INVALID');
   assert.equal(f.inspect().identities.find(row => row.key === f.key('mail-alias')).addresses[0].value, 'different@example.invalid');
   assert.deepEqual(f.inspect().changedIdentityKeys, [f.key('mail-alias')]);
@@ -308,7 +309,7 @@ test('pending historical mutation targets remain informational, while legacy sna
   assert.equal(f.inspect().pendingTargets.length, 1);
   assert.equal(f.inspect().reconciliationRequired, false);
   assert.equal(f.apply([]).exitCode, 0);
-  const source = JSON.parse(fs.readFileSync(f.collection, 'utf8'));
+  const source = readCollection(f.collection).value;
   delete source.reconciliation;
   fs.writeFileSync(f.collection, JSON.stringify(source));
   assert.throws(() => f.inspect(), /Expected CONTACTS-021 reconciliation/);
@@ -317,7 +318,7 @@ test('pending historical mutation targets remain informational, while legacy sna
 test('missing identities after a corrected replay remain explicitly inactive and can later return', t => {
   const f = fixture(t);
   f.apply([]);
-  const original = JSON.parse(fs.readFileSync(f.collection, 'utf8'));
+  const original = readCollection(f.collection).value;
   const replay = structuredClone(original);
   delete replay.records[f.key('unrelated')];
   delete replay.reconciliation.records[f.key('unrelated')];
@@ -358,7 +359,7 @@ test('CLI reports 0/2/1 and retains unavailable source status without empty succ
   };
   assert.equal(run('--inspect').status, 0);
   assert.equal(run('--request').status, 0);
-  const collection = JSON.parse(fs.readFileSync(f.collection, 'utf8'));
+  const collection = readCollection(f.collection).value;
   collection.manifest.status = 'partial';
   collection.manifest.sources.push({ source: 'whatsapp', status: 'requires_setup', reason: 'Synthetic unavailable source' });
   fs.writeFileSync(f.collection, JSON.stringify(collection));

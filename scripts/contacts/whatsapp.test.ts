@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { convert } from './whatsapp.ts';
 import { collect } from './collect.ts';
+import { readCollection } from './collection-store.ts';
 
 const SECRET = 'SYNTHETIC_BODY_MUST_NOT_SURVIVE';
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -75,7 +76,7 @@ function importer(folder, f) {
       fs.writeFileSync(path.join(folder, 'handoff.json'), JSON.stringify(handoff));
       return collect(request, folder);
     },
-    state() { return JSON.parse(fs.readFileSync(path.join(folder, 'collection.json'), 'utf8')); }
+    state() { return readCollection(path.join(folder, 'collection.json')).value; }
   };
 }
 

@@ -9,6 +9,7 @@ import { collect } from './collect.ts';
 import { handoff, period } from './demo.ts';
 import { operate, retentionCutoff } from './operations.ts';
 import { review } from './identity-review.ts';
+import { readCollection } from './collection-store.ts';
 
 function fixture(t) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'heartbeat-operations-'));
@@ -20,7 +21,7 @@ function fixture(t) {
   write();
   collect(request, folder);
   const file = path.join(request.output, 'collection.json');
-  const state = () => JSON.parse(fs.readFileSync(file, 'utf8'));
+  const state = () => readCollection(file).value;
   const now = input.pages.at(-1).retrievedAt;
   const operation = { schemaVersion: 1, dataClass: 'synthetic', store: request.output, now };
   const run = (action, extra = {}) => operate({ ...operation, action, ...extra }, folder);
