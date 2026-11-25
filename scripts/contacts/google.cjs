@@ -79,6 +79,7 @@ function validateOptions(options) {
 async function acquire(options, { transport, previous = null, now = new Date().toISOString(),
   delay = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
   validateOptions(options);
+  check(options.dataClass === 'synthetic', 'private_collection_disabled');
   check(typeof now === 'string' && Number.isFinite(Date.parse(now)), 'invalid_clock');
   const selfIds = sorted(options.selfIds || []);
   const binding = { connector: CONNECTOR, account: options.account, dataClass: options.dataClass,
@@ -100,7 +101,6 @@ async function acquire(options, { transport, previous = null, now = new Date().t
     Object.assign(report, { status, errors: [{ code, retryable }] });
     return { state: previous, handoff: null, report, exitCode: 2 };
   };
-  if (options.dataClass !== 'synthetic') return fail('requires_setup', 'private_run_not_authorized');
   if (typeof transport !== 'function') return fail('requires_setup', 'authorized_transport_unavailable');
   let incremental = previous !== null &&
     Date.parse(now) - Date.parse(previous.fullSyncedAt) < 7 * 86400000;
@@ -223,6 +223,7 @@ async function run(configFile) {
   const options = Object.fromEntries(['dataClass', 'account', 'selfIds', 'maxPages']
     .filter(field => config[field] !== undefined).map(field => [field, config[field]]));
   validateOptions(options);
+  check(config.dataClass === 'synthetic', 'private_collection_disabled');
   check(text(config.output) && (config.fixture === undefined || text(config.fixture)), 'invalid_config');
   const folder = path.dirname(path.resolve(configFile));
   const output = outputLocation(path.resolve(folder, config.output));
@@ -249,7 +250,7 @@ async function run(configFile) {
       };
     }
     const result = await acquire(options, { transport, previous: saved?.state || null });
-    let handoffFile = null;
+    let handoffFile = saved?.handoffFile ?? null;
     if (result.handoff) {
       handoffFile = `google-handoff-${crypto.randomUUID()}.json`;
       writeAtomic(path.join(output, handoffFile), result.handoff);

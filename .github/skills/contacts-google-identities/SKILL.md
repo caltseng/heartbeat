@@ -15,7 +15,9 @@ The [CONTACTS-011 capability record](../../../docs/spec/contacts-google-capabili
 selects read-only `people.connections.list`, implemented for mocked pages by
 CONTACTS-012. Run `npm run contacts:google -- --config <private-config.json>`
 only with synthetic fixtures as documented there. No network transport or
-credential loader ships; private runs return `requires_setup`. Follow the contact-only fields, source IDs,
+credential loader ships; private acquisition is disabled with exit 1
+(`private_collection_disabled`) before any output access or artifact writes.
+Follow the contact-only fields, source IDs,
 snapshot/field limits, pagination and sync/deletion requirements; do not treat
 importer cursors as Google tokens. Real runs still require CONTACTS-010 and
 separate source authorization. Do not request credentials to close this gate.
@@ -36,7 +38,9 @@ separate source authorization. Do not request credentials to close this gate.
    source for an independent refresh, or return it to the coordinating skill.
    Its `retrievedAt` is the acquisition time, not the import time; no cross-page
    point-in-time consistency is claimed. Use the immutable handoff referenced by
-   `google-acquisition.json`. Never import that checkpoint bundle itself.
+   `google-acquisition.json` only after inspecting its report: on failure that
+   pointer deliberately retains the last-good, stale handoff, not a fresh result.
+   Never import that checkpoint bundle itself.
 
 If no suitable authorized tool exists, return `mode: unavailable`,
 `status: requires_setup`, and the missing capability. An existing normalized

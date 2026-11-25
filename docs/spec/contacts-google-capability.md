@@ -135,7 +135,8 @@ incremental response; the latter does not mean an empty address book.
 Without an authorized network transport, collection requests must use
 `mode: unavailable`, `status: requires_setup`, a reviewed account placeholder and
 an explicit reason naming the missing transport/authorization. The acquisition
-CLI itself writes an explicit `requires_setup` report without a handoff. No synthetic data
+CLI writes an explicit `requires_setup` report for missing synthetic transport.
+Private acquisition is disabled before output access (exit 1, no artifacts). No synthetic data
 may masquerade as real output. Unapproved scopes/auth gaps remain `requires_setup`;
 unsupported native formats remain `unsupported`; runtime adapter HTTP 401/403,
 429/5xx, invalid pages or expired checkpoints must report sanitized failures or
@@ -265,10 +266,12 @@ resource IDs; default `[]` makes every invented contact explicitly non-self.
 
 The CLI has **no HTTP or credential loader**. `acquire` accepts an injected
 synthetic transport receiving the fixed URL and parameters; `run` only supplies a
-local synthetic fixture transport. No fixture or transport returns
-`requires_setup/authorized_transport_unavailable`; `dataClass: private` returns
-`requires_setup/private_run_not_authorized` without reading a fixture or invoking
-a transport. Missing/invalid local files are fatal failures, not empty results.
+local synthetic fixture transport. A synthetic config with no fixture/transport
+returns `requires_setup/authorized_transport_unavailable`; `dataClass: private`
+fails closed with exit 1 / `private_collection_disabled` before resolving output,
+creating directories/locks, reading checkpoints/fixtures or writing any report.
+The pure acquisition entry point rejects private data with the same code.
+Missing/invalid local files are fatal failures, not empty results.
 OAuth acquisition and real execution are deliberately unavailable even if a
 caller happens to possess credentials.
 
@@ -287,10 +290,19 @@ the existing importer's `source.input`; never supply the acquisition bundle.
 No collection store or curated file is opened by the adapter. A crash before
 checkpoint replacement leaves the prior generation authoritative; an orphaned
 handoff can be ignored (no automatic deletion). An ordinary failed/auth-limited
-cycle writes a failure report with `handoffFile: null`, preserving the last good
-state and older immutable handoff files. Inspect the report and rerun the same
+synthetic cycle writes a failure report while preserving both the last-good
+state and its `handoffFile` reference (null only if none ever succeeded).
+Inspect the report: a retained handoff is explicitly stale, not current success.
+Rerun the same
 config after correcting the synthetic input; traversal restarts from the last
 complete sync generation, not a partially fetched page.
+
+After a hard kill, a stale lock may remain. Confirm no adapter is running before
+removing only the exact `google-acquisition.lock` in the selected private output
+directory, then rerun; never delete the directory or a live writer's lock.
+Immutable handoffs accumulate intentionally. CONTACTS-032 retention/deletion
+must inventory these files as well as checkpoints and reports; no automatic
+private-data deletion policy is invented here.
 
 State binds account, data class, connector, exact parameters and verified self
 IDs. Mismatch fails before acquisition; select a fresh private output directory
@@ -327,7 +339,8 @@ in the shared importer rather than being reconciled by this adapter.
 
 Exit 0 means a synthetic selected-scope identity snapshot is available, not live
 access or historical completeness. Exit 2 means persisted partial, failed or
-requires-setup reporting; exit 1 means fatal arguments/config/storage/locking
+requires-setup reporting for synthetic runs; exit 1 includes disabled private
+collection (no artifacts), or fatal arguments/config/storage/locking
 failure. Handoffs have null temporal bounds, no provider tokens/vendor fields,
 and empty threads/memberships/events. Source updates/deletions never create activity.
 
@@ -335,7 +348,7 @@ and empty threads/memberships/events. Source updates/deletions never create acti
 
 | Decision / rationale | Alternatives and assumptions | Synthetic validation / revisit condition |
 | --- | --- | --- |
-| Keep transport injection and CLI fixtures only; implement 011's exact request/projection/recovery without private access. | Shipping HTTP/OAuth loading now could imply access authority. No real-run boundary is approved. | Parameter/auth/private-run tests; revisit only after CONTACTS-010, explicit source authorization and reviewed credential/network design. |
+| Keep transport injection and CLI fixtures only; reject private collection before output access, including reports/manifests. | Shipping HTTP/OAuth loading or a private setup report now could imply access/protection authority. Protection is unverified; missing synthetic transport still gets an explicit setup report. | Parameter/auth/private-run no-artifact tests; revisit only after CONTACTS-010, explicit source authorization and verified protection plus reviewed credential/network design. |
 | Atomic complete generations with immutable handoff-before-checkpoint; restart interrupted pagination instead of persisting provider page tokens. | Per-page crash resume adds mutable staging complexity. Small single-user contact snapshots and a 100-page default are assumed; maxPages is bounded to 1-10000. | Pagination/budget/replay and injected checkpoint-write failure; revisit if separately approved snapshot size requires durable page staging. |
 | Preserve original full-sync age; expire at seven days or recover once from incremental 410; bounded mock retries. | Renewing token age from incremental activity conflicts with 011; unlimited retries hide failure. Mock retry timing is not a production quota policy. | Fixed-token multi-page sync, staged-page expiry, seven-day resync and quota tests; revisit timing/Retry-After with an authorized production transport. |
 | Reserve conservative immutable identity baselines and stage revisions/deletions/aliases/absence privately, keeping coverage partial. | Destructive replacement or vendor tombstone events violate append-only ingestion/curated independence; 021 is not delivered. | Changed profile, alias, tombstone, full-resync absence and zero-change replay tests plus untouched curated bytes; revisit with explicit 021 revision/target reconciliation. |

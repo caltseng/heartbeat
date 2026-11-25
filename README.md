@@ -30,7 +30,8 @@ pagination, sync/resync, private checkpoints and identity-only importable handof
 `npm run contacts:google -- --config <private-config.json>`. See the
 [configuration, recovery and decision record](docs/spec/contacts-google-capability.md#contacts-012-local-adapter-and-delegated-decisions).
 It ships no network transport, credential loader or OAuth flow. Private runs
-report `requires_setup` rather than pretending to return an empty address book.
+fail closed with exit 1 (`private_collection_disabled`) before output access,
+without creating directories, locks, reports or manifests.
 
 Canonical identity review, cross-source numerical aggregation, summaries,
 reconnection signals and Heartbeat's map are **not implemented**. Missing source

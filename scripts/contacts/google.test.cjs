@@ -173,9 +173,9 @@ test('missing authorization and private runs are explicit; auth/quota failures a
   assert.equal(missing.report.status, 'requires_setup');
   assert.equal(missing.exitCode, 2);
   assert.equal(missing.handoff, null);
-  const privateRun = await acquire({ ...options, dataClass: 'private' },
-    { now, transport: () => { assert.fail('private transport must never run'); } });
-  assert.equal(privateRun.report.errors[0].code, 'private_run_not_authorized');
+  await assert.rejects(acquire({ ...options, dataClass: 'private' },
+    { now, transport: () => { assert.fail('private transport must never run'); } }),
+  { code: 'private_collection_disabled' });
   for (const status of [401, 403]) {
     const result = await cycle([{ status, body: { token: 'fixture-do-not-log' } }]);
     assert.equal(result.report.status, 'requires_setup');
@@ -217,7 +217,7 @@ test('empty full snapshots, zero-change syncs, primary names, self flags and add
 
 test('checkpoint bindings reject account, data class, self identity or route changes before transport', async () => {
   const first = await cycle([terminal([person()])]);
-  for (const changed of [{ ...options, account: 'other-fixture' }, { ...options, dataClass: 'private' },
+  for (const changed of [{ ...options, account: 'other-fixture' },
     { ...options, selfIds: ['people/a'] }]) {
     await assert.rejects(acquire(changed, { previous: first.state, now,
       transport: () => assert.fail('mismatched checkpoint must not call transport') }),
@@ -226,9 +226,12 @@ test('checkpoint bindings reject account, data class, self identity or route cha
   const tampered = structuredClone(first.state);
   tampered.binding.parameters.pageSize = 1000;
   await assert.rejects(acquire(options, { previous: tampered, now }), { code: 'checkpoint_mismatch' });
+  const differentClass = structuredClone(first.state);
+  differentClass.binding.dataClass = 'private';
+  await assert.rejects(acquire(options, { previous: differentClass, now }), { code: 'checkpoint_mismatch' });
 });
 
-test('private CLI persists immutable importable handoffs before checkpoints; errors preserve last good state', async t => {
+test('synthetic CLI persists handoffs in a private folder; errors preserve last good state and handoff pointer', async t => {
   const f = fixture(t);
   f.write([terminal([person()])]);
   const cli = spawnSync(process.execPath, [path.join(__dirname, 'google.cjs'), '--config', f.configFile], { encoding: 'utf8' });
@@ -242,7 +245,7 @@ test('private CLI persists immutable importable handoffs before checkpoints; err
   assert.equal(unauthorized.status, 2);
   assert.ok(!unauthorized.stdout.includes('fixture-secret'));
   assert.deepEqual(f.saved().state, first.state);
-  assert.equal(f.saved().handoffFile, null);
+  assert.equal(f.saved().handoffFile, first.handoffFile);
   assert.ok(fs.existsSync(path.join(f.output, first.handoffFile)));
   delete f.config.fixture;
   f.write([]);
@@ -250,7 +253,13 @@ test('private CLI persists immutable importable handoffs before checkpoints; err
   assert.equal(missing.report.status, 'requires_setup');
   assert.equal(missing.report.errors[0].code, 'authorized_transport_unavailable');
   assert.deepEqual(f.saved().state, first.state);
+  assert.equal(f.saved().handoffFile, first.handoffFile);
   f.config.fixture = 'pages.json';
+  f.write([{ status: 503 }, { status: 503 }, { status: 503 }]);
+  const unavailable = await run(f.configFile);
+  assert.equal(unavailable.report.errors[0].code, 'upstream_unavailable');
+  assert.equal(f.saved().handoffFile, first.handoffFile);
+  assert.deepEqual(f.saved().state, first.state);
   f.write([terminal([person('b')])]);
   const rename = fs.renameSync;
   t.mock.method(fs, 'renameSync', (from, to) => {
@@ -261,6 +270,21 @@ test('private CLI persists immutable importable handoffs before checkpoints; err
   assert.deepEqual(f.saved().state, first.state);
   assert.equal(fs.existsSync(path.join(f.output, 'google-acquisition.lock')), false);
   assert.ok(!fs.readdirSync(f.output).some(file => file.endsWith('.tmp')));
+});
+
+test('CLI disables private collection before output resolution, directory creation, fixture or checkpoint reads', async t => {
+  const f = fixture(t);
+  f.config.dataClass = 'private';
+  f.config.fixture = 'missing-private-fixture.json';
+  f.write([]);
+  const cli = spawnSync(process.execPath, [path.join(__dirname, 'google.cjs'), '--config', f.configFile], { encoding: 'utf8' });
+  assert.equal(cli.status, 1);
+  assert.equal(cli.stdout, '');
+  assert.match(cli.stderr, /private_collection_disabled/);
+  assert.equal(fs.existsSync(f.output), false);
+  f.config.output = path.join(__dirname, '..', '..', 'docs', 'fixture-forbidden');
+  f.write([]);
+  await assert.rejects(run(f.configFile), { code: 'private_collection_disabled' });
 });
 
 test('CLI rejects public configuration/output, concurrent writers and invalid configuration without leaking input', async t => {
