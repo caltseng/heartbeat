@@ -83,7 +83,11 @@ HTML file with inline SVG hub-and-spoke and person-to-thread maps, labeled
 frequency bands, recency, keyboard selection and shared people/channel/timeline
 views. Open locally without a service. See the [graph contract and decisions](docs/spec/contacts-local-graph.md).
 
-Reconnection signals are **not implemented**. Missing source
+CONTACTS-026 adds `contacts:opportunities`: explainable own-baseline direct-activity
+declines under complete matched coverage and separate curated household rhythm
+reminders. All thresholds are explicit tuning proposals, not relationship scores.
+See the [synthetic workflow and decisions](docs/spec/contacts-opportunities.md).
+Missing source
 data means unknown, not zero. No private accounts, devices, browser sessions,
 credentials or real data are included or authorized by this repository.
 

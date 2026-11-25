@@ -209,3 +209,9 @@ recency, direct/group/membership separation, interval membership bounds, unknown
 coverage, identical report filters across views, cohort pagination, native
 keyboard links, responsive scrolling, HTML escaping, private denial, immutable
 publication and CLI 0/2/1. No browser dependency or service is required at runtime.
+
+The [CONTACTS-026 opportunity report](spec/contacts-opportunities.md) adds
+`contacts:opportunities`, `opportunities.test.cjs` and `check:opportunities` to CI.
+Synthetic cases cover threshold boundaries, matched complete versus uncertain/
+asymmetric/absent channel coverage, group-only/no-history suppression, separate
+civil-date rhythms, unchanged inputs, immutable output and CLI 0/2/1.
