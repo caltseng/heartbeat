@@ -156,6 +156,11 @@ function current(entry) {
   requireValue(leaves.length === 1, 'Referenced source record has unresolved revision branches.', 'revision_collision');
   return { record: leaves[0].record, revision: { id: leaves[0].id } };
 }
+const translationKey = mapping => JSON.stringify([mapping.source, mapping.account, mapping.connector, mapping.type, mapping.id]);
+function directTranslations(mappings) {
+  const ids = new Set(mappings.map(row => key(row.source, row.account, row.type, row.id)));
+  return mappings.every(row => !ids.has(key(row.source, row.account, row.type, row.targetId)));
+}
 function reviewTranslations(input) {
   if (input === undefined) return null;
   object(input, ['revision', 'reviewedAt', 'basis', 'mappings'], 'overlapReview');
@@ -168,12 +173,11 @@ function reviewTranslations(input) {
     object(mapping, ['source', 'account', 'connector', 'type', 'id', 'targetId'], 'mapping');
     requireValue(SOURCES.includes(mapping.source) && ['identity', 'thread', 'event'].includes(mapping.type), 'Invalid translation namespace/type.');
     ['account', 'connector', 'id', 'targetId'].forEach(field => text(mapping[field], `mapping.${field}`));
-    const locator = JSON.stringify([mapping.source, mapping.account, mapping.connector, mapping.type, mapping.id]);
+    const locator = translationKey(mapping);
     requireValue(!seen.has(locator) && mapping.id !== mapping.targetId, 'Duplicate or self translation.');
     seen.add(locator);
   }
-  requireValue(!mappings.some(a => mappings.some(b => a.source === b.source && a.account === b.account &&
-    a.type === b.type && a.targetId === b.id)), 'Translations must point directly to untranslated canonical source IDs.');
+  requireValue(directTranslations(mappings), 'Translations must point directly to untranslated canonical source IDs.');
   return { ...input, reviewedAt };
 }
 function reconcile(state) {
@@ -219,22 +223,34 @@ function preparePage(page, source, state, provenance) {
       (!deletedThrough || instant(event.timestamp, 'event.timestamp') > deletedThrough)),
     'This page contains expired or explicitly deleted metadata; prepare a bounded fresh handoff.', 'retention_required');
   }
-  const prefix = (type, id) => {
-    const mapping = state.overlapReviews.flatMap(review => review.mappings).find(item => item.source === source.source &&
-      item.account === source.account && item.connector === source.connector && item.type === type && item.id === id);
-    return key(source.source, source.account, type, mapping ? mapping.targetId : id);
-  };
+  const translations = new Map();
+  for (const review of state.overlapReviews) {
+    for (const mapping of review.mappings) {
+      if (mapping.source !== source.source || mapping.account !== source.account || mapping.connector !== source.connector) continue;
+      const locator = JSON.stringify([mapping.type, mapping.id]);
+      if (!translations.has(locator)) translations.set(locator, { targetId: mapping.targetId, revision: review.revision });
+    }
+  }
+  const translation = (type, id) => translations.get(JSON.stringify([type, id]));
+  const prefix = (type, id) => key(source.source, source.account, type, translation(type, id)?.targetId ?? id);
   const additions = [];
-  const known = (type, id) => [...additions].reverse().find(item => item.key === prefix(type, id)) || current(state.records[prefix(type, id)]);
+  const latest = new Map(), first = new Map(), revisions = new Map(), saved = new Map();
+  const knownKey = recordKey => {
+    if (latest.has(recordKey)) return latest.get(recordKey);
+    if (!saved.has(recordKey)) saved.set(recordKey, current(state.records[recordKey]));
+    return saved.get(recordKey);
+  };
+  const known = (type, id) => knownKey(prefix(type, id));
   const add = (type, id, record, evidence, revision, context) => {
     const recordKey = prefix(type, id);
     if (recordKey !== key(source.source, source.account, type, id)) {
-      const target = state.records[recordKey] || additions.find(item => item.key === recordKey);
+      const target = state.records[recordKey] || first.get(recordKey);
       requireValue(target, 'Import canonical target evidence before translated aliases.', 'translation_target_missing');
       record.idKind = target.record.idKind;
     }
-    const rows = [...(state.records[recordKey] ? versions(state.records[recordKey]) : []),
-      ...additions.filter(item => item.key === recordKey).map(item => ({ ...item.revision, record: item.record }))];
+    if (!revisions.has(recordKey)) revisions.set(recordKey,
+      new Map((state.records[recordKey] ? versions(state.records[recordKey]) : []).map(row => [row.id, row])));
+    const rows = revisions.get(recordKey);
     if (revision !== undefined) {
       object(revision, ['id', 'supersedes'], 'revision');
       text(revision.id, 'revision.id');
@@ -244,17 +260,20 @@ function preparePage(page, source, state, provenance) {
         predecessors.every(id => typeof id === 'string' && id.length > 0) &&
         (!Array.isArray(revision.supersedes) || predecessors.length > 0) && new Set(predecessors).size === predecessors.length,
       'revision.supersedes must be an ID, a nonempty distinct ID list, or null.');
-      requireValue(predecessors.every(id => id !== revision.id && rows.some(row => row.id === id)),
+      requireValue(predecessors.every(id => id !== revision.id && rows.has(id)),
         'Revision predecessor must already exist.', 'revision_conflict');
       revision = { id: revision.id, supersedes: Array.isArray(revision.supersedes) ? [...revision.supersedes].sort() : revision.supersedes };
     } else revision = { id: '$initial', supersedes: null };
-    const existing = rows.find(row => row.id === revision.id);
+    const existing = rows.get(revision.id);
     requireValue(!existing || (isDeepStrictEqual(existing.supersedes, revision.supersedes) && isDeepStrictEqual(existing.record, record)),
       'An existing source ID/revision has conflicting metadata; supply an explicit new revision.', 'record_conflict');
-    additions.push({ key: recordKey, record, revision, provenance: { ...provenance,
-      overlapReview: state.overlapReviews.find(review => review.mappings.some(item => item.source === source.source &&
-        item.account === source.account && item.connector === source.connector && item.type === type && item.id === id))?.revision || null, originalId: id,
-      sourceRecord: evidence, ...(context ? { context } : {}), pageCursor: page.cursor, retrievedAt } });
+    const addition = { key: recordKey, record, revision, provenance: { ...provenance,
+      overlapReview: translation(type, id)?.revision || null, originalId: id,
+      sourceRecord: evidence, ...(context ? { context } : {}), pageCursor: page.cursor, retrievedAt } };
+    additions.push(addition);
+    latest.set(recordKey, addition);
+    if (!first.has(recordKey)) first.set(recordKey, addition);
+    if (!existing) rows.set(revision.id, { ...revision, record });
   };
   for (const identity of array(page.identities, 'page.identities')) {
     identifier(identity, ['displayName', 'addresses', 'isSelf', 'deleted'], 'identity');
@@ -297,7 +316,12 @@ function preparePage(page, source, state, provenance) {
     add('membership', id, { type: 'membership', threadKey, identityKey,
       ...(temporal ? { validFrom, validUntil } : {}) }, membership);
   }
-  const memberships = [...Object.values(state.records), ...additions].map(item => item.record).filter(record => record.type === 'membership');
+  const memberships = new Map();
+  for (const { record } of [...Object.values(state.records), ...additions]) {
+    if (record.type !== 'membership') continue;
+    if (!memberships.has(record.threadKey)) memberships.set(record.threadKey, []);
+    memberships.get(record.threadKey).push(record);
+  }
   for (const event of array(page.events, 'page.events')) {
     identifier(event, ['threadId', 'senderId', 'timestamp', 'channel', 'eventType', 'recipients', 'classification', 'targetId'], 'event');
     requireValue(known('thread', text(event.threadId, 'event.threadId')), 'Event references an unknown thread.');
@@ -316,9 +340,9 @@ function preparePage(page, source, state, provenance) {
     const thread = observedThread.record;
     if (thread.kind === 'direct') {
       const time = instant(event.timestamp, 'event.timestamp');
-      const people = new Set(memberships.filter(record => record.threadKey === prefix('thread', event.threadId) &&
+      const people = new Set((memberships.get(prefix('thread', event.threadId)) || []).filter(record =>
         (!record.validFrom || record.validFrom <= time) && (!record.validUntil || time < record.validUntil)).map(record => record.identityKey));
-      requireValue(people.size === 2 && [...people].filter(id => ([...additions].reverse().find(item => item.key === id) || current(state.records[id])).record.isSelf).length === 1 &&
+      requireValue(people.size === 2 && [...people].filter(id => knownKey(id).record.isSelf).length === 1 &&
         (event.senderId === null || people.has(prefix('identity', event.senderId))) && recipients.every(recipient => people.has(recipient.identityKey)),
       'A direct event requires exactly two known members including self, with sender and recipients in that thread.');
     }
@@ -478,17 +502,25 @@ function importSource(source, requestFolder, request, period, state, file, repor
     const additions = preparePage(page, source, state, { connector: source.connector, inputDigest: input.digest });
     requireValue(page.nextCursor === null || !visited.has(page.nextCursor), 'Pagination contains a cursor cycle.', 'pagination_error');
     let duplicates = 0;
+    const revisionIndexes = new Map();
     for (const addition of additions) {
       let existing = state.records[addition.key];
       if (!existing) {
         existing = { record: addition.record, provenance: [], revisions: [] };
         state.records[addition.key] = existing;
       } else if (!existing.revisions) existing.revisions = structuredClone(versions(existing));
-      const version = existing.revisions.find(row => row.id === addition.revision.id);
+      if (!revisionIndexes.has(addition.key)) revisionIndexes.set(addition.key,
+        new Map(existing.revisions.map(row => [row.id, row])));
+      const revisionIndex = revisionIndexes.get(addition.key);
+      const version = revisionIndex.get(addition.revision.id);
       if (version) {
         duplicates++;
         if (!version.provenance.some(item => isDeepStrictEqual(item, addition.provenance))) version.provenance.push(addition.provenance);
-      } else existing.revisions.push({ ...addition.revision, record: addition.record, provenance: [addition.provenance] });
+      } else {
+        const row = { ...addition.revision, record: addition.record, provenance: [addition.provenance] };
+        existing.revisions.push(row);
+        revisionIndex.set(row.id, row);
+      }
       if (!existing.provenance.some(item => isDeepStrictEqual(item, addition.provenance))) existing.provenance.push(addition.provenance);
     }
     if (handoff.textArchive) {
@@ -528,9 +560,11 @@ function importSource(source, requestFolder, request, period, state, file, repor
   const explicitThreadCoverage = pages.some(page => page.threadCoverage !== undefined) ||
     sourceRecords.some(([, row]) => row.record.type === 'threadCoverage');
   report.threadCoverageMode = explicitThreadCoverage ? 'per-thread' : 'inherited-source-declaration';
-  const threadsCovered = !explicitThreadCoverage || threadKeys.every(threadKey =>
-    report.threadCoverage.some(row => row.threadKey === threadKey && coversPeriod(row)) &&
-    report.threadCoverage.filter(row => row.threadKey === threadKey).every(coversPeriod));
+  const coveredThreads = new Map();
+  for (const row of report.threadCoverage) {
+    coveredThreads.set(row.threadKey, (coveredThreads.get(row.threadKey) ?? true) && coversPeriod(row));
+  }
+  const threadsCovered = !explicitThreadCoverage || threadKeys.every(threadKey => coveredThreads.get(threadKey) === true);
   const covered = threadsCovered && declaredCoverage.completeness === 'complete' && (source.source === 'google-contacts' ||
     (declaredCoverage.start <= period.start && declaredCoverage.end >= period.end && declaredCoverage.end <= lastRetrieval));
   Object.assign(report, { status: terminal && covered ? 'collected' : 'partial', coverage: declaredCoverage,
@@ -579,13 +613,13 @@ function collect(request, requestFolder = process.cwd(), operationAsOf = null) {
       const previousReview = state.overlapReviews.find(row => row.revision === overlapReview.revision);
       requireValue(!previousReview || isDeepStrictEqual(previousReview, overlapReview), 'An overlap review revision cannot be changed.', 'review_conflict');
       const allMappings = [...state.overlapReviews.flatMap(review => review.mappings), ...overlapReview.mappings];
-      requireValue(!allMappings.some(a => allMappings.some(b => a.source === b.source && a.account === b.account &&
-        a.type === b.type && a.targetId === b.id)), 'Saved and new translations must not form chains or cycles.', 'review_conflict');
+      requireValue(directTranslations(allMappings), 'Saved and new translations must not form chains or cycles.', 'review_conflict');
+      const savedMappings = new Map(state.overlapReviews.flatMap(review => review.mappings)
+        .map(row => [translationKey(row), row.targetId]));
       for (const mapping of overlapReview.mappings) {
         requireValue(!state.records[key(mapping.source, mapping.account, mapping.type, mapping.id)],
           'Translation alias was already imported; retain this store and replay into a fresh store with the review.', 'review_conflict');
-        requireValue(!state.overlapReviews.some(review => review.mappings.some(row =>
-          ['source', 'account', 'connector', 'type', 'id'].every(field => row[field] === mapping[field]) && row.targetId !== mapping.targetId)),
+        requireValue(!savedMappings.has(translationKey(mapping)) || savedMappings.get(translationKey(mapping)) === mapping.targetId,
         'An imported translation cannot be retargeted; preserve the store and replay with a corrected review.', 'review_conflict');
       }
       if (!previousReview) state.overlapReviews.push(overlapReview);

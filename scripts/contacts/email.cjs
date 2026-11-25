@@ -99,7 +99,7 @@ function classify(headers, reviewed) {
   if (automated && bulk) return 'unclassified';
   return automated ? 'automated' : bulk ? 'bulk' : reviewed ? 'interpersonal' : 'unclassified';
 }
-function normalize(message, listed, retrievedAt, config) {
+function normalize(message, listed, retrievedAt, interpersonalIds) {
   object(message, ['id', 'threadId', 'labelIds', 'historyId', 'internalDate', 'payload']);
   requireValue(message.id === listed.id && message.threadId === listed.threadId);
   requireValue(message.labelIds === undefined || (Array.isArray(message.labelIds) && message.labelIds.every(text)));
@@ -129,7 +129,7 @@ function normalize(message, listed, retrievedAt, config) {
   const timestamp = sentTime(headers.date[0], retrievedAt);
   return { id: message.id, idKind: 'local', eventType: 'message', threadId: message.threadId,
     senderId: senders[0], timestamp, channel: 'email', recipients: unique,
-    classification: classify(headers, config.interpersonalIds.includes(message.id)) };
+    classification: classify(headers, interpersonalIds.has(message.id)) };
 }
 function validateConfig(config) {
   object(config, ['schemaVersion', 'dataClass', 'provider', 'account', 'selfAddresses', 'period',
@@ -181,6 +181,10 @@ function validateSavedEvent(event, period) {
 }
 async function acquireEmail(config, transport, previous = null) {
   const period = validateConfig(config);
+  const selfAddresses = new Set(config.selfAddresses);
+  const interpersonalIds = new Set(config.interpersonalIds);
+  const reviewedThreads = new Map(config.reviewedThreads.map(thread =>
+    [thread.id, { ...thread, addressSet: new Set(thread.addresses) }]));
   // The binding excludes budgets; a resumed scan may use a different page budget.
   const { maxPages, ...binding } = config;
   const signature = digest({ ...binding, period });
@@ -214,6 +218,7 @@ async function acquireEmail(config, transport, previous = null) {
     pageTokens: [], messages: [], retrievedAt: null
   };
   const errors = [];
+  const messages = new Map(checkpoint.messages.map(event => [event.id, event]));
   let pages = 0;
   const visited = new Set(checkpoint.pageTokens);
   while (!checkpoint.nativeCursor.finished && pages < maxPages) {
@@ -235,22 +240,27 @@ async function acquireEmail(config, transport, previous = null) {
       const at = new Date(retrievedAt).toISOString();
       requireValue(checkpoint.retrievedAt === null || at >= checkpoint.retrievedAt, 'retrieval_time_regressed');
       const additions = [];
+      const pageMessages = new Map();
       operation = 'get';
       for (const listed of response.messages || []) {
         object(listed, ['id', 'threadId']);
         requireValue(text(listed.id) && text(listed.threadId));
         const message = await transport.get({ userId: 'me', id: listed.id, format: 'metadata',
           metadataHeaders: [...HEADERS], fields: FIELDS });
-        const event = normalize(message, listed, at, config);
+        const event = normalize(message, listed, at, interpersonalIds);
         if (!event || event.timestamp < period.start || event.timestamp >= period.end) continue;
-        const reviewed = config.reviewedThreads.find(thread => thread.id === event.threadId);
+        const reviewed = reviewedThreads.get(event.threadId);
         if (reviewed?.kind === 'direct') requireValue([event.senderId, ...event.recipients.map(item => item.identityId)]
-          .every(value => reviewed.addresses.includes(value)), 'reviewed_roster_conflict');
-        const existing = [...checkpoint.messages, ...additions].find(item => item.id === event.id);
+          .every(value => reviewed.addressSet.has(value)), 'reviewed_roster_conflict');
+        const existing = messages.get(event.id) || pageMessages.get(event.id);
         requireValue(!existing || isDeepStrictEqual(existing, event), 'record_conflict');
-        if (!existing) additions.push(event);
+        if (!existing) {
+          additions.push(event);
+          pageMessages.set(event.id, event);
+        }
       }
       checkpoint.messages.push(...additions);
+      for (const event of additions) messages.set(event.id, event);
       checkpoint.pageTokens.push(pageToken);
       checkpoint.retrievedAt = at;
       checkpoint.nativeCursor = { domain: 'gmail.messages.list', nextPageToken: next, finished: next === null };
@@ -264,14 +274,14 @@ async function acquireEmail(config, transport, previous = null) {
   const identities = new Map(), threads = new Map(), memberships = new Map();
   for (const event of checkpoint.messages) {
     const roster = new Set([event.senderId, ...event.recipients.map(item => item.identityId)]);
-    const reviewed = config.reviewedThreads.find(thread => thread.id === event.threadId);
+    const reviewed = reviewedThreads.get(event.threadId);
     if (reviewed?.kind === 'direct') {
-      requireValue([...roster].every(value => reviewed.addresses.includes(value)), 'reviewed_roster_conflict');
+      requireValue([...roster].every(value => reviewed.addressSet.has(value)), 'reviewed_roster_conflict');
     }
     for (const value of reviewed?.addresses || []) roster.add(value);
     threads.set(event.threadId, { id: event.threadId, idKind: 'local', kind: reviewed?.kind || 'unknown' });
     for (const value of roster) {
-      identities.set(value, { id: value, idKind: 'local', isSelf: config.selfAddresses.includes(value),
+      identities.set(value, { id: value, idKind: 'local', isSelf: selfAddresses.has(value),
         addresses: [{ type: 'email', value }] });
       memberships.set(JSON.stringify([event.threadId, value]), { threadId: event.threadId, identityId: value });
     }

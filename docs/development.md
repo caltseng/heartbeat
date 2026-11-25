@@ -62,6 +62,23 @@ synthetic refresh/resync, stale/disconnected sources, calendar retention,
 inventoried cache deletion, replay fences and interrupted-purge recovery.
 All checks remain dependency-free, synthetic and account-free.
 
+Collector page preparation indexes pending records/revisions, reviewed translations
+and memberships by thread; email acquisition indexes reviewed threads, classifications
+and message IDs. These indexes are transient: array ordering, stored evidence,
+duplicate/conflict checks and page-atomic rollback retain the v1 contract.
+The synthetic scale regression acquires and persists single-page 2,000/4,000-event
+imports (40 messages per reviewed direct thread) and prints elapsed milliseconds.
+Run it alone for timing rather than comparing wall time under parallel CI load:
+
+```powershell
+node --test --test-name-pattern="single-page synthetic imports" scripts\contacts\email.test.cjs
+```
+
+The local performance target is under 2 seconds at 2,000 events and approximately
+linear scaling to 4,000. CI verifies the ordered records and roles at both sizes,
+not a machine-dependent time limit. JSON snapshot serialization and durable writes
+remain part of the measured import; no real source or account is exercised.
+
 CONTACTS-029 adds `prayer.test.cjs` and `check:prayer` to CI. The
 [prayer triage contract](spec/contacts-prayer-triage.md) covers original-note
 grounding, explicit confirmed/ambiguous status, editable ordered plans, atomic

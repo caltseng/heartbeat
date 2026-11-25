@@ -117,6 +117,66 @@ test('budget cursor resumes independently of a terminal immutable handoff and bi
   history.nativeCursor.domain = 'gmail.history.list';
   await assert.rejects(acquireEmail(config, fixtureTransport(fixture), history), { code: 'checkpoint_mismatch' });
 });
+test('same-page duplicate indexes preserve order and discard all additions on conflict before retry', async () => {
+  const { config, fixture } = scenario();
+  const listed = fixture.pages[0].response.messages[0];
+  fixture.pages = [{ pageToken: null, response: { messages: [listed, listed,
+    fixture.pages[0].response.messages[1]] } }];
+  const base = fixtureTransport(fixture);
+  const first = await acquireEmail(config, base);
+  assert.deepEqual(first.checkpoint.messages.map(row => row.id), ['direct', 'multi']);
+  let reads = 0;
+  const failed = await acquireEmail(config, { ...base, get: async request => {
+    const message = await base.get(request);
+    if (++reads === 2) message.payload.headers[1].value = '23 Nov 2026 13:00:00 +0000';
+    return message;
+  } });
+  assert.deepEqual(failed.report.errors, [{ code: 'record_conflict', retryable: false }]);
+  assert.deepEqual(failed.checkpoint.messages, []);
+  assert.deepEqual(failed.checkpoint.pageTokens, []);
+  assert.equal(failed.checkpoint.nativeCursor.nextPageToken, null);
+  const retried = await acquireEmail(config, base, failed.checkpoint);
+  assert.deepEqual(retried, first);
+});
+
+test('single-page synthetic imports preserve 2000 and 4000 ordered events across growing direct rosters', async t => {
+  const template = scenario(), original = template.fixture.details.direct;
+  for (const count of [2000, 4000]) {
+    const { config, fixture } = scenario();
+    config.interpersonalIds = [];
+    config.reviewedThreads = [];
+    fixture.details = {};
+    fixture.pages = [{ pageToken: null, response: { messages: [] } }];
+    for (let i = 0; i < count; i++) {
+      const id = `message-${i}`, threadId = `thread-${Math.floor(i / 40)}`;
+      const peer = `peer-${Math.floor(i / 40)}@example.invalid`;
+      config.interpersonalIds.push(id);
+      if (i % 40 === 0) config.reviewedThreads.push({ id: threadId, kind: 'direct',
+        addresses: ['self@example.invalid', peer] });
+      fixture.pages[0].response.messages.push({ id, threadId });
+      const message = structuredClone(original);
+      Object.assign(message, { id, threadId });
+      message.payload.headers[0].value = peer;
+      fixture.details[id] = message;
+    }
+    const dir = folder(t), started = performance.now();
+    const result = await acquireEmail(config, fixtureTransport(fixture));
+    const imported = importResult(dir, result.handoff);
+    t.diagnostic(`${count} events acquired and persisted in ${(performance.now() - started).toFixed(0)} ms`);
+    assert.equal(imported.exitCode, 2);
+    assert.deepEqual(result.checkpoint.messages.map(row => row.id), config.interpersonalIds);
+    assert.ok(result.checkpoint.messages.every(row => row.classification === 'interpersonal'));
+    assert.equal(result.handoff.pages[0].threads.length, count / 40);
+    assert.equal(result.handoff.pages[0].memberships.length, count / 20);
+    const stored = JSON.parse(fs.readFileSync(imported.file, 'utf8'));
+    const rows = Object.values(stored.records).filter(row => row.record.type === 'event');
+    assert.equal(rows.length, count);
+    assert.deepEqual(rows.map(row => row.provenance[0].originalId), config.interpersonalIds);
+    assert.ok(rows.every(row => row.record.recipients[0].role === 'to' &&
+      row.provenance[0].context.threadKind === 'direct'));
+  }
+});
+
 test('401/403 explicitly require setup and never manufacture a successful empty source', async t => {
   for (const status of [401, 403]) {
     const { config, fixture } = scenario();
