@@ -1,5 +1,7 @@
 # Heartbeat
 
+![Heartbeat wordmark with a custom ping-and-reply H, coral upper-left packet and ink lower-right packet](docs/assets/heartbeat-wordmark.png)
+
 Heartbeat is a user-centered relationship and interaction graph, with a planned
 local visualization of observed communication frequency and recency. It is a
 **single-user local tool with a private JSON store**, not a hosted application.
@@ -65,6 +67,7 @@ hide them. A successful import does not independently certify upstream history.
 - [Selected text export format and device/access limits](docs/spec/contacts-text-format-gate.md)
 - [Stable CONTACTS work-item register](docs/spec/contacts-work-items.md)
 - [Exact migration provenance](docs/provenance.md)
+- [Approved branding assets and crop decision](docs/spec/heartbeat-branding.md)
 - [Repository rules: topic branches, PRs to main, OWNER MERGE](AGENTS.md)
 
 The bootstrap must be independently reviewed at its exact HEAD, pass the
