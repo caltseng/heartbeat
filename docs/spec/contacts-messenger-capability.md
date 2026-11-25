@@ -11,8 +11,9 @@ decision for later owner review, not a claim that personal history is accessible
 Select an offline metadata-only converter for an explicitly versioned JSON
 snapshot profile, proposed connector `messenger-json-snapshot-v1`, for
 CONTACTS-018. It can be developed with invented fixtures without account setup.
-An owner-supplied export would require separate CONTACTS-010 approval **and**
-source authorization. Do not fetch an export, install a bridge, inspect a device,
+The approved CONTACTS-010 metadata-only policy does not authorize real native
+content handling or a source/run. Private processing remains disabled pending
+verified local controls and separate approvals. Do not fetch an export, install a bridge, inspect a device,
 reuse a private browser, acquire credentials, pair, send or create a recurring job.
 
 | Route | Available evidence / metadata | Decision and actual state |
@@ -186,12 +187,12 @@ owner-controlled computer workflow; its availability and format must be recorded
 not assumed or enabled by the converter. Do not ask for passwords, PINs, recovery
 keys, cookies, tokens, private browser access or a sample in chat/PR.
 
-CONTACTS-010 must approve account scope, local native-file handling, metadata
-permissions, processing/storage location, ACLs/encryption, retention/deletion,
-backups and authority for each bounded real run. Keep configuration, exports,
-reviewed mappings, digests/manifests, cursors/checkpoints, normalized data and
-generated private Heartbeat reports/graphs in ignored `.private/` or an approved
-external local directory. Local-only is not encryption or permission.
+CONTACTS-010 now has an [approved metadata-only policy](../privacy.md), not
+permission for native content handling or any particular account/run. Before
+lifting private guards, verify local ACL/encryption, retention/deletion, backup
+exclusions and each source/account/run approval. Real storage must remain outside
+Git worktrees/cloud sync; ignored `.private/contacts/` is for synthetic generated
+files only. Local-only is not encryption or permission.
 
 Public evidence consulted 2026-11-24 (no personal account accessed):
 

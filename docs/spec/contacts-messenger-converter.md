@@ -4,7 +4,8 @@ Status: **implemented for synthetic inputs only**. This implements the local
 `messenger-json-snapshot-v1` route chosen by [017](contacts-messenger-capability.md),
 not a personal API, live connector, current Meta producer certification or
 encrypted-backup reader. Real conversion is disabled, including library calls.
-CONTACTS-010 and separate source authorization remain open; no accounts,
+CONTACTS-010's policy is approved, but its enforceable local controls, separate
+source/account and each-run approvals remain unmet; no accounts,
 credentials, devices, browser sessions, acquisition, sending or schedules were used.
 
 ## Local invocation and contract
@@ -39,7 +40,8 @@ Each native shard must match the selected profile: `participants[].name`,
 `thread_path`, `thread_type` (`Regular` or `RegularGroup`), and `messages[]`.
 Known content/media/title fields are accepted only to discard them; unknown
 wrappers/fields fail the shard rather than guess another format. Content is never
-copied into a handoff, report or error. `Generic` messages without a true
+copied into a handoff, report or error. Real native content handling is not
+authorized by the approved metadata-only policy. `Generic` messages without a true
 `is_unsent` flag become message events; an absent flag is permitted by this
 synthetic profile, not evidence that unsent history is recoverable. Other types
 and explicit unsent entries are excluded and counted. Reactions are not
@@ -105,8 +107,10 @@ sanitized reason instead; never feed native shards to `contacts:collect`.
 
 ## Delegated engineering decisions for owner review
 
-These are engineering defaults under the 2026-11-24 delegation, **not owner-approved
-privacy policy**. No decision lifts the [private boundary](../privacy.md).
+These are engineering defaults under the 2026-11-24 delegation, **not additions to
+owner-approved privacy policy**. No decision lifts the [private boundary](../privacy.md)
+or its synthetic-only enforcement. A future real native-file route needs explicit
+approval for transient content handling as well as local controls/source/run gates.
 
 | Decision / rationale | Alternatives and assumptions | Validation / revisit condition |
 | --- | --- | --- |

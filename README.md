@@ -24,6 +24,11 @@ projects declared synthetic JSON snapshot shards into metadata-only handoffs,
 with stable local IDs, overlap rejection and explicit unknown history. It rejects
 private runs and does not support encrypted backups or arbitrary archive layouts.
 
+CONTACTS-010 records the [owner-approved metadata policy](docs/privacy.md).
+The importer currently accepts **synthetic requests only**: private imports fail
+closed until source/account and each-run approvals plus local protection and
+retention/deletion controls can be verified.
+
 Canonical identity review, cross-source numerical aggregation, summaries,
 reconnection signals and Heartbeat's map are **not implemented**. Missing source
 data means unknown, not zero. No private accounts, devices, browser sessions,
@@ -50,13 +55,15 @@ The first run generates five synthetic handoffs and their request, then persists
 duplicating them. Google contacts add identities, not activity. No network is used
 by the demo, importer or tests.
 
-For a **separately approved**, contract-conforming metadata request:
+For a prepared **synthetic**, contract-conforming metadata request:
 
 ```powershell
 npm run contacts:collect -- --request .private\contacts\run-001\request.json
 ```
 
-This command does not create that request or authorize acquisition. Follow the
+This command does not create that request or authorize acquisition. Private
+requests exit 1 with `private_collection_disabled`, without writing a store or
+printing a manifest. Policy approval is not permission to run collection. Follow the
 [request/handoff contract](docs/spec/contacts-technical-spec.md) and each source's
 access gate first. Exit **0** means all supplied snapshots collected for their
 declared scope, **2** means persisted partial/unavailable/failed sources, and
