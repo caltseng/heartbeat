@@ -107,14 +107,15 @@ are preserved; no private access or recurring job is enabled.
 
 ## Install and run
 
-Install Node.js 20+ (CI uses 20.11.0, npm 10.2.4) and Git. There are no external
-runtime or test dependencies and no package installation step:
+Install Node.js 20.11.0+ (CI uses 20.11.0, npm 10.2.4) and Git. Repository-local
+TypeScript, Node types and the `tsx` source runtime are pinned in the lockfile:
 
 ```powershell
 git clone https://github.com/caltseng/heartbeat.git
 Set-Location heartbeat
 node --version
 npm --version
+npm ci
 npm run ci
 npm run contacts:collect -- --demo --output .private\contacts\demo-001
 npm run contacts:collect -- --request .private\contacts\demo-001\request.synthetic.json

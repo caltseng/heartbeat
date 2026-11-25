@@ -21,7 +21,7 @@ and [register](contacts-work-items.md) remain authoritative.
 
 ## One operator, one local store
 
-Use Node.js 20+, Git and the existing dependency-free CLI. No server, host,
+Use Node.js 20+, Git and `npm ci` to restore the TypeScript CLI toolchain. No server, host,
 backend, product login, cloud processing, account connection or schedule is
 needed. Keep collection skill names and schema names unchanged. Heartbeat names
 the reports and relationship/interaction graph, not a bulk contacts rename.

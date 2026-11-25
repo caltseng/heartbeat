@@ -1,6 +1,6 @@
 # Heartbeat period summary contract
 
-CONTACTS-024 adds `scripts/contacts/summary.cjs`, `contacts:summary` and the
+CONTACTS-024 adds `scripts/contacts/summary.ts`, `contacts:summary` and the
 focused `contacts-summary` presentation skill. One immutable private local JSON
 dataset drives the summary, people table, per-channel counts and daily timeline.
 It calls the [CONTACTS-023 reducer](contacts-aggregation.md) directly; it does not

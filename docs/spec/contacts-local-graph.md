@@ -1,6 +1,6 @@
 # Heartbeat local graph (CONTACTS-025)
 
-Implemented: dependency-free, synthetic-only `contacts:graph` reads the exact
+Implemented: synthetic-only TypeScript `contacts:graph` reads the exact
 CONTACTS-024 `report.json` and emits one private local `graph.html` containing
 inline SVG maps, person-to-thread diagrams, accessible tables and evidence.
 Open it directly in a browser with `file:`; no server, Muse, Main Branch route,

@@ -1,7 +1,7 @@
 # Heartbeat cross-source aggregation
 
 CONTACTS-023 implements the pure `aggregate(collection, mapping, options)`
-reducer in `scripts/contacts/aggregate.cjs`, a local `contacts:aggregate` CLI,
+reducer in `scripts/contacts/aggregate.ts`, a local `contacts:aggregate` CLI,
 and the independent `contacts-aggregate` skill. It consumes snapshots; it never
 collects, connects, edits source/mapping records, renders UI, sends, or schedules.
 The [product](contacts-store-spec.md), [revision](contacts-source-revisions.md),

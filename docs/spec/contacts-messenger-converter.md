@@ -124,7 +124,7 @@ approval for transient content handling as well as local controls/source/run gat
 
 ## Synthetic validation
 
-`npm run ci` includes `scripts/contacts/messenger.test.cjs` alongside the existing
+`npm run ci` includes `scripts/contacts/messenger.test.ts` alongside the existing
 baseline. Fixtures are invented in memory/temporary folders and cleaned up.
 Cases cover direct/four-member group events, multiple shards, millisecond time,
 same-time duplicate events, stable/reordered replay, overlap and connector-order

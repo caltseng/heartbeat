@@ -5,37 +5,50 @@ exact-final-head review and authorized retained-writer delivery.
 
 ## Checks and CI
 
-Node.js 20+ and npm are sufficient; the baseline has no package dependencies.
-No install, build, browser, device, private environment or server is required.
+Use Node.js 20.11.0+ and run `npm ci` to restore the pinned TypeScript compiler,
+Node types and `tsx` runtime. Source and tests are TypeScript; `tsx` runs them
+directly without emitting JavaScript into the checkout. No browser, device,
+private environment or server is required.
+The minimum matches CI and supports the `--import tsx` loader registration.
 
-Shared contacts infrastructure lives in `scripts/contacts/lib.cjs`: JSON parsing
+The migration checks every source and test with TypeScript, using shared
+interfaces for handoffs, stored records, review results and acquisition
+dependencies. Legacy JSON-heavy paths retain non-strict inference
+(`strict: false`); this is not full strict-mode coverage. Existing runtime shape/privacy
+validation remains authoritative for parsed input, including deliberately
+invalid synthetic fixtures.
+
+Shared contacts infrastructure lives in `scripts/contacts/lib.ts`: JSON parsing
 with a single leading BOM removed, exact-byte versus serialized-JSON SHA-256,
 output-path guards, exclusive locks, durable atomic replacement, no-clobber
 publication and synchronous/asynchronous CLI error handling. Keep command-specific
 validation, error messages/codes, lock metadata and result formatting in each
 command. The collector's reconciliation-aware `persist` and its existing helper
-exports remain compatible; `local-json.cjs` re-exports the shared persistence API.
-Collection snapshots use `collection-store.cjs` for compact revision-reference
+exports remain compatible; `local-json.ts` re-exports the shared persistence API.
+Collection snapshots use `collection-store.ts` for compact revision-reference
 storage and legacy expansion; use `readCollection` when inspecting record
 payloads, and keep digests bound to the exact on-disk bytes. Generic JSON readers
 do not expand collection references.
 Temporary-file collisions must preserve the other writer's file. Focused
-`lib.test.cjs` regressions run with `test:contacts` and CI; no private data is used.
+`lib.test.ts` regressions run with `test:contacts` and CI; no private data is used.
 
 ```powershell
 npm run test:contacts
+npm run typecheck
 npm run check
 npm run ci
 ```
 
-`test:contacts` uses Node's built-in directory discovery for all `*.test.cjs`
-files under `scripts/contacts`; `npm test` discovers tests throughout `scripts`,
-including the private-boundary tests using temporary Git repositories. `check`
-recursively checks every CommonJS (`.cjs`) file under `scripts` and runs
-`check:private`; `ci` runs `check` and `test`. New modules and tests in these
-directories need no `package.json` edit. Existing module-specific `check:*`
-commands remain available for focused syntax checks, but CI does not need their
-enumeration. Shared synthetic test helpers in `scripts/contacts/fixtures.cjs`
+`test:contacts` discovers every `*.test.ts` under `scripts/contacts`;
+`npm test` discovers tests throughout `scripts`, including the private-boundary
+tests using temporary Git repositories. `scripts/test.ts` passes the sorted
+explicit file list to Node's built-in test runner with the TypeScript loader,
+including on Node 20 where directory discovery does not recognize `.ts` files.
+Additional Node test options can follow `--` in either npm test command.
+`check` runs the compiler over all source and tests and runs `check:private`;
+`ci` runs `check` and `test`. New modules and tests in these directories need no
+`package.json` edit. Existing module-specific `check:*` aliases now run the
+shared compiler check. Shared synthetic test helpers in `scripts/contacts/fixtures.ts`
 provide per-test temporary directories with cleanup and identity mapping
 inspection/application with current revision and digest preconditions.
 Scenario-specific inputs and assertions stay in each test file.
@@ -86,11 +99,12 @@ tombstone/collision/missing links, and requires explicit metadata refresh. Its
 integration cases exercise the actual collector's revision/target semantics,
 including informational historical pending targets.
 
-CONTACTS-032 adds `operations.test.cjs` and `check:operations` to `npm run ci`.
+CONTACTS-032 adds `operations.test.ts` and `check:operations` to `npm run ci`.
 The [source operations contract](spec/contacts-source-operations.md) covers
 synthetic refresh/resync, stale/disconnected sources, calendar retention,
 inventoried cache deletion, replay fences and interrupted-purge recovery.
-All checks remain dependency-free, synthetic and account-free.
+All checks remain synthetic and account-free; development dependencies are
+installed reproducibly from `package-lock.json`.
 
 Collector page preparation indexes pending records/revisions, reviewed translations
 and memberships by thread; email acquisition indexes reviewed threads, classifications
@@ -101,7 +115,7 @@ imports (40 messages per reviewed direct thread) and prints elapsed milliseconds
 Run it alone for timing rather than comparing wall time under parallel CI load:
 
 ```powershell
-node --test --test-name-pattern="single-page synthetic imports" scripts\contacts\email.test.cjs
+node --import tsx --test --test-name-pattern="single-page synthetic imports" scripts\contacts\email.test.ts
 ```
 
 The local performance target is under 2 seconds at 2,000 events and approximately
@@ -109,7 +123,7 @@ linear scaling to 4,000. CI verifies the ordered records and roles at both sizes
 not a machine-dependent time limit. JSON snapshot serialization and durable writes
 remain part of the measured import; no real source or account is exercised.
 
-CONTACTS-029 adds `prayer.test.cjs` and `check:prayer` to CI. The
+CONTACTS-029 adds `prayer.test.ts` and `check:prayer` to CI. The
 [prayer triage contract](spec/contacts-prayer-triage.md) covers original-note
 grounding, explicit confirmed/ambiguous status, editable ordered plans, atomic
 rollback, stale evidence/revision rejection, private denial and CLI 0/2/1 exits.
@@ -136,7 +150,8 @@ native/registry/output access. No real producer/export or live source is verifie
 GitHub Actions runs `.github/workflows/ci.yml` for PRs targeting `main` and pushes
 to `main`, on Node 20.11.0. Its stable job/check name is
 **`Heartbeat synthetic baseline`**. The workflow needs only `contents: read` and
-no secrets, dependencies or deployment permissions. The service owner must
+no secrets or deployment permissions. It restores the lockfile with `npm ci`
+before running the compiler and synthetic suite. The service owner must
 configure that exact check in Phalanx `ready_checks` before merging the bootstrap;
 repository required-check/ruleset configuration remains owner-controlled and must
 not be bypassed. Green checks are not independent review or permission to merge.
@@ -210,8 +225,8 @@ and versions before acting.
    versioned envelope, namespaced source/account IDs, explicit self identities,
    sender/recipient roles, timestamps, cursors, coverage and provenance. Do not
    duplicate collection/storage logic or add unneeded dependencies.
-4. Add focused synthetic cases to `scripts/contacts/collect.test.cjs` (or an
-   adapter-specific `*.test.cjs` file discovered automatically). Exercise
+4. Add focused synthetic cases to `scripts/contacts/collect.test.ts` (or an
+   adapter-specific `*.test.ts` file discovered automatically). Exercise
    pagination/expiry/failure, unknown coverage, replay and format ambiguity.
    Never commit native real-account exports or copy another checkout's data.
 5. Update the relevant source skill, capability matrix and affected docs. Adding
@@ -226,7 +241,7 @@ Heartbeat names the product and future local reports/maps, not a bulk schema
 rename. Identity review is a separate synthetic-only overlay; see its
 [contract and engineering decisions](spec/contacts-identity-review.md).
 The [CONTACTS-027 curated store](spec/contacts-curated-records.md) adds
-`contacts:curate` and `curated.test.cjs`: exact original notes, explicit connections,
+`contacts:curate` and `curated.test.ts`: exact original notes, explicit connections,
 groups, per-household rhythms, reference preservation, atomic rollback and CLI
 0/2/1 exits. It reuses canonical reviewed households; no real notes are authorized.
 The independent [CONTACTS-023 reducer](spec/contacts-aggregation.md) is also
@@ -236,14 +251,14 @@ direct/group/To/CC/BCC semantics, coverage bounds and immutable CLI output.
 Renderers remain distinct work items.
 
 The [CONTACTS-030 audience CLI](spec/contacts-life-update-audience.md) adds
-`check:audience` and synthetic `audience.test.cjs` to `npm run ci`. Cases cover
+`check:audience` and synthetic `audience.test.ts` to `npm run ci`. Cases cover
 household-to-person editing, inclusion/exclusion reasons, explicit wording,
 missing/invalid/ambiguous/duplicate email addresses, stale exact-input review,
 unavailable sources, unchanged notes, atomic rollback and actual CLI 0/2/1 exits.
 No real contacts, beliefs inference, sending or donation records are introduced.
 
 The [CONTACTS-024 period report](spec/contacts-period-summary.md) adds
-`contacts:summary`, a focused presentation skill, `summary.test.cjs` and
+`contacts:summary`, a focused presentation skill, `summary.test.ts` and
 `check:summary` in CI. Synthetic cases reconcile summary/table/channel/timeline
 counts, preserve inactive peers, exact zeros versus unknown/lower bounds,
 cross-channel reviewed identities, DST/skipped-date calendars, 7d/30d/custom
@@ -258,13 +273,13 @@ keyboard links, responsive scrolling, HTML escaping, private denial, immutable
 publication and CLI 0/2/1. No browser dependency or service is required at runtime.
 
 The [CONTACTS-026 opportunity report](spec/contacts-opportunities.md) adds
-`contacts:opportunities`, `opportunities.test.cjs` and `check:opportunities` to CI.
+`contacts:opportunities`, `opportunities.test.ts` and `check:opportunities` to CI.
 Synthetic cases cover threshold boundaries, matched complete versus uncertain/
 asymmetric/absent channel coverage, group-only/no-history suppression, separate
 civil-date rhythms, unchanged inputs, immutable output and CLI 0/2/1.
 
 The [CONTACTS-028 reconnection review](spec/contacts-reconnection-review.md) adds
-`contacts:reconnect`, `check:reconnection` and `reconnection.test.cjs` to CI.
+`contacts:reconnect`, `check:reconnection` and `reconnection.test.ts` to CI.
 Synthetic cases cover evidence-category ordering/overflow, due civil-day
 boundaries, unknown/confirmed/observed separation, original notes and prayer
 status, direct/group/passive membership, saved links, thread tombstones,

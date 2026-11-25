@@ -1,6 +1,6 @@
 # Heartbeat life-update audience review (CONTACTS-030)
 
-Status: implemented, synthetic only. A dependency-free, user-invoked local CLI
+Status: implemented, synthetic only. A user-invoked local TypeScript CLI
 resolves explicitly selected canonical households to individual email candidates.
 It preserves inclusion/exclusion reasons and explicit wording preferences and
 produces only a reviewed recipient list. There is no sending, scheduling, campaign
