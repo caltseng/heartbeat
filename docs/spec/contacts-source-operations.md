@@ -79,6 +79,9 @@ not bypass its binding or revision/overlap gates.
 The operations result contains per-source `stale`, `observedOnly`, coverage and
 recovery guidance. Default freshness is seven days; partial, failed, unavailable,
 missing or future retrieval evidence is always stale, even inside that window.
+Previously requested source namespaces omitted from the latest request remain
+visible as `not_refreshed`, with null current coverage and separately labeled
+`lastKnownCoverage`; an unrelated source refresh cannot hide stale cached history.
 Gmail's terminal partial history remains partial. Disconnection is an explicit
 `requires_setup` source in the collection request, not deletion of its records
 or evidence of zero activity. Reconnect only with separate authorization; no

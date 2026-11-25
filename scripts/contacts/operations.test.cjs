@@ -93,6 +93,26 @@ test('refresh resumes interruption, expired cursor requires resync, replay stays
   assert.equal(fs.readFileSync(f.notes, 'utf8'), '{"notes":["unchanged synthetic note"]}\n');
 });
 
+test('refresh cannot hide a historical cached source omitted from the latest request', t => {
+  const f = fixture(t);
+  const google = handoff('google-contacts', null);
+  fs.writeFileSync(path.join(f.folder, 'google.json'), JSON.stringify(google));
+  const collectionRequest = { ...f.request, sources: [
+    { source: google.source, account: google.account, connector: google.connector,
+      mode: 'metadata-import', input: 'google.json' }
+  ] };
+  const result = f.run('resync', { collectionRequest });
+  assert.equal(result.exitCode, 2);
+  assert.equal(result.sources.find(source => source.source === 'google-contacts').stale, false);
+  const email = result.sources.find(source => source.source === 'email');
+  assert.equal(email.status, 'not_refreshed');
+  assert.equal(email.stale, true);
+  assert.equal(email.coverage, null);
+  assert.equal(email.lastKnownCoverage.completeness, 'complete');
+  assert.equal(f.run('status').sources.find(source => source.source === 'email').stale, true);
+  assert.equal(eventCount(f.state()), 1);
+});
+
 test('retention purges every metadata copy and orphan identifier, preserves notes and fences replay', t => {
   const f = fixture(t);
   fs.mkdirSync(path.join(f.request.output, 'cache'));

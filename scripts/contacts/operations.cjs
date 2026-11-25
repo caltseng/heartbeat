@@ -87,7 +87,16 @@ function finishPurge(store, file, state) {
   persist(file, state);
 }
 function sourceStatus(state, now, maxAgeHours) {
-  return (state.manifest.sources || []).map(source => {
+  const namespace = source => JSON.stringify([source.source, source.account, source.connector]);
+  const sources = new Map((state.manifest.sources || []).map(source => [namespace(source), source]));
+  for (const previous of [...(state.history || [])].reverse()) {
+    for (const source of previous.sources || []) {
+      if (!sources.has(namespace(source))) sources.set(namespace(source), { ...source,
+        status: 'not_refreshed', coverage: null, lastKnownCoverage: source.lastKnownCoverage || source.coverage,
+        lastKnownStatus: source.lastKnownStatus || source.status });
+    }
+  }
+  return [...sources.values()].map(source => {
     const age = source.retrievedAt ? Date.parse(now) - Date.parse(source.retrievedAt) : Infinity;
     const stale = source.status !== 'collected' || !Number.isFinite(age) || age < 0 ||
       age >= maxAgeHours * 3600000;
@@ -128,7 +137,7 @@ function operate(request, requestFolder = process.cwd()) {
     if (error.code === 'EEXIST') requireValue(false, 'Store is locked; recover only after its owner exits.', 'store_locked');
     throw error;
   }
-  let collectionRequest;
+  let collectionRequest, previousHistory;
   try {
     fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, startedAt: now }));
     const state = readJSON(file).value;
@@ -176,6 +185,7 @@ function operate(request, requestFolder = process.cwd()) {
     requireValue(collectionRequest.dataClass === 'synthetic' &&
       outputLocation(path.resolve(requestFolder, collectionRequest.output)) === store,
     'Collection must target the same synthetic store.');
+    previousHistory = [...state.history, { sources: state.manifest.sources }];
     // Keep the fence even after successful imports, so old immutable inputs cannot restore erased history.
     state.operations = { ...state.operations, schemaVersion: 1, asOf: now, cutoff };
     persist(file, state);
@@ -184,7 +194,7 @@ function operate(request, requestFolder = process.cwd()) {
     fs.unlinkSync(lock);
   }
   const result = collect(collectionRequest, requestFolder, now);
-  const sources = sourceStatus({ manifest: result.manifest }, now, maxAgeHours);
+  const sources = sourceStatus({ manifest: result.manifest, history: previousHistory }, now, maxAgeHours);
   const stale = sources.some(source => source.stale);
   return { title: 'Heartbeat source refresh', ...result, sources, exitCode: stale ? 2 : result.exitCode };
 }
