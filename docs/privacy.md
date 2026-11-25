@@ -33,7 +33,7 @@ Use a local filesystem; network shares are not certified for snapshot atomicity.
 
 | Source | Current capability | Pending owner selection / authorization |
 | --- | --- | --- |
-| Google contacts | Normalized identity handoff import only | CONTACTS-010/011: select authorized tool or proposed People API route, read-only fields/account scope, IDs, pagination/sync/deletion and snapshot limits; adapter 012 remains future work. |
+| Google contacts | Normalized identity handoff import only | [CONTACTS-011](spec/contacts-google-capability.md) selects proposed read-only `people.connections.list`, not connected access. CONTACTS-010 boundary/source authorization and adapter 012 remain required; snapshot/field limits and sync/deletion gaps stay explicit. |
 | Email | Normalized activity handoff import only | CONTACTS-010/013: select provider/tool, read-only metadata permissions, verified self identity, message/thread IDs, To/CC roles, history bounds and bulk classification; adapter 014 remains future work. |
 | SMS/MMS/RCS/iMessage | Normalized text metadata handoff import only | CONTACTS-010/015: select device, reader/export format/version, protocols, timestamps/time zone, stable IDs and group/history coverage; converter 016 remains future work. No device or backup inspection. |
 | Personal Messenger | Normalized metadata handoff import only | CONTACTS-010/017: select verified personal route or export format and establish encryption/history constraints; route 018 remains future work. Business APIs or prior Muse browser queries do not establish personal-inbox access. |
