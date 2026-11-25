@@ -55,6 +55,12 @@ canonical reviewed households and never infers connections from message activity
 See the [local workflow and decision record](docs/spec/contacts-curated-records.md).
 Real note content remains unauthorized under the metadata-only privacy policy.
 
+CONTACTS-029 adds `contacts:prayer` for user-invoked synthetic prayer requests,
+explicit confirmed status updates and editable ordered plans grounded in unchanged
+original notes. Ambiguous status asks for confirmation; age never implies an
+answered/resolved request. All output is private-local-only, with no outreach
+export. See the [workflow and decisions](docs/spec/contacts-prayer-triage.md).
+
 CONTACTS-023 adds the independent `contacts-aggregate` skill and
 `contacts:aggregate` CLI: deterministic synthetic snapshot reduction with
 explicit mapping revision, per-person/thread/channel/day counts, coverage and
