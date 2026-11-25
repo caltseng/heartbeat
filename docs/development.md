@@ -62,6 +62,12 @@ synthetic refresh/resync, stale/disconnected sources, calendar retention,
 inventoried cache deletion, replay fences and interrupted-purge recovery.
 All checks remain dependency-free, synthetic and account-free.
 
+CONTACTS-029 adds `prayer.test.cjs` and `check:prayer` to CI. The
+[prayer triage contract](spec/contacts-prayer-triage.md) covers original-note
+grounding, explicit confirmed/ambiguous status, editable ordered plans, atomic
+rollback, stale evidence/revision rejection, private denial and CLI 0/2/1 exits.
+Prayer artifacts extend the private Git boundary; no outreach exporter is added.
+
 The [local workflow](spec/contacts-local-workflow.md) defines current commands,
 future versioned handoffs and recovery. `npm run check:private` rejects nonempty
 public output roots and private operational Git candidates, including force-added
