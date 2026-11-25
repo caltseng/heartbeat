@@ -6,8 +6,16 @@ Select **an owner-operated Android phone, SMS Backup & Restore by SyncTech
 v10.30.009, uncompressed full-backup XML**, with Android 14 as the initial
 reference platform. This is a bounded format selection for CONTACTS-016, not a
 claim that an Android 14 device or that producer version has been tested here.
-No actual device, SIM, backup, account or self number has been selected or read.
+No specific device, SIM, backup, account or self number has been selected or read
+by this task.
 Different Android/producer versions require a separately reviewed profile.
+
+Coordinator-relayed platform fact (2026-11-25): the owner confirmed Android and
+accepted SMS Backup & Restore / SyncTech XML through an existing owner question.
+The platform/format choice therefore has no remaining device-design hold.
+This is relayed selection evidence, not device inspection: Android 14 and producer
+10.30.009 remain unverified reference assumptions. It grants no source/account
+access, raw-content processing or private-run authorization.
 
 Rationale: documented local XML exposes direction, epoch timestamps and MMS
 recipient roles without a hosted integration or pairing. Android 14 is a

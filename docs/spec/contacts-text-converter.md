@@ -21,6 +21,9 @@ reads the raw XML path. The programmatic converter rejects private class with
 the same error. CONTACTS-010, source and
 raw-content processing approval plus a separately reviewed real-run path are
 still required. Changing a real manifest to `synthetic` does not authorize it.
+The coordinator subsequently relayed owner confirmation of Android and SyncTech
+XML as the selected platform/format; see the [gate's evidence note](contacts-text-format-gate.md).
+That closes no source-access, OS/version-verification or real-processing gate.
 
 ## Local invocation and manifest
 
