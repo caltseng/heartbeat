@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { hash, readJSONWithDigest: readJSON, createGuard, publish, runCLI, outputLocation } = require('./lib.cjs');
 const { resolvePeriod } = require('./collect.cjs');
+const { expandCollection } = require('./collection-store.cjs');
 
 const CHANNELS = {
   email: ['email'], 'text-messages': ['sms', 'mms', 'rcs', 'imessage'],
@@ -66,6 +67,7 @@ function aggregate(collection, mapping, options) {
   requireValue(collection?.dataClass === 'synthetic' && mapping?.dataClass === 'synthetic',
     'Private aggregation is disabled; source/run authorization and verified local controls remain required.',
     'private_collection_disabled');
+  collection = expandCollection(collection);
   object(options, ['collectionDigest', 'identityMappingRevision', 'period', 'channels'], 'options');
   const period = resolvePeriod(options.period);
   requireValue(typeof options.collectionDigest === 'string' && /^[a-f0-9]{64}$/.test(options.collectionDigest),

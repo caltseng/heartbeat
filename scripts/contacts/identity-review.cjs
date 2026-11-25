@@ -3,6 +3,7 @@ const path = require('node:path');
 const { isDeepStrictEqual } = require('node:util');
 const { hash: digest, readJSONWithDigest: readJSON, createGuard, persist, openLock, releaseLock, runCLI,
   outputLocation } = require('./lib.cjs');
+const { expandCollection } = require('./collection-store.cjs');
 
 const SOURCES = ['google-contacts', 'email', 'text-messages', 'messenger', 'whatsapp'];
 const own = (value, key) => Object.hasOwn(value, key);
@@ -38,6 +39,7 @@ function normalized(type, value) {
 function identitiesFrom(collection) {
   requireValue(collection.schemaVersion === 1 && collection.dataClass === 'synthetic',
     'Private identity review is disabled: source/run authorization and verified local controls remain required under CONTACTS-010.', 'private_collection_disabled');
+  collection = expandCollection(collection);
   requireValue(collection.records && typeof collection.records === 'object' && !Array.isArray(collection.records) &&
     collection.manifest && ['collected', 'partial'].includes(collection.manifest.status) &&
     Array.isArray(collection.manifest.sources) && collection.manifest.sources.length > 0,

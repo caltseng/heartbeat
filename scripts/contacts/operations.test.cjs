@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { readCollection } = require('./collection-store.cjs');
 const path = require('node:path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
@@ -19,7 +20,7 @@ function fixture(t) {
   write();
   collect(request, folder);
   const file = path.join(request.output, 'collection.json');
-  const state = () => JSON.parse(fs.readFileSync(file, 'utf8'));
+  const state = () => readCollection(file).value;
   const now = input.pages.at(-1).retrievedAt;
   const operation = { schemaVersion: 1, dataClass: 'synthetic', store: request.output, now };
   const run = (action, extra = {}) => operate({ ...operation, action, ...extra }, folder);

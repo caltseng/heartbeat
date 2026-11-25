@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { readCollection } = require('./collection-store.cjs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { collect } = require('./collect.cjs');
@@ -53,7 +54,7 @@ function fixture(t, change = () => {}) {
   identityMapping.apply([]);
   const mappingFile = path.join(folder, 'mapping', 'identity-review.json');
   const mapping = JSON.parse(fs.readFileSync(mappingFile, 'utf8'));
-  const collection = JSON.parse(fs.readFileSync(collected.file, 'utf8'));
+  const collection = readCollection(collected.file).value;
   assert.ok(collection.manifest.sources.filter(source => source.connector === 'synthetic-handoff')
     .every(source => source.status === 'collected' || source.status === 'partial'), JSON.stringify(collection.manifest.sources));
   const options = { period, channels: ['email', 'sms'], collectionDigest: inspection.collectionDigest, identityMappingRevision: 1 };

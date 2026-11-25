@@ -15,6 +15,10 @@ publication and synchronous/asynchronous CLI error handling. Keep command-specif
 validation, error messages/codes, lock metadata and result formatting in each
 command. The collector's reconciliation-aware `persist` and its existing helper
 exports remain compatible; `local-json.cjs` re-exports the shared persistence API.
+Collection snapshots use `collection-store.cjs` for compact revision-reference
+storage and legacy expansion; use `readCollection` when inspecting record
+payloads, and keep digests bound to the exact on-disk bytes. Generic JSON readers
+do not expand collection references.
 Temporary-file collisions must preserve the other writer's file. Focused
 `lib.test.cjs` regressions run with `test:contacts` and CI; no private data is used.
 

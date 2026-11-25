@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { readCollection } = require('./collection-store.cjs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { collect } = require('./collect.cjs');
@@ -158,7 +159,7 @@ test('CLI reports complete/partial/fatal explicitly and private denial never tou
   const current = f.inspect();
   result = run({ ...f.request, expectedRevision: current.revision, curatedDigest: current.curatedDigest, operations: [f.creation] }, '--request');
   assert.equal(result.status, 0, result.stderr);
-  const collection = JSON.parse(fs.readFileSync(f.collection));
+  const collection = readCollection(f.collection).value;
   collection.manifest.status = 'partial';
   collection.manifest.sources[0].status = 'requires_setup';
   collection.manifest.sources[0].errors = [{ code: 'auth_required', message: 'Synthetic unavailable source' }];

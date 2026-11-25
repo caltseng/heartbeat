@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { readCollection } = require('./collection-store.cjs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -182,7 +183,7 @@ test('imported archive replay is idempotent and changed exports or ledgers canno
   };
   assert.equal(run().exitCode, 2);
   assert.equal(run().exitCode, 2);
-  const state = () => JSON.parse(fs.readFileSync(path.join(folder, 'collection.json')));
+  const state = () => readCollection(path.join(folder, 'collection.json')).value;
   const events = () => Object.values(state().records).filter(row => row.record.type === 'event');
   assert.equal(events().length, 2);
   assert.ok(!JSON.stringify(state()).includes(SECRET));

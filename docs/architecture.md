@@ -74,7 +74,9 @@ tracked paths. External locations still require privacy approval.
 | Key | Implemented meaning |
 | --- | --- |
 | `schemaVersion`, `dataClass` | Version and `synthetic`/`private` isolation; mixing classes in a store fails. |
-| `records` | Normalized identities, threads, memberships and events keyed by JSON tuples of source/account/type/original ID. Each value carries the record and connector/input SHA-256/page/retrieval provenance. |
+| `recordStorage` | `revision-references-v1` selects compact storage within schema version 1. Absent on legacy expanded snapshots, which remain readable and compact on their next collector/operations write. |
+| `records` | Normalized identities, threads, memberships and events keyed by JSON tuples of source/account/type/original ID. Each entry stores only `revisions`: immutable `id`, `supersedes`, `record` and connector/input SHA-256/page/retrieval `provenance`. Each revision's payload and evidence are stored once; base-entry record/provenance aliases exist only in memory. |
+| `reconciliation` | Current revision references (`revision`, `editedBy`, `deletedBy`) keyed by the same source tuple, plus collisions and unresolved/pending targets. Payloads resolve from `records[key].revisions` rather than being copied here; a missing reference fails visibly. |
 | `checkpoints` | Source/account/connector cursor, terminal state and exact resolved-period signature. |
 | `textArchives` (optional) | Synthetic text converter's immutable source/account archive and reviewed-ledger binding; changed/overlapping archives fail pending CONTACTS-021. See the [converter contract](spec/contacts-text-converter.md). |
 | `manifest` | Current collection time/period, per-source status/coverage/freshness/errors, unresolved identities and explicit implementation limits. |
@@ -86,6 +88,15 @@ collection digest and explicit revision. The collector's
 `identityMappingRevision` stays null because review never mutates its manifest.
 Record conflicts fail visibly rather than overwriting evidence. Group membership
 does not manufacture direct interactions; Google contact presence creates none.
+
+`scripts/contacts/collection-store.cjs` expands revision references for collection,
+identity review, aggregation and dependent local reports, and writes compact JSON
+through the same durable atomic replacement helper. Legacy expanded snapshots
+are not rewritten just by reading them. Review/mapping digests always bind the
+exact file bytes, not the expanded representation; a write still requires review
+against the new snapshot digest. Synthetic size regressions compare the same
+1,000-event snapshot in the former expanded/indented layout and current compact
+layout and require at least a 50% reduction in total store bytes per event.
 
 ## Failure and recovery
 

@@ -1,4 +1,5 @@
 const fs = require('node:fs');
+const { readCollection } = require('./collection-store.cjs');
 const path = require('node:path');
 const { isDeepStrictEqual } = require('node:util');
 const { hashJSON: digest, createGuard, persist, publish, openLock, releaseLock, runCLI, outputLocation,
@@ -138,7 +139,7 @@ function reconnection(request, folder = process.cwd(), mode = '--inspect') {
   requireValue(Number.isSafeInteger(limit) && limit > 0, 'Limit must be a positive safe integer.');
   const curated = curate({ schemaVersion: 1, dataClass: request.dataClass, collection: request.collection,
     mapping: request.mapping, output: text(request.curated) }, folder, true);
-  const collection = readJSON(path.resolve(folder, text(request.collection)));
+  const collection = readCollection(path.resolve(folder, text(request.collection)));
   const mapping = readJSON(path.join(path.resolve(folder, text(request.mapping)), 'identity-review.json'));
   requireValue(collection.digest === curated.collectionDigest &&
     digest({ revision: mapping.value.revision, view: mapping.value.view }) === curated.mappingDigest,
