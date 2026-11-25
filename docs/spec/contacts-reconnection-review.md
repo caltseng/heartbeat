@@ -8,13 +8,9 @@ the exact reviewed collection. Optional CONTACTS-029 prayer context stays
 original-note grounded. Collection, mapping, notes, connections and rhythms are
 never rewritten here.
 
-The [owner-approved metadata policy](../privacy.md) does not authorize real
-notes, source access or a run. Every private request fails before resolving input
-or output paths, including inspection and report publication. No credentials,
-accounts, devices, browser sessions, acquisition, sending, remote processing or
-schedules are used. Synthetic output and requests belong in ignored
-`.private\contacts\` or an external local synthetic directory, never Git/public
-output. Ignored checkout storage is not approved real-data storage.
+Apply the [shared operating rules](contacts-technical-spec.md#shared-operating-rules).
+Every private request fails before resolving input or output paths, including
+inspection and report publication.
 
 ## Input and commands
 
