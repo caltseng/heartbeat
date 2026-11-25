@@ -38,11 +38,16 @@ The CLI must read the request JSON to identify its class; this is not authority
 to prepare or inspect a real request during development.
 
 The baseline cannot verify Windows ACL/encryption, backup exclusions or private
-approvals, and has no operational retention/deletion implementation. Therefore
+approvals. [CONTACTS-032](spec/contacts-source-operations.md) implements only
+synthetic managed-cache retention/deletion and recovery, not real-input age,
+protection or machine-wide inventory verification. Therefore
 it does not enable private imports even after a verbal approval. Future
 source/operations work must implement and validate these controls before lifting
 the guard; a source adapter must check them before acquisition, not after fetching
 or writing a handoff. Approval alone never makes unverified protection acceptable.
+
+The earlier future-retention/deletion decisions below are now exercised by that
+synthetic CLI; their real-data verification and consent gates remain unchanged.
 
 Use synthetic data for development, CI, review and examples. Synthetic requests,
 demo generation, replay/resume and explicit unavailable/unsupported source reports

@@ -93,6 +93,12 @@ visualization remain here.
 
 ## 3. Request contract
 
+The [CONTACTS-032 operations contract](contacts-source-operations.md) layers
+explicit synthetic refresh/resync, stale-source inspection and managed-cache
+retention/deletion/recovery over these same handoffs. It does not change the
+source capability matrix or authorize private runs. Managed stores require
+`contacts:operate` refresh/resync so their retention clock is checked.
+
 Example with one available synthetic input and one explicitly unavailable source:
 
 ```json
@@ -329,6 +335,16 @@ retention/deletion and backup behavior; it does not implement their verification
 or authorize a real account/run. The private-request guard stays closed until
 these controls are implemented and verified. Git ignore and build exclusion are
 not access control. See the policy's engineering decisions and revisit conditions.
+
+CONTACTS-032's synthetic `operations` snapshot member holds only maintenance
+time/cutoff, an optional deletion time fence and, during interrupted purge, the
+pending exact-file inventory. An approved whole-cache purge erases normalized
+records, provenance/revisions, history, reviews, archives and cursors together,
+then removes inventoried cache/derived files. Curated files are outside purge
+targets. Direct import is refused while purge recovery is pending; explicit
+operations recovery finishes without restoring erased metadata. The
+[managed layout and decision record](contacts-source-operations.md) define this
+bounded local lifecycle, not real protection or machine-wide deletion.
 
 ## 6. Manifest and downstream handoff
 

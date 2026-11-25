@@ -44,6 +44,12 @@ Text archive binding tests also reject unbound pre-existing text events after
 explicit revisions, without changing their records or reserving an archive.
 See the [revision contract and decision record](spec/contacts-source-revisions.md).
 
+CONTACTS-032 adds `operations.test.cjs` and `check:operations` to `npm run ci`.
+The [source operations contract](spec/contacts-source-operations.md) covers
+synthetic refresh/resync, stale/disconnected sources, calendar retention,
+inventoried cache deletion, replay fences and interrupted-purge recovery.
+All checks remain dependency-free, synthetic and account-free.
+
 GitHub Actions runs `.github/workflows/ci.yml` for PRs targeting `main` and pushes
 to `main`, on Node 20.11.0. Its stable job/check name is
 **`Heartbeat synthetic baseline`**. The workflow needs only `contents: read` and

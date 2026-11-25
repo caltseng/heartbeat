@@ -40,6 +40,11 @@ reconnection signals and Heartbeat's map are **not implemented**. Missing source
 data means unknown, not zero. No private accounts, devices, browser sessions,
 credentials or real data are included or authorized by this repository.
 
+[CONTACTS-032 source operations](docs/spec/contacts-source-operations.md) adds
+`contacts:operate` for explicit synthetic refresh/resync, stale-source inspection,
+inventoried cache retention/deletion and interrupted-purge recovery. Curated files
+are preserved; no private access or recurring job is enabled.
+
 ## Install and run
 
 Install Node.js 20+ (CI uses 20.11.0, npm 10.2.4) and Git. There are no external

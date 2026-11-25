@@ -111,6 +111,15 @@ public artifacts. A successful synthetic demo proves local ingestion only.
 
 ## Handoff boundary
 
+For an existing synthetic store use
+`npm run contacts:operate -- --request <operation.synthetic.json>` for explicit
+refresh/resync, stale coverage, retention/deletion or recovery. Follow the
+[CONTACTS-032 contract](../../../docs/spec/contacts-source-operations.md):
+inventory cache/derived files, preserve opaque curated files, finish interrupted
+purges before importing, and do not restore erased history from old inputs.
+Managed stores require operations refresh/resync rather than direct collection.
+Private operations and recurring schedules remain disabled.
+
 No name-only person merges, inferred couples, group-membership-to-direct exchanges,
 relationship-quality scores, meaningful-connection resets, source writes,
 automations, or visualization implementation belong in collection. Canonical
