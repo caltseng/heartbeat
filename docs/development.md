@@ -23,6 +23,10 @@ lock conflicts and unsafe output rejection. No live endpoint is verified.
 The [CONTACTS-014 adapter](spec/contacts-email-adapter.md) adds native Gmail
 metadata fixtures, separate native/handoff cursors, page rollback, auth/expiry,
 classification and a synthetic-only CLI with immutable private output.
+The [CONTACTS-018 Messenger converter](spec/contacts-messenger-converter.md)
+adds synthetic direct/group JSON shards, stable snapshot-local IDs, conservative
+overlap rejection, interrupted conversion/retry and unsupported history/layout
+cases. Its CLI also rejects private conversion.
 
 GitHub Actions runs `.github/workflows/ci.yml` for PRs targeting `main` and pushes
 to `main`, on Node 20.11.0. Its stable job/check name is

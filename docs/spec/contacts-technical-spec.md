@@ -7,8 +7,10 @@ Stable CONTACTS IDs, collection skill names and JSON schema are preserved.
 Remaining CONTACTS execution is blocked until this bootstrap is verified checked in.
 
 Status: proposed architecture with a runnable metadata-handoff slice. No accounts
-are connected by this change, and no live endpoint adapter or native archive parser
-is implemented. See the [product specification](contacts-store-spec.md) and
+are connected by this change. Synthetic native Gmail metadata adaptation and
+[Messenger JSON conversion](contacts-messenger-converter.md) are implemented,
+but no live endpoint or private native archive processing is enabled.
+See the [product specification](contacts-store-spec.md) and
 [work items](contacts-work-items.md).
 
 Confirmed execution boundary: **one user, local tool, local store in a private
@@ -74,11 +76,11 @@ file. Every desired source must have an entry, even if it is unavailable.
 | `contacts-google-identities` | Validate/import identity metadata handoffs | [CONTACTS-011 selects proposed `people.connections.list`](contacts-google-capability.md), with `contacts.readonly` and contact-only fields. No authorized Google tool is verified; no OAuth client or People API adapter ships here. Snapshot completeness is not historical contact completeness; sync/deletion reconciliation remains future work. |
 | `contacts-email-activity` | Validate/import email metadata handoffs; [014 synthetic native Gmail adapter/CLI](contacts-email-adapter.md) | [CONTACTS-013](contacts-email-access.md) selects Gmail API `gmail.metadata` enumeration (no search `q`), not connected access. 014 implements injected metadata transport, list-token paging and conservative role/class normalization; no HTTP/OAuth transport or private runs. Native cursors stay separate and coverage stays partial. |
 | `contacts-text-activity` | Validate/import SMS/MMS/RCS/iMessage metadata handoffs | [CONTACTS-015](contacts-text-format-gate.md) selects Android 14 / SyncTech 10.30.009 full XML, design profile v1 for SMS/MMS with explicit protocol evidence. No device is verified; CONTACTS-016 converter is not implemented. RCS/iMessage/native backups remain unsupported by that profile. |
-| `contacts-messenger-activity` | Validate/import personal Messenger metadata handoffs | [CONTACTS-017 selects proposed local JSON snapshot conversion](contacts-messenger-capability.md) for 018; no native converter or structured personal reader is available. Export producer version and encrypted-backup layout remain unverified. Page/business APIs and Muse queries do not establish personal-inbox history; no private session reuse or real-data remote AI processing. |
+| `contacts-messenger-activity` | Validate/import metadata handoffs; [018 synthetic-only JSON snapshot converter](contacts-messenger-converter.md) with local IDs and overlap guard | [CONTACTS-017 selects local JSON conversion](contacts-messenger-capability.md), not a structured personal reader. Private conversion is disabled; producer version and encrypted-backup layout remain unverified. Page/business APIs and Muse queries do not establish personal-inbox history; no private session reuse or real-data remote AI processing. |
 | `contacts-whatsapp-activity` | Validate/import WhatsApp metadata handoffs | No verified personal-inbox connector is configured here. Native exports need a separately validated converter. Business inbox access is not evidence of access to existing personal groups. |
 
-All five are **import-capable**, not live-connected. Native export conversion and
-live acquisition remain distinct work items. Beeper and direct API credentials
+All five are **import-capable**, not live-connected. Synthetic conversion does
+not authorize real acquisition or private processing. Beeper and direct API credentials
 are not installed or assumed. Muse UI evidence does not establish structured
 personal Messenger access or authorize real-data remote AI processing; the
 Heartbeat model and local visualization remain here.
@@ -245,6 +247,10 @@ retains both connector provenances. If their IDs differ, review/translation is
 required **before import**; this implementation cannot automatically detect that
 overlap and must not be used to claim reconciled cross-connector totals.
 Separate messages on different channels remain separate, even with identical text.
+The `messenger-json-snapshot-v1` route additionally rejects a changed snapshot or
+another Messenger connector in the same source/account store in either import
+order. Only replay of the same immutable snapshot is supported until reviewed
+CONTACTS-021 translation exists; see the [converter contract](contacts-messenger-converter.md).
 
 Conflicting metadata for the same key fails the page without overwriting the old
 record. A new edit/deletion event may be retained under its own ID/type, but target

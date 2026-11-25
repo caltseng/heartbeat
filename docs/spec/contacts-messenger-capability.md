@@ -1,7 +1,7 @@
 # Heartbeat: personal Messenger access gate (CONTACTS-017)
 
-Status: **proposed local export conversion selected; no acquisition implemented
-or authorized**. Destination is `caltseng/heartbeat`, Phalanx repository ID
+Status: **local export conversion selected; [018 synthetic-only converter](contacts-messenger-converter.md)
+now implemented; no real acquisition authorized**. Destination is `caltseng/heartbeat`, Phalanx repository ID
 `heartbeat`. Bootstrap owner merge was verified at
 `6b6299475b0d1dbcf2bd005c87d383ee97537e2b`. This gate records a technical
 decision for later owner review, not a claim that personal history is accessible.
@@ -17,12 +17,12 @@ reuse a private browser, acquire credentials, pair, send or create a recurring j
 
 | Route | Available evidence / metadata | Decision and actual state |
 | --- | --- | --- |
-| Existing normalized handoff | Local `contacts-messenger-activity` plus `contacts:collect` accepts schemaVersion 1 identities, threads, memberships and timestamped sender events with provenance. | Callable now for synthetic inputs; not acquisition. No native export parser ships here. |
+| Existing normalized handoff | Local `contacts-messenger-activity` plus `contacts:collect` accepts schemaVersion 1 identities, threads, memberships and timestamped sender events with provenance. | Callable now for synthetic inputs; not acquisition. 018 adds a synthetic-only native JSON projection. |
 | Already available structured personal tool | This session's exposed tools and relevant deferred-tool descriptions contain no personal Messenger inbox reader/schema. No account or authentication probe was made. | No verified reader: `requires_setup`. This is a bounded catalog observation, not proof no such tool exists anywhere. |
 | Public tool discovery | Agent Finder's five-result `Facebook Messenger` search returned HasData Facebook MCP (public pages/profiles), SendKuy (sending/campaigns), Faxette, MVVM Toolkit Messenger and Chat SDK. | None establishes personal-inbox reads. No candidate installed, connected or invoked. Discovery metadata is not a verified callable contract. |
 | Meta Messenger Platform Conversations API | Documented Page conversations/messages expose IDs, timestamps and sender/recipient details; require a Page ID, Page token, Page tasks and permissions. | **Unsupported for this personal-inbox requirement.** Business onboarding/permissions do not grant existing personal friend/group history. Do not create a business app to bypass the gate. |
 | Muse/browser UI | Prior reported query success is only UI evidence; it supplies no verified enumeration, IDs, pagination or coverage contract here. No prior session was inspected. | Not a selected acquisition route. Browser-query success cannot close structured access. Real collected data must not be sent to remote AI; UI-as-remote-acquisition is not a workaround. |
-| Owner-provided Facebook JSON export | Publicly documented user export; public community schema describes participant labels, thread path/type, sender labels and epoch-millisecond timestamps. | Selected **proposed snapshot** route. Local converter absent: native input remains `unsupported`; acquiring a real export remains `requires_setup` pending separate approvals. |
+| Owner-provided Facebook JSON export | Publicly documented user export; public community schema describes participant labels, thread path/type, sender labels and epoch-millisecond timestamps. | Selected **snapshot** route, implemented in 018 for invented inputs only. Private conversion disabled; real export acquisition remains `requires_setup` pending separate approvals and actual producer-shape validation. |
 | Encrypted chat backup / secure storage download | Meta documents a separate computer download of encrypted chat history. Actual account availability, backup reach and archive schema/version are unverified. | Separate format, **not included in v1**. Report unavailable encrypted periods explicitly; do not assume the standard export includes them or request recovery secrets. |
 
 Why export first: it avoids inventing a personal API, separates owner-controlled
@@ -35,7 +35,8 @@ counts cannot substitute for event records.
 ## Selected export profile and version boundary
 
 `messenger-json-snapshot-v1` is a **Heartbeat proposal version**, not a Meta export
-version or a currently supported parser. Meta's public help specifies JSON versus
+version. The [018 converter](contacts-messenger-converter.md) supports this profile
+only for synthetic inputs. Meta's public help specifies JSON versus
 HTML but supplies no stable versioned Messenger archive schema. Producer/export
 version is **unknown**; do not label it "Meta v1" or promise current encrypted
 backup compatibility.
@@ -152,9 +153,10 @@ claiming a converter: direct/four-member group; multiple shards and interruption
 identical replay; duplicate timestamps; changed/overlapping export rejection;
 duplicate-name/departed-sender/self ambiguity; invalid timestamps; content
 projection; excluded event types; truncated/encrypted history; and unsupported
-layout/version. None of those converter behaviors is implemented by this gate.
+layout/version. The gate itself did not implement conversion; those behaviors are now exercised
+by the separate [018 implementation and decision record](contacts-messenger-converter.md).
 
-Until then a desired real Messenger source remains explicit, for example:
+A desired real Messenger source remains explicit, for example:
 
 ```json
 {
@@ -163,7 +165,7 @@ Until then a desired real Messenger source remains explicit, for example:
   "connector": "none",
   "mode": "unavailable",
   "status": "requires_setup",
-  "reason": "No authorized personal reader or implemented export converter; private boundary and source authorization not established."
+  "reason": "No authorized personal reader; private converter processing disabled and source authorization not established."
 }
 ```
 
@@ -214,4 +216,5 @@ Public evidence consulted 2026-11-24 (no personal account accessed):
 
 The [technical contract](contacts-technical-spec.md), [privacy boundary](../privacy.md)
 and [stable register](contacts-work-items.md) remain authoritative. This decision
-does not deliver CONTACTS-018, grant CONTACTS-010 approval or authorize owner merge.
+does not grant CONTACTS-010 approval or authorize owner merge. CONTACTS-018 is
+documented separately and remains synthetic-only.

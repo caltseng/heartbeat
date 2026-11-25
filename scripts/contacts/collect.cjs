@@ -228,6 +228,26 @@ function persist(file, state) {
     fs.renameSync(temporary, file);
   } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
 }
+function guardMessengerSnapshot(source, pages, state) {
+  if (source.source !== 'messenger') return;
+  const connector = 'messenger-json-snapshot-v1';
+  const existing = Object.entries(state.records).filter(([id]) => {
+    const [family, account] = JSON.parse(id);
+    return family === source.source && account === source.account;
+  });
+  const priorSnapshot = existing.some(([, row]) => row.provenance.some(item => item.connector === connector));
+  if (source.connector !== connector && !priorSnapshot) return;
+  requireValue(source.connector === connector, 'Messenger snapshot overlap requires reviewed translation before importing another route.', 'snapshot_overlap');
+  const ids = pages.flatMap(page => ['identities', 'threads', 'events'].flatMap(kind =>
+    array(page[kind], `page.${kind}`).map(row => row.id)));
+  const binding = id => typeof id === 'string' && /^messenger-json-snapshot-v1:([a-f0-9]{64}):[a-f0-9]{64}$/.exec(id)?.[1];
+  const snapshot = binding(ids[0]);
+  requireValue(snapshot && ids.every(id => binding(id) === snapshot),
+    'Messenger snapshot IDs must share one labeled immutable namespace.', 'snapshot_overlap');
+  requireValue(existing.every(([id, row]) => row.provenance.every(item => item.connector === connector) &&
+    (row.record.type === 'membership' || binding(JSON.parse(id)[3]) === snapshot)),
+  'Changed or overlapping Messenger snapshots require reviewed translation; use the same account, not an alias.', 'snapshot_overlap');
+}
 function importSource(source, requestFolder, request, period, state, file, report) {
   const input = readJSON(path.resolve(requestFolder, source.input));
   object(input.value, ['schemaVersion', 'dataClass', 'source', 'account', 'connector', 'coverage', 'pages', 'errors'], 'handoff');
@@ -242,6 +262,7 @@ function importSource(source, requestFolder, request, period, state, file, repor
   });
   const pages = array(handoff.pages, 'handoff.pages');
   requireValue(pages.length > 0, 'At least one page is required, including for a verified empty result.');
+  guardMessengerSnapshot(source, pages, state);
   const checkpointKey = sourceKey(source);
   const signature = hash(JSON.stringify(period));
   const previous = state.checkpoints[checkpointKey];
@@ -327,7 +348,7 @@ function collect(request, requestFolder = process.cwd()) {
       sources: sources.map(source => ({ source: source.source, account: source.account, connector: source.connector, status: 'pending',
         persistedPages: 0, duplicateRecords: 0, coverage: null, retrievedAt: null, paginationComplete: false, nextCursor: null })),
       unresolvedIdentityKeys: [],
-      limitations: ['Metadata handoff imports only; no live endpoint adapters or native archive parsers.',
+      limitations: ['Metadata handoff imports only; no live endpoint access. Synthetic conversion does not authorize private processing.',
         'Provider/account namespaces and local IDs require review before overlapping imports.',
         'Reactions, edits, deletions and membership events are retained separately, not reconciled into message counts.'] };
     persist(file, state);

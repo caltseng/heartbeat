@@ -21,7 +21,8 @@ Only allowlisted metadata is accepted. Bodies, snippets, attachments, subjects,
 credentials and raw vendor payload fields are rejected, but allowlisting cannot
 detect secrets placed in an otherwise valid text field. Inspect and minimize
 authorized inputs before import. Native archives remain in their approved private
-location; there is no native archive parser. Do not upload private records to
+location; the [Messenger JSON converter](spec/contacts-messenger-converter.md)
+accepts only synthetic inputs, not private native archives. Do not upload private records to
 external processing systems under this baseline.
 
 Node requests owner-only POSIX permissions. Windows ACLs, encryption, backups,
@@ -36,7 +37,7 @@ Use a local filesystem; network shares are not certified for snapshot atomicity.
 | Google contacts | Normalized identity handoff import only | [CONTACTS-011](spec/contacts-google-capability.md) selects proposed read-only `people.connections.list`, not connected access. CONTACTS-010 boundary/source authorization and adapter 012 remain required; snapshot/field limits and sync/deletion gaps stay explicit. |
 | Email | Normalized activity handoff import plus [014 synthetic Gmail metadata adapter](spec/contacts-email-adapter.md) | CONTACTS-010 and bounded Gmail source authorization remain open; no HTTP transport, connected tool or credentials. The adapter rejects private runs. `gmail.metadata` excludes bodies and search `q`; self/aliases, hidden BCC, partial history and classifications remain explicit. |
 | SMS/MMS/RCS/iMessage | Normalized text metadata handoff import only | [CONTACTS-015](spec/contacts-text-format-gate.md) selects a synthetic-only Android/SyncTech XML design profile; converter 016 remains future work. CONTACTS-010 and source authorization, raw-export/content processing approval, actual device/SIM/self/protocol evidence and history limits remain open. No device or backup inspection. |
-| Personal Messenger | Normalized metadata handoff import only | [CONTACTS-017](spec/contacts-messenger-capability.md) selects proposed local JSON snapshot conversion; converter 018 and CONTACTS-010/source authorization remain required. Producer version, encrypted-backup layout and history coverage are unverified. Business APIs/Muse queries do not establish personal access; no real-data remote AI processing. |
+| Personal Messenger | Normalized metadata handoff import plus [018 synthetic JSON snapshot converter](spec/contacts-messenger-converter.md) | [CONTACTS-017](spec/contacts-messenger-capability.md) selects local versioned conversion, not a personal API. Private conversion is disabled; CONTACTS-010/source authorization and actual producer-shape validation remain required. Producer version, encrypted-backup layout and history coverage are unverified. Business APIs/Muse queries do not establish personal access; no real-data remote AI processing. |
 | Personal WhatsApp | Normalized metadata handoff import only | CONTACTS-010/019: select personal route or export format, linked-device/history limits and ID/time-zone strategy; route 020 remains future work. No pairing or business-API equivalence. |
 
 CONTACTS-010 additionally requires approved processing/storage location,

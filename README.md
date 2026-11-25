@@ -15,10 +15,14 @@ The CONTACTS-001 through CONTACTS-004 baseline provides six composable collectio
 skills, a strict metadata-handoff importer, atomic JSON persistence, provenance,
 coverage, replay/resume, synthetic fixtures and tests. It imports normalized
 Google identity, email, text-message, personal Messenger and WhatsApp metadata.
-**It does not fetch live endpoints or parse native vendor archives.**
+**It does not fetch live endpoints or authorize private archive processing.**
 The [CONTACTS-014 Gmail metadata adapter](docs/spec/contacts-email-adapter.md)
 also converts synthetic native pages with an injected transport, separate native
 cursors and explicit partial coverage. Its CLI cannot access real accounts.
+The [CONTACTS-018 Messenger converter](docs/spec/contacts-messenger-converter.md)
+projects declared synthetic JSON snapshot shards into metadata-only handoffs,
+with stable local IDs, overlap rejection and explicit unknown history. It rejects
+private runs and does not support encrypted backups or arbitrary archive layouts.
 
 Canonical identity review, cross-source numerical aggregation, summaries,
 reconnection signals and Heartbeat's map are **not implemented**. Missing source
@@ -67,6 +71,7 @@ hide them. A successful import does not independently certify upstream history.
 - [Product specification](docs/spec/contacts-store-spec.md)
 - [Technical contracts and source capability matrix](docs/spec/contacts-technical-spec.md)
 - [Personal Messenger access gate and proposed export profile](docs/spec/contacts-messenger-capability.md)
+- [Messenger synthetic snapshot converter and engineering decisions](docs/spec/contacts-messenger-converter.md)
 - [Google identity access gate: proposed read-only route, no live access](docs/spec/contacts-google-capability.md)
 - [Selected text export format and device/access limits](docs/spec/contacts-text-format-gate.md)
 - [Email access gate: proposed Gmail metadata route and synthetic payload](docs/spec/contacts-email-access.md)
