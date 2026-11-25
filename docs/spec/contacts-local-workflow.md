@@ -2,8 +2,9 @@
 
 Status: synthetic collection, source reconciliation and identity review are
 runnable, including the landed CONTACTS-021/022 contracts. Synthetic Google/email
-acquisition and text conversion have separate commands below. Aggregation,
-Heartbeat reports/graphs remain future CONTACTS-023 through 025 work.
+acquisition and text conversion have separate commands below. CONTACTS-023 now
+adds synthetic cross-source aggregation; Heartbeat summary presentation/graphs
+remain future work.
 [CONTACTS-027](contacts-curated-records.md) adds separate synthetic note capture,
 curated groups, explicit connections and rhythms using reviewed households.
 This workflow composes those stages without claiming future delivery. The
@@ -110,6 +111,28 @@ addresses. Tombstone/collision/missing links remain inactive, changed metadata
 requires explicit refresh, and original canonical references survive.
 Reinspect before each mutation; no command silently matches names or addresses.
 
+### Synthetic aggregation handoff
+
+After that review, prepare `demo-031\aggregate.synthetic.json` with
+`schemaVersion:1`, `dataClass:"synthetic"`, `collection:"collection.json"`,
+`mapping:"..\\reviewed\\identity-review.json"`, `identityMappingRevision:1`,
+the same demo period (`7d`, `America/Los_Angeles`,
+`asOf:"2026-11-24T20:00:00Z"`), and `output:"..\\reports\\run-001"`.
+The [aggregation contract](contacts-aggregation.md) gives complete JSON,
+optional channels, coverage and interpretation rules.
+
+```powershell
+npm run contacts:aggregate -- --request .private\contacts\demo-031\aggregate.synthetic.json
+if ($LASTEXITCODE -eq 1) { throw 'Aggregation failed; preserve the pinned inputs and inspect the error.' }
+npm run check:private
+```
+
+Exit 2 saves an explicitly partial dataset, not empty success. The exact mapping
+history revision must bind the collection bytes. Inputs remain unchanged; each
+new run publishes a separate immutable `aggregates.json` with version, filters,
+period/zone/as-of, source coverage, exclusion ledger and observed/lower-bound
+metrics. No summary renderer, graph, source access or private run is enabled.
+
 ### Other implemented synthetic entry points
 
 These are separate local producers, not live connectors or an all-in-one job.
@@ -155,7 +178,7 @@ Identity review uses its own version-1 request, with the exact collection digest
 expected mapping revision, reason and explicit operations. There is no shared
 global configuration; source adapters own their documented local requests.
 
-Example layout; `reports` entries alone are reserved for later implementations:
+Example layout; summary/graph entries remain reserved for later implementations:
 
 ```text
 .private/contacts/
@@ -173,7 +196,8 @@ Example layout; `reports` entries alone are reserved for later implementations:
     curated.lock                    # only during curation
     curated.json.<pid>.tmp           # transient atomic-write staging file
   reports/<chosen-run>/
-    aggregates.json                 # future CONTACTS-023
+    aggregates.json                 # implemented CONTACTS-023
+    aggregates.<uuid>.tmp           # transient atomic no-replace publication
     report.json                     # future CONTACTS-024
     graph.html / graph.svg          # future CONTACTS-025
 ```
@@ -184,7 +208,7 @@ Example layout; `reports` entries alone are reserved for later implementations:
 | Collector -> identity review | Existing `schemaVersion:1` `collection.json` | Read records, checkpoints, manifest and history as one atomic generation; retain source keys and unknown coverage. Do not edit source evidence to resolve a person. |
 | Identity review -> reducer | Implemented `schemaVersion:1` `identity-review.json`, defined by 022 | Monotonic `revision`, exact `collectionDigest`, current `view`, `identityDigests`, inactive links and append-only history. Read an explicitly pinned revision/digest; preserve aliases and unresolved/inactive people. Names/group membership cannot imply merges or households. |
 | Identity review -> curated records | Implemented `schemaVersion:1` `curated.json`, defined by 027 | Pin canonical view digest plus curation revision; preserve original IDs/text and separate capture/encounter dates. Only explicit connections affect confirmed dates; source changes never overwrite notes. |
-| Collection + mapping -> reducer | Reserved `aggregates.json`; schema defined by 023 | Pin exact collection bytes (SHA-256), data class, mapping revision and resolved half-open period/time zone/as-of. Reconcile source IDs, direct/group roles, exclusions and unknown/lower-bound coverage. |
+| Collection + mapping -> reducer | Implemented `schemaVersion:1` `aggregates.json`; [contract defined by 023](contacts-aggregation.md) | Pin exact collection bytes (SHA-256), data class, explicit saved mapping revision and resolved half-open period/time zone/as-of. Reconcile source IDs, direct/group roles, exclusions and unknown/lower-bound coverage. |
 | Reducer -> Heartbeat summary | Reserved `report.json`; schema defined by 024 | Versioned shared dataset with the same input references, filters, source freshness/coverage, exclusions, counts and daily timeline. Narrative must not invent numbers. |
 | Shared report -> Heartbeat graph | Reserved private `graph.html` / `graph.svg`; renderer defined by 025 | Same report revision/digest, period and filters in all views; explain group-only/inactive/unknown categories. Offline files, no remote assets, telemetry or hosted service. |
 
@@ -192,7 +216,8 @@ Reserved filenames are **not implemented schemas or CLI commands**. Each future
 JSON producer must declare `schemaVersion`, preserve `dataClass` and pin input
 revisions/digests; consumers must reject unsupported versions, mismatched data
 classes/periods/revisions and missing inputs, never substitute empty/stale data.
-CONTACTS-023/024 own their future exact schemas, version migration and validators;
+CONTACTS-023 owns the implemented aggregate schema; CONTACTS-024 owns its future
+exact summary schema, version migration and validators;
 CONTACTS-022's implemented overlay contract remains unchanged.
 CONTACTS-025 depends on this workflow, not on this item shipping its renderer.
 Do not pass the raw collection directly to a graph or derive totals in a renderer.
@@ -217,8 +242,9 @@ Persist derived generations separately from collection. Future producers must
 validate first, write atomically inside the same private boundary (reuse the
 collector's output-location checks), and leave prior valid output intact on
 failure. Explicitly label partial datasets as observed/lower-bound; interrupted
-or invalid inputs block downstream work. Until those consumers exist, use only the reviewed overlay and explicit synthetic
-curation: there is no numerical report, graph or all-in-one command.
+or invalid inputs block downstream work. Use the reviewed overlay, explicit
+synthetic curation and structured aggregates:
+there is no rendered summary, graph or all-in-one command.
 
 ## Recovery without losing source evidence
 
@@ -298,3 +324,4 @@ inputs only, existing collection v1 remains compatible.
 | With no public product, require empty/absent public output instead of building a sanitizer or website. Inspect Git candidates for reserved private artifacts too. | Public asset packaging/redaction pipeline. | CI negative tests seed docs, tooling, renamed data, locks and graphs in every guarded root and force-add ignored private files. Revisit only after an explicitly changed product/publication boundary; never silently permit private files. |
 | Manual replay/resume and regeneration, no backup/scheduling automation. Preserve explicit nonzero errors. | Managed refresh, automatic lock breaking or retention jobs. | Existing rollback, cursor, lock and CLI-exit tests; source operations belong to 032. Revisit after its real-adapter and separately approved privacy/operations contracts. |
 | Integration (2026-11-25): compose actual owner-merged main `68fe4157360abf2d9e50f7ca642ad74649ac974a`, preserving collector reconciliation, identity matching/refresh and all source/test entry points. Cover actual private producer filenames plus reserved review lock/temp aliases, without changing upstream writers. | Rejected reimplementing matching or replacing landed scripts; no blanket private-store approval is inferred from integration. The approved CONTACTS-010 policy remains authoritative. | Full configured CI plus a synthetic demo/replay/inspect/review handoff proves the overlay pins the unchanged collection and stays outside public/Git delivery. Revisit when another producer adds operational filenames or a downstream schema becomes runnable. |
+| CONTACTS-023 integration: use the reserved `aggregates.json`, add its UUID staging/request names to the private guard, and keep every existing producer/check entry point. | Rejected a competing report name, source/mapping rewrites or bypassing the landed publication guard. Assumes dependency-free local snapshots remain sufficient. | Synthetic demo/replay/review/aggregate CLI composition pins unchanged inputs and private output; negative tests cover actual aggregate staging/request names. Revisit when CONTACTS-024 defines its own versioned summary. |

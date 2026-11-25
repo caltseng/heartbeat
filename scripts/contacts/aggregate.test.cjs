@@ -64,9 +64,9 @@ function fixture(t, change = () => {}) {
   ];
   const request = { schemaVersion: 1, dataClass: 'synthetic', period, output: 'store',
     sources: inputs.map(input => ({ source: input.source, account: input.account, connector: input.connector,
-      mode: 'metadata-import', input: `${input.source}.json` })) };
+      mode: 'metadata-import', input: `${input.source}.${input.connector}.json` })) };
   change(inputs, request);
-  for (const input of inputs) fs.writeFileSync(path.join(folder, `${input.source}.json`), JSON.stringify(input));
+  for (const input of inputs) fs.writeFileSync(path.join(folder, `${input.source}.${input.connector}.json`), JSON.stringify(input));
   collect(request, folder);
   // Replay to prove source-event IDs, not import attempts or connector observations, are counted.
   const collected = collect(request, folder);
@@ -154,6 +154,30 @@ test('DST dates and reviewed cross-channel identity mappings form unions, not su
   assert.throws(() => f.reduce({ collectionDigest: 'a'.repeat(64) }), /bind/);
 });
 
+test('reviewed different-ID connector translations retain provenance without multiplying source events', t => {
+  const f = fixture(t, (inputs, request) => {
+    const alias = structuredClone(inputs[0]);
+    alias.connector = 'second-synthetic-handoff';
+    const mappings = alias.pages[0].events.map(event => {
+      const targetId = event.id;
+      event.id += '-alias';
+      return { source: alias.source, account: alias.account, connector: alias.connector, type: 'event', id: event.id, targetId };
+    });
+    inputs.push(alias);
+    request.sources.push({ source: alias.source, account: alias.account, connector: alias.connector,
+      mode: 'metadata-import', input: `${alias.source}.${alias.connector}.json` });
+    request.overlapReview = { revision: 'synthetic-overlap-1', reviewedAt: period.asOf,
+      basis: 'Synthetic explicit same-provider-message translation.', mappings };
+  });
+  const result = f.reduce();
+  reconciles(result);
+  assert.equal(result.audit.uniqueSourceEvents, 17);
+  assert.equal(result.audit.repeatedEventEvidence, 15);
+  assert.equal(result.totals.observedMessages, 10);
+  assert.equal(result.perSource.filter(row => row.source === 'email').length, 1);
+  assert.equal(result.sources.filter(row => row.source === 'email').length, 2);
+});
+
 test('group-only activity, To/CC roles, passive membership and broadcast are not direct exchanges', t => {
   const f = fixture(t);
   const result = f.reduce();
@@ -198,10 +222,19 @@ test('BCC-only receipt is not direct; recipient roles deduplicate canonical alia
     page.events = [
       message('bcc-only', 'a', '2026-11-01T10:00:00Z', { recipients: [{ identityId: 'self', role: 'bcc' }] }),
       message('repeated-group-recipient', 'self', '2026-11-01T11:00:00Z', { threadId: 'group',
-        recipients: [{ identityId: 'b', role: 'to' }, { identityId: 'b', role: 'to' }, { identityId: 'b', role: 'cc' }] })
+        recipients: [{ identityId: 'b', role: 'to' }, { identityId: 'b', role: 'to' },
+          { identityId: 'c', role: 'to' }, { identityId: 'b', role: 'cc' }] })
     ];
   });
-  const result = f.reduce({ channels: ['email'] });
+  review({
+    schemaVersion: 1, dataClass: 'synthetic', collection: f.collectionFile, output: 'review', expectedRevision: 2,
+    collectionDigest: f.options.collectionDigest, reason: 'Synthetic explicit alias review.',
+    operations: [{ type: 'merge', people: [f.person('email', 'b'), f.person('email', 'c')], into: f.person('email', 'b'),
+      evidence: [{ kind: 'provider', identityKeys: [key('email', 'identity', 'b'), key('email', 'identity', 'c')],
+        reference: 'Synthetic provider alias equivalence.' }] }]
+  }, f.folder);
+  const result = aggregate(f.collection, JSON.parse(fs.readFileSync(f.mappingFile, 'utf8')),
+    { ...f.options, identityMappingRevision: 3, channels: ['email'] });
   reconciles(result);
   const a = result.people.find(row => row.personId === f.person('email', 'a'));
   const b = result.people.find(row => row.personId === f.person('email', 'b'));

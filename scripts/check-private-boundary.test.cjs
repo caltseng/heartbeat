@@ -29,7 +29,8 @@ test('private ignored workflow stays local, including reports and graph files', 
     'google-acquisition.lock', 'google-acquisition.json.123.tmp', 'google-handoff-synthetic.json',
     'whatsapp-registry.synthetic.json', 'whatsapp-conversion.lock', 'whatsapp.synthetic.json',
     'whatsapp.synthetic.json.12345678-abcd.tmp', 'request.synthetic.json.12345678-abcd.tmp',
-    'handoff.json', 'checkpoint.json', 'aggregates.json', 'report.json', 'graph.html', 'graph.svg']) {
+    'handoff.json', 'checkpoint.json', 'aggregates.json', 'aggregate.synthetic.json',
+    'aggregates.12345678-1234-1234-1234-123456789abc.tmp', 'report.json', 'graph.html', 'graph.svg']) {
     f.write(path.join('.private', 'contacts', 'synthetic', file));
   }
   f.write(path.join('docs', 'spec', 'contacts-local-workflow.md'));
@@ -67,7 +68,9 @@ test('reserved private handoffs fail outside ignored storage', t => {
     'google-handoff-synthetic.json', 'google-handoff-synthetic.json.123.tmp',
     'whatsapp-registry.synthetic.json', 'whatsapp-registry.synthetic.json.12345678-abcd.tmp',
     'whatsapp-conversion.lock', 'whatsapp.synthetic.json', 'whatsapp.synthetic.json.12345678-abcd.tmp',
-    'request.synthetic.json.12345678-abcd.tmp', 'handoff.json', 'checkpoint.json', 'aggregates.json',
+    'request.synthetic.json.12345678-abcd.tmp',
+    'handoff.json', 'checkpoint.json', 'aggregates.json', 'aggregate.json', 'aggregate.synthetic.json',
+    'aggregates.12345678-1234-1234-1234-123456789abc.tmp',
     'report.json', 'graph.html', 'graph.svg', '.env.local', 'private.key']) {
     const target = f.write(path.join('accidental', name));
     assert.throws(() => checkBoundary(f.root), /Private operational artifact/);
@@ -103,7 +106,7 @@ test('additional output locations, filesystem redirects and CLI errors fail clos
   assert.match(bad.stderr, /Usage:/);
 });
 
-test('documented synthetic collection-to-review handoff stays private and preserves its pinned snapshot', t => {
+test('documented synthetic collection-to-review-to-aggregation handoff stays private and pins unchanged inputs', t => {
   const f = fixture(t);
   f.write('.gitignore', '.private/\n');
   const demo = path.join(f.root, '.private', 'contacts', 'demo');
@@ -131,6 +134,24 @@ test('documented synthetic collection-to-review handoff stays private and preser
   assert.equal(mapping.dataClass, 'synthetic');
   assert.equal(mapping.revision, 1);
   assert.equal(mapping.collectionDigest, inspection.collectionDigest);
+  const mappingBytes = fs.readFileSync(result.file);
+  const aggregationRequest = {
+    schemaVersion: 1, dataClass: 'synthetic', collection: 'collection.json',
+    mapping: '../reviewed/identity-review.json', identityMappingRevision: 1,
+    period: { preset: '7d', timeZone: 'America/Los_Angeles', asOf: '2026-11-24T20:00:00Z' },
+    output: '../reports/run-001'
+  };
+  const aggregationFile = f.write(path.join('.private', 'contacts', 'demo', 'aggregate.synthetic.json'),
+    JSON.stringify(aggregationRequest));
+  const aggregated = run(path.join(__dirname, 'contacts', 'aggregate.cjs'), ['--request', aggregationFile]);
+  const dataset = JSON.parse(fs.readFileSync(aggregated.file, 'utf8'));
+  assert.equal(dataset.schemaVersion, 1);
+  assert.equal(dataset.dataClass, 'synthetic');
+  assert.equal(dataset.collectionDigest, inspection.collectionDigest);
+  assert.equal(dataset.identityMappingRevision, 1);
+  assert.equal(dataset.totals.observedMessages, 4);
+  assert.equal(dataset.audit.uniqueSourceEvents, 4);
+  assert.deepEqual(fs.readFileSync(result.file), mappingBytes);
   assert.deepEqual(fs.readFileSync(path.join(demo, 'collection.json')), snapshot);
   assert.doesNotThrow(() => checkBoundary(f.root));
   execFileSync('git', ['add', '--force', path.relative(f.root, result.file)], { cwd: f.root });
