@@ -10,6 +10,8 @@ import { handoff } from './demo.ts';
 import { review } from './identity-review.ts';
 import { summary } from './summary.ts';
 import { graphModel, render, run } from './graph.ts';
+import { GRAPH_SCRIPT } from './graph-interaction.ts';
+import { demoGraph } from './demo-graph.ts';
 
 const period: import('./collect.ts').PeriodRequest = { preset: 'custom', timeZone: 'UTC', start: '2026-11-01T00:00:00Z',
   end: '2026-11-11T00:00:00Z', asOf: '2026-11-11T00:00:00Z' };
@@ -151,25 +153,69 @@ test('large cohorts paginate without omissions, with native keyboard links and r
     assert.equal((html.match(new RegExp(`id="${person.anchor}"`, 'g')) || []).length, 1);
     assert.equal((html.match(new RegExp(`<circle class="person ${person.band}"`, 'g')) || []).length,
       model.people.filter(row => row.band === person.band).length);
-    assert.match(html, new RegExp(`<a href="#${person.anchor}" aria-label=`));
+    assert.match(html, new RegExp(`<a href="#${person.anchor}" data-person="${person.anchor}" aria-label=`));
   }
   assert.match(html, /width=device-width, initial-scale=1/);
   assert.match(html, /@media\(max-width:600px\)/);
   assert.match(html, /Skip map to accessible people table/);
   assert.match(html, /role="region" aria-label="Scrollable map sheet/);
   assert.match(html, /:focus-visible/);
-  assert.doesNotMatch(html, /<script|<iframe|<img|<link|\bon\w+=|(?:href|src)="(?:https?:|javascript:)/i);
+  assert.doesNotMatch(html, /<iframe|<img|<link|\bon\w+=|(?:href|src)="(?:https?:|javascript:)/i);
 });
-test('HTML escapes report strings, emits no scripts/remote assets and rejects malformed reports', t => {
+test('HTML escapes report strings and permits only the fixed hash-pinned offline program', t => {
   const f = fixture(t);
   f.report.context.sources[0].reason = '<script>alert("synthetic")</script>';
   const html = render(f.report, f.graphRequest.reportDigest);
-  assert.doesNotMatch(html, /<script/);
+  assert.equal((html.match(/<script>/g) || []).length, 1);
+  assert.ok(html.includes(`<script>${GRAPH_SCRIPT}</script>`));
+  assert.ok(html.includes(`script-src 'sha256-${crypto.createHash('sha256').update(GRAPH_SCRIPT).digest('base64')}'`));
+  assert.match(html, /connect-src 'none'/);
+  assert.doesNotMatch(html, /<iframe|<img|<link|\bon\w+=|(?:href|src)="(?:https?:|javascript:)/i);
+  assert.doesNotMatch(GRAPH_SCRIPT, /innerHTML|eval\(|fetch\(|XMLHttpRequest|localStorage|https?:|setTimeout/);
   assert.match(html, /&lt;script&gt;/);
   assert.match(html, /default-src 'none'/);
   f.report.views.peopleTable[0].group.observedPosted = '<svg onload=alert(1)>';
   assert.throws(() => render(f.report, f.graphRequest.reportDigest), /Invalid graph person/);
   assert.throws(() => render({ ...f.report, schemaVersion: 2 }, f.graphRequest.reportDigest), /Invalid/);
+});
+test('owner demo composes actual collector, reviewed mapping, bound reports and interactive graphs', t => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'heartbeat-owner-demo-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const result = demoGraph(path.join(folder, 'demo'));
+  assert.equal(result.exitCode, 2);
+  const root = path.dirname(result.file);
+  const all = JSON.parse(fs.readFileSync(path.join(root, 'all-channels-report', 'report.json'), 'utf8'));
+  const email = JSON.parse(fs.readFileSync(path.join(root, 'covered-email-report', 'report.json'), 'utf8'));
+  assert.equal(all.views.peopleTable.length, 37);
+  assert.equal(all.views.summary.metrics.messages.observed, 48);
+  assert.equal(email.views.summary.metrics.messages.observed, 12);
+  assert.equal(all.context.collectionDigest, email.context.collectionDigest);
+  assert.equal(all.context.identityMappingRevision, email.context.identityMappingRevision);
+  assert.equal(all.context.coverage, 'incomplete-or-uncertain');
+  assert.equal(email.context.coverage, 'complete-declared');
+  assert.deepEqual([...new Set(graphModel(all).people.map(p => p.band))].sort(),
+    ['frequent', 'group', 'occasional', 'regular', 'unknown']);
+  assert.ok(graphModel(email).people.some(p => p.band === 'inactive'));
+  assert.ok(graphModel(all).sheets > 1);
+  for (const [report, file] of [[all, result.graphs[0]], [email, result.graphs[1]]]) {
+    const html = fs.readFileSync(file, 'utf8');
+    assert.ok(html.includes(`Report SHA-256: <code>${digest(fs.readFileSync(path.join(root,
+      file === result.graphs[0] ? 'all-channels-report' : 'covered-email-report', 'report.json')))}</code>`));
+    assert.match(html, /id="inspector" tabindex="-1"/);
+    assert.match(html, /prefers-reduced-motion:reduce/);
+    assert.equal((html.match(/<option value="person-/g) || []).length, 37);
+    assert.equal(graphModel(report).people.length, 37);
+  }
+  assert.throws(() => demoGraph(root), /empty output directory/);
+  const cli = path.join(__dirname, 'demo-graph.ts');
+  const args = ['--import', 'tsx', cli, '--output', path.join(folder, 'cli')];
+  const invoked = spawnSync(process.execPath, args, { encoding: 'utf8' });
+  assert.equal(invoked.status, 2, invoked.stderr);
+  assert.equal(JSON.parse(invoked.stdout).exitCode, 2);
+  assert.equal(fs.existsSync(JSON.parse(invoked.stdout).file), true);
+  const replay = spawnSync(process.execPath, args, { encoding: 'utf8' });
+  assert.equal(replay.status, 1);
+  assert.match(replay.stderr, /empty output directory/);
 });
 test('CLI is immutable, pins exact input bytes, denies private input before reads and rejects unsafe output', t => {
   const f = fixture(t);

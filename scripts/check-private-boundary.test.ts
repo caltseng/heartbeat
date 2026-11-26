@@ -161,8 +161,8 @@ test('documented synthetic collection-to-review-to-aggregation handoff stays pri
   assert.equal(dataset.dataClass, 'synthetic');
   assert.equal(dataset.collectionDigest, inspection.collectionDigest);
   assert.equal(dataset.identityMappingRevision, 1);
-  assert.equal(dataset.totals.observedMessages, 4);
-  assert.equal(dataset.audit.uniqueSourceEvents, 4);
+  assert.equal(dataset.totals.observedMessages, 48);
+  assert.equal(dataset.audit.uniqueSourceEvents, 48);
   const summaryFile = f.write(path.join('.private', 'contacts', 'demo', 'summary.synthetic.json'),
     JSON.stringify({ ...aggregationRequest, output: '../reports/summary-001' }));
   const summarized = run(path.join(__dirname, 'contacts', 'summary.ts'), ['--request', summaryFile]);
@@ -170,8 +170,8 @@ test('documented synthetic collection-to-review-to-aggregation handoff stays pri
   assert.equal(report.context.collectionDigest, dataset.collectionDigest);
   assert.equal(report.context.identityMappingRevision, dataset.identityMappingRevision);
   assert.deepEqual(report.context.period, dataset.period);
-  assert.equal(report.views.summary.metrics.messages.observed, 4);
-  assert.equal(report.views.timeline.reduce((total, row) => total + row.observedMessages, 0), 4);
+  assert.equal(report.views.summary.metrics.messages.observed, 48);
+  assert.equal(report.views.timeline.reduce((total, row) => total + row.observedMessages, 0), 48);
   assert.deepEqual(report.views.perChannel, dataset.perChannel);
   const reportBytes = fs.readFileSync(summarized.file);
   const graphRequest = f.write(path.join('.private', 'contacts', 'demo', 'graph.synthetic.json'),

@@ -221,12 +221,12 @@ test('all five synthetic sources persist metadata, not inferred cross-source peo
   const result = collect(demo.request, demo.folder);
   assert.equal(result.exitCode, 0);
   const file = readCollection(result.file).value;
-  assert.equal(events(file).length, 4);
-  assert.equal(result.manifest.unresolvedIdentityKeys.length, 5);
+  assert.equal(events(file).length, 48);
+  assert.equal(result.manifest.unresolvedIdentityKeys.length, 37);
   assert.equal(result.manifest.identityMappingRevision, null);
   assert.equal(result.manifest.sources[0].coverage.kind, 'identity-snapshot');
   collect(demo.request, demo.folder);
-  assert.equal(events(readCollection(result.file).value).length, 4);
+  assert.equal(events(readCollection(result.file).value).length, 48);
   const replayed = readCollection(result.file).value;
   assert.equal(replayed.history.length, 1);
   assert.equal(replayed.history[0].status, 'collected');

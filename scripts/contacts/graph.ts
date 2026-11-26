@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { publishText, runCLI, readJSON, requireValue, object, outputLocation } from './lib.ts';
 import { selectView } from './summary.ts';
+import { GRAPH_SCRIPT } from './graph-interaction.ts';
 
 const BANDS = [
   { id: 'frequent', radius: 105, label: 'Direct: at least 50% of local dates' },
@@ -72,6 +74,7 @@ function graphModel(report) {
 }
 function mapSVG(model, sheet) {
   const center = 540;
+  const spokes = [];
   const circles = BANDS.map(band => `<circle class="band" cx="${center}" cy="${center}" r="${band.radius}"/>
 <text class="band-label" x="${center}" y="${center - band.radius - 8}" text-anchor="middle">${escape(band.label)}</text>`).join('');
   const nodes = BANDS.flatMap(band => {
@@ -82,18 +85,18 @@ function mapSVG(model, sheet) {
       const y = +(center + band.radius * Math.sin(angle)).toFixed(2);
       const direct = person.directDays > 0;
       const recency = person.latestObserved ? person.latestObserved.slice(0, 10) : 'unknown';
-      return `${direct ? `<line class="activity" x1="${center}" y1="${center}" x2="${x}" y2="${y}"/>` : ''}
-<a href="#${person.anchor}" aria-label="${escape(`${person.label}: ${person.band}; latest observed ${recency}; inspect evidence`)}">
+      if (direct) spokes.push(`<line class="activity" x1="${center}" y1="${center}" x2="${x}" y2="${y}"/>`);
+      return `<a href="#${person.anchor}" data-person="${person.anchor}" aria-label="${escape(`${person.label}: ${person.band}; latest observed ${recency}; inspect evidence`)}">
 <circle class="person ${person.band}" cx="${x}" cy="${y}" r="23"/><text x="${x}" y="${y + 5}" text-anchor="middle">${person.label}</text>
 <title>${escape(`${person.label}: latest observed ${recency}`)}</title>
 <text class="recency" x="${x}" y="${y + 42}" text-anchor="middle">${person.latestObserved ? escape(recency.slice(5)) : '?'}</text></a>`;
     });
   }).join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" role="group" aria-labelledby="map-title-${sheet} map-desc-${sheet}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" tabindex="0" role="group" aria-labelledby="map-title-${sheet} map-desc-${sheet}">
 <title id="map-title-${sheet}">Heartbeat user-centered map, sheet ${sheet + 1} of ${model.sheets}</title>
 <desc id="map-desc-${sheet}">You are at the center. Only observed direct activity creates spokes.
 Outer categories are not frequency rankings. Tab to a person and press Enter for evidence.</desc>
-${circles}${nodes}<circle class="self" id="map-self-${sheet}" cx="${center}" cy="${center}" r="36"/>
+${circles}${spokes.join('')}${nodes}<circle class="self" id="map-self-${sheet}" cx="${center}" cy="${center}" r="36"/>
 <text x="${center}" y="${center + 5}" text-anchor="middle">You</text></svg>`;
 }
 function threadSVG(person) {
@@ -115,8 +118,9 @@ function render(report, reportDigest) {
   requireValue(typeof reportDigest === 'string' && /^[a-f0-9]{64}$/.test(reportDigest), 'Exact report byte digest required.');
   const model = graphModel(report);
   const { context, views } = report;
+  const scriptHash = crypto.createHash('sha256').update(GRAPH_SCRIPT).digest('base64');
   const rows = model.people.map(person => [
-    `<a href="#${person.anchor}">${person.label}</a>`, escape(person.personId), escape(person.band),
+    `<a href="#${person.anchor}" data-person="${person.anchor}">${person.label}</a>`, escape(person.personId), escape(person.band),
     `${person.directDays}/${person.periodDays}`, escape(count(person.observedDirectMessages)),
     String(person.group.observedPosted), escape(latest(person.latestObserved))
   ]);
@@ -144,12 +148,12 @@ ${escape(row.event.timestamp)}<pre>${escape(row.event.key)}</pre></li>`).join(''
   })}</pre></details><p><a href="#people">Back to people</a> | <a href="#map">Back to map</a></p></section>`).join('');
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-${scriptHash}'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Heartbeat local interaction graph</title>
 <style>
 *{box-sizing:border-box}body{margin:0 auto;padding:1rem;max-width:76rem;font:16px/1.5 system-ui,sans-serif;color:#17212b;background:#fff}
 h1,h2,h3,p,pre{overflow-wrap:anywhere}nav{display:flex;flex-wrap:wrap;gap:1rem}a{color:#064b9b}
-a:focus-visible,summary:focus-visible,.scroll:focus-visible{outline:3px solid #8a3600;outline-offset:3px}
+a:focus-visible,summary:focus-visible,.scroll:focus-visible,button:focus-visible,select:focus-visible,svg:focus-visible,#inspector:focus-visible{outline:3px solid #8a3600;outline-offset:3px}
 .scroll{overflow:auto;max-width:100%;margin:1rem 0}.map svg{width:100%;min-width:48rem;display:block}
 svg text{font:16px system-ui,sans-serif;fill:#17212b}svg .band-label{font-size:15px;paint-order:stroke;stroke:white;stroke-width:5px;stroke-linejoin:round}
 .band{fill:none;stroke:#8c959f;stroke-dasharray:3 5}.activity{stroke:#305c84;stroke-width:2}.membership{stroke:#59636e;stroke-dasharray:7 5;stroke-width:2}
@@ -160,8 +164,23 @@ table{border-collapse:collapse;min-width:100%;text-align:left}caption{text-align
 th,td{border:1px solid #8c959f;padding:.6rem;vertical-align:top}td pre{min-width:12rem}
 pre{white-space:pre-wrap;font-size:.85rem}li{margin-bottom:.5rem}.selection{border-top:2px solid #8c959f;padding:1rem 0;scroll-margin-top:1rem}
 .selection:target{border:3px solid #9b3800;padding:1rem;background:#fffaf0}.thread-wrap{overflow:auto}
+.enhancement{display:none}.graph-ready .enhancement{display:block}[hidden]{display:none!important}
+.workspace{margin:1rem 0}.workspace>*{min-width:0}.map-sheet{min-width:0}
+.toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.75rem 0}
+button,select{font:inherit;min-height:44px;max-width:100%;padding:.4rem .7rem;border:1px solid #59636e;border-radius:.4rem;background:#fff;color:#17212b}
+button{cursor:pointer}button:hover{background:#e8f1fa}label{font-weight:600}
+.interactive{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:1rem;align-items:start}
+.interactive .map svg{width:100%;min-width:0;height:auto;aspect-ratio:1;touch-action:pinch-zoom;user-select:none;background:#f8fafc;border:1px solid #8c959f;border-radius:.5rem}
+.interactive .map{margin:0;overflow:hidden}.interactive .band-label{display:none}.interactive svg text{font-size:23px}
+.inspector{border:1px solid #8c959f;border-radius:.5rem;padding:1rem;max-height:48rem;overflow:auto;background:#f8fafc}
+.inspector .selection{border:0;padding:0}.inspector h3{margin-top:0}.inspector .threads{min-width:30rem}
+.legend{display:flex;flex-wrap:wrap;gap:.4rem 1rem;padding:0;list-style:none}.legend li{border-left:4px solid #305c84;padding-left:.5rem}
+svg a[aria-current] .person{fill:#ffd9ad;stroke:#9b3800;stroke-width:5}
+.graph-ready .fallback-hint{display:none}.sheet-heading{margin:.5rem 0}
+@media(max-width:900px){.interactive{grid-template-columns:minmax(0,1fr)}.inspector{max-height:32rem}}
 @media(max-width:600px){body{padding:.75rem}h1{font-size:1.6rem}h2{font-size:1.3rem}th,td{padding:.45rem}}
-@media print{.scroll{overflow:visible}.map svg{min-width:0}a{color:inherit}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+@media print{.scroll{overflow:visible}.map svg{min-width:0}.enhancement{display:none!important}.interactive{display:block}.map-sheet[hidden]{display:block!important}a{color:inherit}}
 </style></head><body>
 <a href="#people">Skip map to accessible people table</a>
 <header><h1>Heartbeat local interaction graph</h1>
@@ -180,7 +199,7 @@ Channels: ${escape(context.filters.channels.join(', '))}.</p>
 <p>Report SHA-256: <code>${reportDigest}</code>. Collection SHA-256: <code>${escape(context.collectionDigest)}</code>.
 Mapping revision: ${escape(context.identityMappingRevision)}.</p>
 ${views.summary.statements.map(statement => `<p>${escape(statement)}</p>`).join('')}
-<details open><summary>Source status, retrieval freshness and coverage</summary>
+<details><summary>Source status, retrieval freshness and coverage</summary>
 <pre>${json({ sources: context.sources, sourceFreshness: context.sourceFreshness })}</pre></details>
 <details><summary>Exclusions, unresolved evidence and limitations</summary><pre>${json({
     filters: context.filters, exclusions: context.exclusions, audit: context.audit,
@@ -195,11 +214,30 @@ Inactive means no attributed direct/group posts with declared complete coverage,
 <p>Circles are people, rectangles are threads; solid lines are observed activity and dashed lines are membership only.
 Only direct activity makes a user spoke. Node labels show latest observed attributed activity (UTC month-day; ? means unknown), not confirmed meaningful contact.
 Group-only means only group activity was observed, not proof of no direct history.</p>
-<p>Tab then Enter selects a person; browser Back returns. On small screens, swipe/scroll the map horizontally
+<p class="fallback-hint">Tab then Enter selects a person; browser Back returns. On small screens, swipe/scroll the map horizontally
 or use the full-size linked people table. Each sheet repeats the same centered user and bands; no peers are omitted.</p>
-${Array.from({ length: model.sheets }, (_, sheet) => `<h3>Map sheet ${sheet + 1} of ${model.sheets}</h3>
-<p><a href="#map-self-${sheet}">Center this map on You</a></p>
-<div class="scroll map" tabindex="0" role="region" aria-label="Scrollable map sheet ${sheet + 1}">${mapSVG(model, sheet)}</div>`).join('')}
+<ul class="legend" aria-label="Map bands">${BANDS.map(band => `<li>${escape(band.label)}: ${model.people.filter(p => p.band === band.id).length} people</li>`).join('')}</ul>
+<div class="enhancement">
+<p>Choose a node or person to inspect evidence here. Drag empty map space to pan (mouse or one finger);
+use + / − and Fit for zoom, or focus the map and use arrow keys, + / − and Home. Browser pinch zoom remains available.
+Sheet and person controls navigate the entire cohort; they do not filter or regenerate report totals.</p>
+<div class="toolbar"><label for="person-picker">Inspect person</label><select id="person-picker">
+<option value="">Select a person</option>${model.people.map(person => `<option value="${person.anchor}">${person.label} · ${escape(person.band)} · ${escape(person.personId)}</option>`).join('')}</select></div>
+<div class="toolbar"><button id="previous-sheet" type="button">Previous sheet</button>
+<label for="sheet-picker">Map sheet</label><select id="sheet-picker">${Array.from({ length: model.sheets }, (_, sheet) => `<option value="${sheet}">${sheet + 1} of ${model.sheets}</option>`).join('')}</select>
+<button id="next-sheet" type="button">Next sheet</button></div></div>
+<div class="workspace"><div>
+${Array.from({ length: model.sheets }, (_, sheet) => `<section class="map-sheet"><h3 class="sheet-heading">Map sheet ${sheet + 1} of ${model.sheets}</h3>
+<div class="enhancement"><div class="toolbar" aria-label="Map camera controls">
+${[['in', 'Zoom in'], ['out', 'Zoom out'], ['fit', 'Fit'], ['left', 'Pan left'], ['right', 'Pan right'], ['up', 'Pan up'], ['down', 'Pan down']].map(([action, label]) => `<button type="button" data-camera="${action}">${label}</button>`).join('')}
+<output aria-label="Map zoom">100%</output></div></div>
+<p class="fallback-hint"><a href="#map-self-${sheet}">Center this map on You</a></p>
+<div class="scroll map" tabindex="0" role="region" aria-label="Scrollable map sheet ${sheet + 1}">${mapSVG(model, sheet)}</div></section>`).join('')}
+</div><aside class="inspector enhancement" aria-label="Selected person evidence">
+<h3>Person evidence</h3><p id="selection-status" role="status">Select a person to inspect their saved evidence.</p>
+<div class="toolbar"><button type="button" id="return-person">Return to selection</button>
+<button type="button" id="clear-selection">Clear selection</button></div>
+<div id="inspector" tabindex="-1" aria-label="Selected person details"></div></aside></div>
 </section><section id="people"><h2>People</h2>
 ${table(['Select', 'Canonical person', 'Band', 'Direct dates / period dates', 'Direct messages', 'Observed group posts', 'Latest observed'],
     rows, 'All reviewed peers, including inactive and unknown')}
@@ -215,7 +253,7 @@ ${table(['Local date', 'Partial date', 'Messages', 'Sent', 'Received', 'Other'],
 <p>Membership edges appear only for threads with included messages in this filtered report and overlapping
 membership intervals. Missing validity bounds remain unknown. Membership does not imply participation,
 direct activity, household membership or relationships between peers.</p>${details}</section>
-</body></html>\n`;
+<script>${GRAPH_SCRIPT}</script></body></html>\n`;
 }
 function run(request, folder = process.cwd()) {
   object(request, ['schemaVersion', 'dataClass', 'report', 'reportDigest', 'output'], 'request');

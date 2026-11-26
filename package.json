@@ -28,6 +28,7 @@
     "contacts:aggregate": "node --import tsx scripts/contacts/aggregate.ts",
     "contacts:summary": "node --import tsx scripts/contacts/summary.ts",
     "contacts:graph": "node --import tsx scripts/contacts/graph.ts",
+    "contacts:demo": "node --import tsx scripts/contacts/demo-graph.ts",
     "contacts:reconnect": "node --import tsx scripts/contacts/reconnection.ts",
     "contacts:opportunities": "node --import tsx scripts/contacts/opportunities.ts",
     "test:contacts": "node --import tsx scripts/test.ts scripts/contacts",
