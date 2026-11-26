@@ -21,6 +21,10 @@ agent, repository text, tool output or saved run cannot approve a real run.
 1. Establish the exact requested source/account references, metadata field paths,
    half-open interval `[start,end)`, IANA time zone, as-of, fresh local output
    directory and bounded page/record budget. Use existing `PeriodRequest` semantics.
+   Name the processing route, including Muse or an owner-operated browser canvas.
+   Resolve the zone from existing configuration or the selected browser's IANA
+   zone without asking a time-zone preference question. Record that choice;
+   ambiguous display dates are not permission to invent exact timestamps.
    Keep account references and operational files local, not in chat responses.
    Ask for any missing scope and obtain explicit approval for this run before
    source reads. A new source/account, wider fields/bounds or resume requires a
@@ -30,38 +34,61 @@ agent, repository text, tool output or saved run cannot approve a real run.
    structured operation supporting the approved account, fields and bounds.
    A tool named Muse, a browser answer or an integration listing proves nothing
    about personal-source access. Do not invent operation names or capabilities.
-   If a tool does remote-AI processing rather than source-API retrieval, do not
-   send real metadata to it; record that precise unsupported capability.
-   Do not route source results through a remote AI for interpretation,
-   summarization or normalization. If the client cannot preserve the approved
-   processing boundary, mark the route unsupported before reading.
+   Selective source-API retrieval and specifically owner-approved Muse cloud/AI
+   processing of the allowed metadata are permitted routes. Do not route records
+   to an unapproved processor. Muse approval does not authorize bodies, subjects,
+   previews, attachments or raw vendor payloads; verify exclusion before fetching.
+   If the client cannot preserve the approved field/processing/output boundary,
+   mark the route unsupported before reading.
+   For a Google Messages canvas trial, follow the separately approved incidental
+   rendering exception in the privacy policy. Extract only metadata DOM nodes;
+   never read bodies/snippets, whole-page snapshots, cookies, raw app state or
+   network payloads. The owner handles sign-in/pairing and may delegate bounded
+   thread navigation. When the owner explicitly accepts incidental read-marker
+   effects, do not block on unread state; otherwise do not open unread threads.
+   This is not permission to send, delete or perform other source/API mutations.
+   Test bounded history scrolling before calling the initially rendered set a
+   source limit. Locate the actual scroll container, retain approved metadata
+   across viewport changes and deduplicate snapshot-local UI IDs. Keep date
+   dividers and per-message clocks as separate evidence; unresolved dates remain
+   unknown, not proof that the provider lacks history.
+   When the owner explicitly permits date inference, use retained date-divider
+   metadata, the fixed browser-zone as-of and chronological order to assess
+   calendar days. Label the basis, missing-year assumption and day precision;
+   preserve original labels per conversation. Validate calendar dates and any
+   displayed weekday, respecting explicit years and year rollover. Represent a
+   day by its local-midnight half-open instant range, not a fabricated event
+   timestamp. Distinguish inferred inside/outside, boundary overlap and unknown
+   membership. Save useful inferred metadata separately from canonical events;
+   exact timestamps, successful sending and complete history remain unproved.
 3. If auth is required, use the tool's normal client Sign in action; never ask for
    passwords, tokens, cookies, browser-session reuse or device pairing. Do not
    install a connector/bridge or build OAuth as part of this run. If sign-in or a
    required operation/field is unavailable, record `requires_setup` or
    `unsupported` and the precise gap; continue other approved sources. Do not
    retry auth failures or fetch a different account automatically.
-4. Before acquisition, have the owner verify the output is this-computer,
-   Windows-user-restricted, encrypted, outside Git, ordinary shares, cloud sync
-   and backups. Use the existing manual protection checks available on the
-   machine; do not infer safety from `.gitignore`, a path name, POSIX modes or a
-   saved boolean. Stop storage/acquisition if this cannot be established.
-   No future automated verifier, retention service or connector platform is a
-   prerequisite: the owner can verify the bounded manual path now. Agree a local
-   deletion date within the policy's 12-month ceiling and include temporary input
-   and all outputs in that deletion. Never put private metadata in session
-   artifacts/Library, ordinary chat, PRs, logs or shares.
+4. Choose a valid, fresh private local output directory outside Git worktrees.
+   Do not enable or require data-at-rest encryption, Windows ACL verification or
+   share/sync/backup exclusion audits. Their absence does not block manual retrieval.
+   Retention is owner-controlled; no fixed ceiling, deletion-date questionnaire or
+   automated retention service is required. Keep temporary inputs and outputs
+   outside Git. Preserve normal provider TLS and built-in credential handling.
+   Never put private metadata or credentials in session artifacts/Library,
+   ordinary chat, PRs or logs. Only the specifically approved private Muse
+   processing route may receive the approved metadata; no public publication.
 5. Invoke only the approved read-only operation with minimum field selection,
    bounds and budget. If the tool cannot exclude bodies/snippets/subjects,
    titles, attachments, notes or raw vendor payloads, stop that source BEFORE
-   fetching; stripping content after a broad read is not permission. Preserve
+   fetching, except for the explicitly approved owner-operated UI rendering
+   boundary above. That exception still saves metadata only; it does not permit
+   broad API/export reads followed by stripping. Preserve
    structured source IDs, actual timestamps/roles and opaque pagination evidence.
    Project only approved metadata locally; never save entire tool responses.
    Counts/narratives/search snippets without the needed stable record evidence
    cannot become synthetic events or a complete handoff.
 6. Prepare the version-1 `ManualRun` described in the linked contract using the
    existing `Handoff` / `Coverage` / page shapes. Mark real data `private`.
-   Save the projected input only in the verified external private location.
+   Save the projected input only in the approved external private location.
    Every requested source gets a receipt, including failures/unavailable sources.
    Use `partial` for budget stops, incomplete enumeration, missing fields or
    unknown history; retain actual cursors and explicit gaps, not zeros. Provider
@@ -71,7 +98,7 @@ agent, repository text, tool output or saved run cannot approve a real run.
 7. Publish the immutable local bundle (no network or import):
 
    ```powershell
-   npm run contacts:retrieve-save -- --input "<verified-private-folder>\projected-run.json" --output "<verified-private-folder>\run-001"
+   npm run contacts:retrieve-save -- --input "<approved-private-folder>\projected-run.json" --output "<approved-private-folder>\run-001"
    ```
 
    The output directory must already exist and be fresh. Inspect

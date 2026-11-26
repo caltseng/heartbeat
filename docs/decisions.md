@@ -2,7 +2,7 @@
 
 ## Decision log
 
-One repository-wide record of delegated engineering choices from 2026-11-24/25. The tables retain their original alternatives, assumptions, validation scope and revisit conditions. They are historical implementation rationale, not fresh execution status or consent. Statements that a later item was pending describe the original decision; current contracts and the [stable register](spec/contacts-work-items.md) govern implemented capabilities. The [owner-approved policy](privacy.md) governs privacy. None of these choices approves source/account access, raw-content processing, private import, remote AI, sending, pairing or schedules. Manual [V0 retrieval](spec/contacts-manual-retrieval.md) remains a separate per-run-approved source-API handoff, not importer authorization.
+One repository-wide record of delegated engineering choices from 2026-11-24/25. The tables retain their original alternatives, assumptions, validation scope and revisit conditions. They are historical implementation rationale, not fresh execution status or consent. Statements that a later item was pending describe the original decision; current contracts and the [stable register](spec/contacts-work-items.md) govern implemented capabilities. The [owner-approved policy](privacy.md) governs privacy. None of these choices approves source/account access, raw-content processing, private import, remote AI, sending, pairing or schedules. Manual [V0 retrieval](spec/contacts-manual-retrieval.md) remains a separate per-run-approved metadata handoff, including specifically approved Muse processing under the revised manual policy, not importer authorization.
 
 ### Branding
 

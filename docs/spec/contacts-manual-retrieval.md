@@ -9,9 +9,10 @@ account was accessed or connected by this change.
 
 For source feasibility and iteration, use the [retrieval
 plan](contacts-retrieval-plan.md): Android SMS/MMS, Google contacts, Gmail,
-personal Messenger/WhatsApp, GroupMe and Muse device/cloud distinctions. It
-records public API evidence and alternatives, not installed-tool or live-access
-proof. Research-only planning does not require private storage or authentication;
+personal Messenger/WhatsApp, GroupMe, personal Instagram DMs and Muse device/cloud
+distinctions. It records public API evidence, credential-free client checks and
+alternatives, not live-access proof. Research-only planning does not require
+private storage or authentication;
 the gates below apply before actual acquisition/storage.
 
 ## Owner walkthrough
@@ -30,11 +31,13 @@ the gates below apply before actual acquisition/storage.
    selective-field access, stable IDs or safe processing route produces
    `unsupported` with the missing capability named. Other approved sources may
    proceed; neither outcome is an empty source.
-3. Verify effective Windows-user access, disk encryption and exclusion from
-   ordinary shares/sync/backups for the external local directory before retrieval.
-   Arrange deletion of inputs/outputs within 12 months. These are manual safety
-   checks, not a requirement to build an automated verifier/retention platform.
-   Unverified safety or unclear processing stops the affected run before reads.
+3. Choose a fresh private local output directory outside Git worktrees. The
+   [owner's manual-policy revision](../privacy.md#owner-authorized-manual-v0-retrieval)
+   removes mandatory encryption, ACL verification, share/sync/backup audits and
+   the fixed retention ceiling; do not enable encryption or block on those checks.
+   Normal client credential handling/TLS remain. For Muse, explicitly approve
+   its cloud/AI processing of the selected metadata for this run. Unapproved
+   processing or inability to exclude content still stops the route before reads.
 4. Inspect the saved `manual-handoff.json` **locally**, including each account's
    tool provenance, actual record IDs/timestamps, requested bounds, coverage,
    unknowns and unfinished cursors. Do not upload it, add it to Library, put it
@@ -43,8 +46,8 @@ the gates below apply before actual acquisition/storage.
    new directory; the saver never fetches, resumes or overwrites automatically.
 
 **Owner live trial still required:** actual client skill discovery, normal source
-sign-in, inspected authenticated tool operation/field support, local processing
-and filesystem protections, and inspection of one owner-approved bounded real
+sign-in, inspected authenticated tool operation/field support, the approved
+processing/output boundary, and inspection of one owner-approved bounded real
 handoff. Synthetic tests cannot establish any of these live facts. A Muse name
 or a previously successful narrative query is not structured metadata evidence.
 
@@ -95,12 +98,69 @@ manual retrieval skill.
 
 ## Processing and failure semantics
 
-Source-API reads through an approved authenticated tool differ from sending
-collected metadata to remote AI. The latter remains prohibited. Inspect the
-tool's processing behavior before a read; if the available client/route cannot
-honor this boundary, mark it unsupported. A tool exposing a remote-AI prompt is
-not interchangeable with a selective structured source read. Normal client
-sign-in grants tool access, not broader field/content or per-run consent.
+Source-API reads and specifically owner-approved Muse cloud/AI processing of
+allowed metadata are distinct permitted routes for this manual workflow.
+Inspect processing, field exclusion and output behavior before a read; an
+unapproved processor or a route that cannot preserve those boundaries is
+unsupported. A remote-AI prompt, prose count or JSON-looking answer alone is
+not stable provider-record evidence. Muse approval does not authorize broad
+content reads followed by stripping. Normal client sign-in grants tool access,
+not broader field/content or per-run consent. The revised manual storage/
+retention policy does not change private-import guards.
+
+For the separately approved Google Messages canvas trial, the owner may allow
+incidental rendering of content by the first-party web client while the
+extractor reads only metadata DOM nodes. The owner signs in/pairs normally and
+may delegate bounded conversation navigation, including explicitly accepted
+read-marker effects. Do not add an unread-state gate after that approval.
+Do not extract cookies, inspect raw app/network state or snapshot the whole
+private page; other source mutations remain unauthorized.
+Use the browser's configured zone without another time-zone question. Exact
+IDs/timestamps/direction/transport still need evidence; ambiguous labels and
+conversation-list activity cannot become message events or "last sent" dates.
+An owner-local save must stay outside Git/Library/logs; no content is exported.
+This limited UI exception is not authorization for content-bearing APIs/exports
+or downstream private import.
+
+The initially rendered message set is not an established history limit. Test
+the actual scroll container within the approved budget; older history can load
+at the upper boundary while the client restores the viewport anchor. Preserve
+selected metadata across loads, deduplicate snapshot-local IDs and disclose a
+budget/no-progress stop. Incomplete scrolling and unresolved date parsing are
+retrieval limitations, not proof that Google Messages cannot supply the period.
+
+The near-term DOM projection may publish a partial thread-reference handoff
+without message events when exact timestamps/identity evidence is absent.
+Keep its IDs explicitly snapshot-local and coverage unknown; empty event arrays
+do not establish zero interaction. Selected UI ID/direction/transport/date-label
+observations may be preserved in a separate metadata-only input file, without
+pretending that uncertain labels are canonical event timestamps or verified
+in-period records. Do not copy a divider's clock onto every message.
+
+With explicit owner approval, save inferred calendar-day metadata as a useful
+separate observation subset rather than withholding it for lack of native exact
+times. Preserve original date labels with conversation/row provenance, the
+fixed browser-zone date context, inference basis, missing-year assumptions and
+day precision. Respect explicit years; reject impossible dates and weekday
+mismatches, and handle year rollover using chronological constraints.
+Use a calendar-day instant range to label inferred inside/outside, boundary
+overlap or unknown window membership. A boundary-overlapping day is only a
+candidate, not a confirmed in-period message. Missing dividers stay unknown.
+Neither a latest-compatible-year heuristic nor an outgoing UI flag verifies
+native time, successful sending or per-person activity. Keep canonical event
+arrays empty when their required evidence is absent; existing importer guards
+and exact event contracts do not change.
+
+Use automatic browser downloads only after a synthetic routing probe establishes
+the approved local destination without Library capture. Move only the exact
+named private download into the fresh external input folder, preserving original
+bytes; reference that file from a separate canonical projection. A native file
+picker is a fallback requiring an owner save, not an inherent manual hop.
+Neither route may paste JSON records into tools. The saver then validates/
+publishes the private projection with exit 2 for its declared gaps. Never report
+publication until the file and bundle are verified. New requested bounds require
+a fresh capture/output, not a relabeled earlier snapshot; use the existing
+`custom` period for a fourteen-day window.
 
 On auth failure stop that source and request its normal client sign-in; never
 extract credentials or use another account. On a budget, paging, field or history
