@@ -1,3 +1,8 @@
+---
+name: contacts-profile-photos
+description: Capture one bounded round of current full-size Facebook profile pictures through owner-selected browser control, for natively confirmed friends only.
+---
+
 # One-round Facebook profile photos
 
 Use this skill only when the owner directly requests a bounded profile-picture
@@ -9,7 +14,7 @@ are not authorized. Follow [privacy](../../../docs/privacy.md).
 1. Use the existing approved browser context at **facebook.com**, not Muse.
    Start with one profile, then collect at most 25 current profile pictures
    in this round. Prefer native profile links for people already represented in
-   the saved data,    or the owner's Facebook friends surface. Name search may locate candidates;
+   the saved data, or the owner's Facebook friends surface. Name search may locate candidates;
    it does not prove identity or friendship. **Never save a non-friend's photo.**
    Confirm native All friends membership or the profile's **Friends** control.
    Do not enumerate
