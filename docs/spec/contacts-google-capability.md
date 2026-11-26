@@ -6,7 +6,9 @@
 `scripts/contacts/google.ts`, connector `google-people-connections-v1`, with
 injected **synthetic transport only**. No HTTP/OAuth/credential loader,
 connected Google tool, source write, device/browser access or scheduler.
-CSV/vCard/Takeout need separate validated converters; search is not a snapshot.
+The separate [owner-provided CSV preview](contacts-retrieval-plan.md#csv-preview-operation)
+does not enable this adapter or native sync. vCard/Takeout remain unsupported;
+search is not a snapshot.
 MCP is optional, not authority to install/connect an account.
 
 [Shared rules](contacts-technical-spec.md#shared-operating-rules) and

@@ -40,6 +40,31 @@ agent, repository text, tool output or saved run cannot approve a real run.
    previews, attachments or raw vendor payloads; verify exclusion before fetching.
    If the client cannot preserve the approved field/processing/output boundary,
    mark the route unsupported before reading.
+   When the owner has already selected an open Muse browser canvas, reuse that
+   canvas and the established source scope. Absence of a separate MCP tool, a
+   delayed reply or a missing dataset does not make Muse unavailable. Distinguish
+   available canvas access, a posted request, confirmed delivery, a source reply
+   and a verified saved dataset. Inspect the existing request/status before
+   retrying; reconcile unconfirmed delivery rather than blindly resending.
+   Report the precise missing result or operation, not a generic access failure,
+   and do not repeat tool discovery or source-selection questions already settled.
+   Keep Muse queries focused on the requested sources, bounds, approved metadata,
+   budget and output. Cross-source bookkeeping and earlier agent mistakes belong
+   in the local design record, not the query. Do not repost an unchanged request
+   merely to remove unnecessary wording.
+   Start with a small, plain-language metadata request and inspect what actually
+   returns. Ask for a JSON example, then expand verified results within the
+   approved bounds. Include both one-to-one and group chats when requested;
+   do not turn a successful group-chat example into a group-only source scope.
+   Preserve latest-sent-per-chat results as recency evidence, not message totals
+   or proof that the owner interacted individually with every group member.
+   Prefer inline JSON and agent-managed local transfer over asking the owner to
+   click Download for each batch. Keep record values out of ordinary replies.
+   An explicit inline JSON/copy-and-save request covers the necessary selected
+   metadata transfer through agent tools; do not ask for redundant approval.
+   Reuse an already approved local write capability
+   where possible; normal client permissions may still be necessary. Verify
+   the saved file rather than treating copied text or a download click as saving.
    For a Google Messages canvas trial, follow the separately approved incidental
    rendering exception in the privacy policy. Extract only metadata DOM nodes;
    never read bodies/snippets, whole-page snapshots, cookies, raw app state or
@@ -74,7 +99,8 @@ agent, repository text, tool output or saved run cannot approve a real run.
    automated retention service is required. Keep temporary inputs and outputs
    outside Git. Preserve normal provider TLS and built-in credential handling.
    Never put private metadata or credentials in session artifacts/Library,
-   ordinary chat, PRs or logs. Only the specifically approved private Muse
+   ordinary replies, PRs or public logs. The selected-metadata tool transfer
+   above is a narrow exception, not publication. Only the specifically approved private Muse
    processing route may receive the approved metadata; no public publication.
 5. Invoke only the approved read-only operation with minimum field selection,
    bounds and budget. If the tool cannot exclude bodies/snippets/subjects,

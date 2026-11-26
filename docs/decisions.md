@@ -4,6 +4,24 @@
 
 One repository-wide record of delegated engineering choices from 2026-11-24/25. The tables retain their original alternatives, assumptions, validation scope and revisit conditions. They are historical implementation rationale, not fresh execution status or consent. Statements that a later item was pending describe the original decision; current contracts and the [stable register](spec/contacts-work-items.md) govern implemented capabilities. The [owner-approved policy](privacy.md) governs privacy. None of these choices approves source/account access, raw-content processing, private import, remote AI, sending, pairing or schedules. Manual [V0 retrieval](spec/contacts-manual-retrieval.md) remains a separate per-run-approved metadata handoff, including specifically approved Muse processing under the revised manual policy, not importer authorization.
 
+### Local contacts and dashboard direction (2026-11-26)
+
+[Selected design and current limits](spec/contacts-retrieval-plan.md#local-contacts-store-and-dashboard-selected-design);
+[owner-approved design boundary](privacy.md#approved-local-contacts-and-dashboard-design).
+These decisions do not mark the refresh/dashboard implementation delivered.
+
+| Decision / rationale | Rejected assumption / remaining work |
+| --- | --- |
+| Seed a local JSON contacts store from Google while retaining Heartbeat's stable canonical-person IDs and independent curated records. | Google is not the canonical relationship store; source changes cannot erase notes or relationship history. |
+| One user-initiated, read-only refresh should validate a bounded snapshot and update an offline dashboard; incremental refresh follows only verified native support. | No recurring automation, hosted backend or source writes. Current contacts acquisition/identity/graph commands remain synthetic-only. |
+| Use official Google `gwscli` Personal mode, as selected by the owner. | Installed community `gws` is a different client; its offline field-mask proof cannot establish official-client schemas or contact snapshot/sync support. |
+| Official Personal mode client creation/download/registration is acceptable; prioritize local retrieval without building or publishing an application. | The owner clarified this explicitly; treating the client-file step as a rejected blocker was an incorrect interpretation. Keep normal client setup/sign-in distinct from automatically saving retrieved contact metadata; no credential extraction or client substitution. |
+| Phone/email evidence can suggest identity matches; names cannot justify merges. | Current Messages observations lack verified participant-number links. A contacts import alone cannot turn opaque conversations into attributed people or verified last-sent activity. |
+| The owner approved a narrow local contacts/dashboard design using approved metadata, with existing private guards unchanged. | Design approval is not source/account/per-run permission or proof of an implemented import path. Validate with synthetic fixtures and obtain independent exact-head review before a bounded live invocation. |
+| Start the proof with the owner-provided contacts CSV and saved Google Messages observations; add more sources later. | API setup and future sync must not block this slice. CSV row IDs are exact-export-local, not provider IDs or automatic cross-export matches. |
+| Reuse the already-open Muse canvas and previously established source scope; requests have already been posted there. | No verified dataset yet is not unavailable canvas access. Separate submission, confirmed delivery, returned records and local persistence; reconcile uncertain delivery before retries and do not repeat settled integration/source questions. |
+| Muse is the selected route for personal Facebook Messenger and Instagram DMs; Google Messages has its own canvas capture and contacts currently use the provided CSV. | Requesting duplicate Google Messages history from Muse was an incorrect source mapping. Stop the duplicate; keep Instagram distinct instead of relabeling it to satisfy existing source enums. |
+
 ### Branding
 
 [Current contract](spec/heartbeat-branding.md).

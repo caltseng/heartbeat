@@ -39,22 +39,174 @@ walkthrough consistent with approach changes. Cite public evidence here, but kee
 account bindings, approvals, records and operational files private. A feasibility
 finding does not itself amend privacy policy or approve a run.
 
+## Local contacts store and dashboard: selected design
+
+Owner-selected direction, 2026-11-26. This is an approved design, not a delivered
+refresh command, connected Google account or permission for an unlimited run.
+The [policy record](../privacy.md#approved-local-contacts-and-dashboard-design)
+records the narrow local-only extension; existing private importer, adapter,
+identity-review and graph guards remain unchanged.
+
+| Decision | Intended mechanism / current limit |
+| --- | --- |
+| Local contacts store, not Google as the canonical store | Reuse local JSON and Heartbeat's stable person IDs. Keep Google provider IDs and source snapshots separate from curated records. Google changes/deletions must not overwrite notes, relationship history or canonical-person decisions. No database server or hosting. |
+| One user-initiated refresh pipeline | The initial CSV command saves locally and generates an offline dashboard in one invocation. Full People API refresh, native pagination/sync and a dashboard refresh action remain future integration. No recurring schedule or source writes. |
+| Official Google `gwscli` Personal mode | The owner selected this client first. Its installed Windows contact-search schema does not support the requested full contacts store. After that limitation was verified, the owner explicitly approved community `gws` as the future full read-only People API transport. Do not conflate the clients or treat either offline discovery as live retrieval. CSV is the current input; no contact API has been authenticated or called. |
+| Normal Personal mode setup is acceptable | The owner clarified that creating/downloading/registering the official OAuth client is fine; the goal is local data retrieval without building or publishing an application. An earlier interpretation that the client-file step was a blocker was incorrect. Use normal owner-operated client setup/sign-in, keep credentials private and outside Git, and save retrieved metadata automatically rather than requiring repeated browser downloads. |
+| Contact fields and source coverage | Proposed fields are Google contact IDs, names, phone numbers, email addresses and minimal revision/deletion evidence. No notes, photos, birthdays, content or unrelated Google services. Verify an actual complete-list operation and pre-read selection; contact search is not a complete snapshot. Contact presence is not communication activity. |
+| Initial full snapshot, then incremental refresh where supported | Advance the native sync token/checkpoint only after all approved pages validate and persist. Preserve last-good data on failures. Native sync/deletion support in the selected official client must be inspected before implementing this promise; the existing synthetic adapter is not live proof. |
+| Conservative identity linking | Use phone/email evidence to suggest matches; keep ambiguous/shared/stale identities unresolved and never merge by display name. The current Messages capture has opaque conversation IDs, not verified participant-number evidence, so importing contacts alone cannot attribute those messages. No extra participant read is implicitly authorized. |
+| Offline dashboard using approved saved metadata | Clearly distinguish inferred calendar days, boundary candidates, unknown dates and incomplete source coverage. Do not relabel observations as canonical events, claim successfully sent direct messages, infer relationship quality or reset confirmed meaningful connections. Keep generated files outside Git, Library and tool logs. |
+
+Build and validate with synthetic fixtures, then obtain independent review of
+the exact implementation before any separately approved bounded live invocation.
+Design approval and source sign-in are not permission to run private imports,
+read more source fields, install/connect another route or enable a schedule.
+
+### Build with available captures first
+
+The owner supplied a Google Contacts CSV and selected it as the initial contacts
+input. Build the local dashboard with that export and the saved Google Messages
+metadata now; future source integration and API refresh must not delay the
+first proof of the flow. Retain selected contact name/email/phone columns only.
+Other export columns may contain excluded information: do not display, analyze
+or put their values in normalized output. Keep the owner-provided original and
+all generated files private and outside Git.
+
+CSV does not establish stable Google provider IDs or incremental sync. Bind
+local row IDs to the exact export bytes and retain provenance; repeated imports
+of identical bytes may reuse those IDs, but another export needs explicit
+reconciliation. Never merge people by names or shared addresses automatically.
+The first preview must preserve anonymous/unlinked conversations, inferred-day
+precision and incomplete coverage rather than inventing person attribution.
+
+Muse is already accessible through the owner-selected browser canvas, and
+requests have been posted there. Calling Muse unavailable because its dataset
+has not yet been retrieved was an incorrect description of access. Reuse the
+existing canvas and settled source scope; do not restart integration discovery.
+The owner clarified the exact source mapping: **Muse retrieves personal
+Facebook Messenger and Instagram DMs; Google Messages uses its separate canvas
+capture; contacts currently use the owner-provided Google CSV.** A duplicate
+Google Messages request through Muse was incorrect and was stopped.
+Do not reinterpret Muse as another Android/Google Messages route or ask the owner
+to repeat this already-settled selection. Future OAuth/API refresh is separate
+from building with the available snapshots now. Instagram remains a distinct
+supplemental source; do not relabel its records as Messenger to fit an existing
+source enum or bypass private importer contracts.
+Track canvas access, request submission, delivery confirmation, a returned
+dataset and verified private persistence as separate states.
+The inspected request showed **Delivery not confirmed** and disappeared on a
+normal reload. That is client-delivery evidence, not an authentication failure,
+an absent canvas or proof that native source access is unsupported.
+Reconcile the existing request before any bounded retry. Until source records
+are verified, the dashboard must say **Muse data not yet retrieved**, not imply
+zero messages or that the service itself is unavailable.
+The corrected Messenger/Instagram metadata request has been posted in the
+existing canvas. Submission is not evidence of returned source records or
+verified private persistence.
+Keep the Muse query source-specific: Facebook Messenger and Instagram, requested
+period, metadata fields, bounded retrieval and structured output. Unrelated
+Google Messages status and agent correction history are local coordination
+notes, not necessary query content. Do not resend unchanged requests just to
+clean up wording.
+
+The owner demonstrated that a short Muse request for latest sent-message times
+and group participants returns useful information. Use that incremental approach
+instead of demanding a complete collector contract in the first prompt: obtain a
+small result, request JSON, inspect its fields and provenance, then expand within
+the approved scope. Both one-to-one and group chats are required for Facebook
+Messenger and Instagram; the successful group example is not a group-only limit.
+The owner prefers inline JSON followed by agent-managed local transfer, not
+manual Download clicks per batch. Automate that transfer using an approved local
+write capability without copying record values into ordinary replies. The
+owner's explicit inline JSON/copy-and-save instruction covers necessary selected
+metadata transfer through agent tool history; do not add a redundant approval.
+Normal client permissions are distinct from per-batch download work. Confirm
+actual local persistence, and use an already downloaded file rather than making
+the owner retrieve the same result again.
+Latest sent-message timestamps establish chat-level recency, not total message
+counts or individual interaction with every group member. A small Messenger JSON
+example returned structured metadata, and a subsequent small Messenger batch
+returned both one-to-one and group chat kinds, participant lists, reported chat
+IDs and timestamp values. This verifies the conversational JSON route, not native
+enumeration completeness or independent ID/timestamp corroboration. Instagram
+reported not connected in its associated response. No Instagram records were
+saved; this does not block Messenger. Private output preserves those limits.
+
+### Current profile pictures
+
+The owner separately requested a one-round profile-picture pass, explicitly
+using Facebook browser control rather than Muse. The
+[dedicated skill](../../.github/skills/contacts-profile-photos/SKILL.md) selects
+native profile/friend-card references, verifies native friendship and excludes
+non-friends. Name search is candidate discovery only. Expand the current profile
+picture in its native full-screen viewer and retain its photo reference and
+displayed full-size image URL, with a 25-image attempt budget.
+`contacts:photos` saves only observed Facebook-CDN
+raster assets to a fresh private external bundle and offline gallery. Missing
+photos, source failures, partial enumeration and unresolved canonical contact
+links remain explicit. No image-based or display-name identity matching,
+historical media, profile content, source writes or recurring refresh.
+
+### CSV preview operation
+
+After synthetic validation and independent review, the owner-approved local
+operation accepts the supplied Google CSV and optional saved UI observation file:
+
+```powershell
+npm run contacts:csv -- --input "<owner-provided-contacts.csv>" --observations "<saved-ui-metadata.json>" --output "<fresh-existing-external-directory>"
+```
+
+It writes an atomic `preview` subdirectory with original input bytes,
+`contacts.json`, independent `people.json`, `contact-import.json` and
+`dashboard.html`. Inputs are bounded to 10 MB; CSV is limited to 5,000 logical
+data rows, and Messages observations to 200 records across three conversations.
+Original Messages bytes and their digest remain bound to the validated projection.
+Malformed inputs fail before publication. Existing output is never overwritten.
+Exit **2** means a persisted partial preview, not a failed save; exit **1** means
+no preview was published. There is no complete-coverage success claim.
+
+Open `preview\dashboard.html` locally. Search/select contacts independently of
+anonymous conversations; inspect inferred-day activity and explicit uncertainty.
+Shared normalized addresses are suggestions, never automatic merges. The source
+cards do not claim Muse records are in this bundle until they are integrated.
+No network calls, source writes, hosting, scheduling, API refresh or existing
+private importer/aggregation/graph bypass occurs.
+
+Add `--muse "<saved-recency.private.json>"` for an approved local Muse projection;
+repeat it for a second source. Each file uses `kind: muse-reported-chat-recency`,
+`dataClass: private`, source `messenger` or `instagram`, reported chat IDs/types,
+participants, latest sent timestamps, `nativeEvidenceVerified: false`, partial
+coverage and explicit gaps. Limit each source to 100 chat records and reject
+duplicate source snapshots, duplicate reported chat IDs, unsupported/content
+fields or invented native corroboration. Original bytes and digests are preserved.
+The preview presents one-to-one and group recency separately from observed
+message-frequency metrics; it does not link participants by name or force
+Instagram into the Messenger enum. Missing files/results remain unknown.
+
 ## Google client and authentication evidence
 
 Keep these two clients distinct:
 
 | Client | Verified evidence | Remaining work |
 | --- | --- | --- |
-| Community `gws` (`googleworkspace/cli`), locally installed 0.22.5 | Public schemas and offline GET serialization support People/Gmail field masks. A credential-free login preflight stops with `No OAuth client configured`, exit 2, before browser sign-in. | Configure or reuse a Desktop OAuth client privately, inspect auth scopes/processing and obtain separate bounded-run approval. No live API acceptance or account read has been proved. |
-| Official Google `gwscli` | Google's documentation offers Personal mode for a single-user OAuth client, automatically enables core services and skips consent-screen setup/app verification. No application needs to be built or published. | Select/create a personal-mode Cloud project, create/download the client JSON, register it locally and sign in. This client is not installed or authenticated here; command schemas/metadata field exclusion still need verification. |
+| Community `gws` (`googleworkspace/cli`), locally installed 0.22.5 | Public schemas and offline GET serialization support People/Gmail field masks. A credential-free login preflight stops with `No OAuth client configured`, exit 2, before browser sign-in. | Owner-approved future full People API transport after official search limitations were verified. Refresh is deferred; no live API acceptance or account read has been proved. |
+| Official Google `gwscli` | Installed Windows client reports `1.0.6.1026726559`. Offline help and contact-search output schema were inspected. Personal mode client registration/sign-in is acceptable normal setup; no application needs to be built or published. | Actual People commands provide profile, contact search and directory search, not a full contact list/sync operation. Contact search exposes names/emails only, capped at 30 results, without provider IDs, phone numbers or pagination/sync evidence. Authentication and live retrieval remain unverified. |
 
 The official [Personal mode setup](https://developers.google.com/workspace/guides/workspace-cli#personal-mode)
 is a simpler authentication candidate than manually configuring a consent screen.
 It still registers an OAuth client; it is not a bundled-client, setup-free login.
-Use normal owner-operated setup/sign-in and minimum command/service scopes, not
+The documentation rechecked on 2026-11-26 explicitly says to click **Create
+Client**, download the client secret JSON and register it with `gwscli auth
+setup`. The official user guide likewise describes bring-your-own-client or
+bring-your-own-token authentication; it does not establish an automatic
+client-file-free login. Do not request pasted credentials/tokens as a workaround.
+Any viable route must use normal client setup/sign-in and minimum service scopes, not
 all-service authorization. Registration, API enablement and sign-in are separate
 owner actions, not authorized by this research.
-People commands are documented as Developer Preview. Official `gwscli` uses
+People commands are documented as Developer Preview requiring an enrolled Cloud
+project. A complete contact snapshot with native pagination/sync has not been
+verified merely from documented contact search. Official `gwscli` uses
 Google's Workspace MCP-backed commands (People uses the People API directly);
 do not assume its commands accept community `gws` masks or have identical
 processing/output behavior. Gmail, Calendar and Drive access for a general
@@ -72,6 +224,21 @@ forwarding, not live retrieval or completeness. The installed release resolves
 OAuth client credentials before login and also adds identity scopes even with
 custom source scopes; inspect that behavior before approving sign-in.
 No credential or actual account binding belongs in this plan.
+
+**Executed offline proof for official `gwscli`:** `version`, `people --help`,
+`people search_contacts --help` and `people search_contacts --schema` ran without
+source reads. Available People commands are `get_user_profile`,
+`search_contacts` and `search_directory_people`. `search_contacts` accepts a
+query and `maxResults` (default 10, maximum 30); its response is
+`results:[{name,email}]`. No phone number, stable provider contact ID, page
+continuation or sync token is exposed, and no field-mask flag is listed.
+This verified command cannot supply the proposed complete phone-linked contacts
+snapshot. Do not sweep search queries and call the union a complete sync.
+Native People `people.connections.list` remains the full-snapshot API candidate;
+using another client/transport requires an explicit route decision, not silent
+substitution or token extraction. No contact, profile or directory query ran.
+Subsequent inspection commands disable optional usage telemetry with
+`GWSCLI_TELEMETRY_ENABLED=0`.
 
 Sources: [pinned community README](https://github.com/googleworkspace/cli/blob/v0.22.5/README.md),
 [pinned auth implementation](https://github.com/googleworkspace/cli/blob/v0.22.5/crates/google-workspace-cli/src/auth_commands.rs),

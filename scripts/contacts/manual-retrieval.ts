@@ -122,7 +122,7 @@ function validateHandoff(source: ManualSource, dataClass: string, period: Return
     'Unfinished pagination must remain partial.');
 }
 
-function saveManualRun(input: ManualRun, output: string) {
+function validateManualRun(input: ManualRun) {
   object(input, ['schemaVersion', 'dataClass', 'period', 'sources'], 'run');
   requireValue(input.schemaVersion === 1 && ['private', 'synthetic'].includes(input.dataClass), 'Invalid run version/data class.');
   const period = resolvePeriod(input.period);
@@ -151,9 +151,13 @@ function saveManualRun(input: ManualRun, output: string) {
       requireValue(source.handoff === null && source.gaps.length > 0, 'Unavailable/failed sources need explicit gaps, not fabricated pages.');
     }
   }
+  return period;
+}
+
+function manualOutputLocation(output: string, dataClass: string): string {
   const folder = outputLocation(output);
   requireValue(fs.statSync(folder).isDirectory() && fs.realpathSync(folder) === folder, 'Choose an existing, non-redirected output directory.', 'unsafe_output');
-  if (input.dataClass === 'private') {
+  if (dataClass === 'private') {
     requireValue(!folder.startsWith('\\\\'), 'Private output must be on this computer.', 'unsafe_output');
     for (let ancestor = folder; ; ancestor = path.dirname(ancestor)) {
       requireValue(!fs.existsSync(path.join(ancestor, '.git')), 'Private output must be outside every Git worktree.', 'unsafe_output');
@@ -161,9 +165,15 @@ function saveManualRun(input: ManualRun, output: string) {
     }
     requireValue(!within(path.resolve(__dirname, '..', '..'), folder), 'Private output must be outside the checkout.', 'unsafe_output');
   }
+  return folder;
+}
+
+function saveManualRun(input: ManualRun, output: string) {
+  const period = validateManualRun(input);
+  const folder = manualOutputLocation(output, input.dataClass);
   const file = path.join(folder, 'manual-handoff.json');
   publish(file, { ...input, period });
-  return { file, exitCode: sources.every(source => source.status === 'collected') ? 0 : 2 };
+  return { file, exitCode: input.sources.every(source => source.status === 'collected') ? 0 : 2 };
 }
 
 if (require.main === module) {
@@ -180,5 +190,5 @@ if (require.main === module) {
   });
 }
 
-export { saveManualRun };
+export { saveManualRun, validateManualRun, manualOutputLocation };
 export type { ManualRun, ManualSource };

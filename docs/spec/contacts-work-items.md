@@ -25,7 +25,7 @@ not five implemented live connectors.
 
 Confirmed scope is a **single-user local tool and local JSON store** in Heartbeat.
 Prove the flow first; defer polished design. All remaining reporting/graph work
-targets local CLI output or generated private files, not a hosted website,
+targets local CLI output or generated private files, not a hosted website or
 dashboard, backend, multi-tenant infrastructure or product account system.
 
 ## Smallest end-to-end slices
@@ -42,6 +42,13 @@ is a user-invoked, per-run-approved route through available authenticated tools.
 It saves metadata and precise unavailable/partial evidence locally, not an
 imported graph. No new connector or automation platform is a prerequisite.
 This does not relabel any existing CONTACTS adapter as live-capable.
+
+**Owner-approved local-file preview:** the separate
+[`contacts:csv` operation](contacts-retrieval-plan.md#csv-preview-operation)
+projects owner-supplied contact fields, saved UI observations and optional
+Muse-reported recency into an offline private dashboard. It preserves partial
+coverage and unresolved identities without enabling the generic private
+collection/aggregation/graph pipeline or changing stable item acceptance.
 
 **First real-data import slice (not delivered):** enforce the approved CONTACTS-010 policy
 with verified local protection and retention/deletion controls, obtain private

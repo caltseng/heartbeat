@@ -66,7 +66,11 @@ test('all public output roots reject docs, tooling, private data, checkpoints an
 
 test('reserved private handoffs fail outside ignored storage', t => {
   const f = fixture(t);
-  for (const name of ['manual-handoff.json', 'projected-run.json', 'projected-run.synthetic.json',
+  for (const name of ['contacts.csv', 'contacts.original.csv', 'contacts.json', 'people.json', 'contact-import.json',
+    'messages.original.json', 'muse-messenger.original.json', 'muse-instagram.original.json',
+    'dashboard.html', 'dashboard.html.12345678-abcd.tmp', 'source.private.json',
+    'profile-photos.json', `profile-photo-${'a'.repeat(64)}.png`, 'gallery.html',
+    'manual-handoff.json', 'projected-run.json', 'projected-run.synthetic.json',
     'manual-handoff.12345678-abcd.tmp', 'request.json', 'request.synthetic.json', 'operation.json', 'operation.synthetic.json', 'collection.json', 'collection.lock',
     'collection.json.123.tmp', 'config.local.json', 'identity-review.json', 'identity-review.lock',
     'identity-review.json.123.tmp', 'identity-review.json.lock', 'identity-review.json.tmp',
