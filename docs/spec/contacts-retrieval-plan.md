@@ -88,6 +88,16 @@ The owner clarified the exact source mapping: **Muse retrieves personal
 Facebook Messenger and Instagram DMs; Google Messages uses its separate canvas
 capture; contacts currently use the owner-provided Google CSV.** A duplicate
 Google Messages request through Muse was incorrect and was stopped.
+The owner selected dedicated local chats for independent retrieval workstreams:
+Facebook friend profile pictures through browser control, Messenger/Instagram
+metadata through Muse, and Gmail metadata separately. Gmail is not a request to
+refresh Google Contacts or repeat Google Messages capture. Reuse children and
+saved inputs, give each source one browser/output owner, and keep integration in
+the coordinating conversation. Handoffs carry the verified direct owner request,
+private file references, existing evidence gaps and remaining cumulative budget,
+not private records or images. Creating an idle chat is not starting retrieval;
+missing/stale relay provenance is not an account-access failure and cannot be
+replaced with agent-authored permission.
 Do not reinterpret Muse as another Android/Google Messages route or ask the owner
 to repeat this already-settled selection. Future OAuth/API refresh is separate
 from building with the available snapshots now. Instagram remains a distinct
