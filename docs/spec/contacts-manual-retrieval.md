@@ -7,6 +7,13 @@ sync, scheduler or future privacy-control platform is required. Demo/UI work is
 parallel, not a prerequisite. Implementation and review use mocks only; no real
 account was accessed or connected by this change.
 
+For source feasibility and iteration, use the [retrieval
+plan](contacts-retrieval-plan.md): Android SMS/MMS, Google contacts, Gmail,
+personal Messenger/WhatsApp, GroupMe and Muse device/cloud distinctions. It
+records public API evidence and alternatives, not installed-tool or live-access
+proof. Research-only planning does not require private storage or authentication;
+the gates below apply before actual acquisition/storage.
+
 ## Owner walkthrough
 
 1. Open a local Heartbeat project session containing this checkout. Invoke

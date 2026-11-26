@@ -17,6 +17,9 @@ saving a bounded metadata-only handoff. Follow the
 retention/deletion, unavailable sources and the still-required owner live trial.
 Approved source-API retrieval is not permission for remote-AI processing.
 **This path does not enable private import or aggregation.**
+The [source retrieval plan](docs/spec/contacts-retrieval-plan.md) distinguishes
+API candidates, Android/export alternatives and Muse's device/cloud processing
+boundary without claiming live access.
 
 Other commands use synthetic inputs only; private importer and adapter guards
 remain unchanged. Demo/tests access no accounts, devices or real archives.
