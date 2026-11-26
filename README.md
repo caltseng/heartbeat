@@ -2,131 +2,59 @@
 
 ![Heartbeat wordmark with a custom ping-and-reply H, coral upper-left packet and ink lower-right packet](docs/assets/heartbeat-wordmark.png)
 
-Heartbeat is a user-centered relationship and interaction graph, with a synthetic
-local visualization of observed communication frequency and recency. It is a
-**single-user local tool with a private JSON store**, not a hosted application.
-Households and explicit meaningful connections belong to the longer-term curated
-relationship model; message activity must never silently become relationship
-quality or a confirmed meaningful connection.
+Heartbeat is a **single-user local relationship and interaction graph tool with
+a private JSON store**. It visualizes communication frequency and recency alongside
+curated households, notes and meaningful connections. Activity never establishes
+relationship quality. Missing data means unknown, not zero.
 
 ## What runs today
 
 **Manual metadata retrieval V0:** invoke `/contacts-retrieve` in a local
-Heartbeat project session. It inspects actual available source-tool capabilities,
-uses normal client sign-in and obtains approval for each bounded metadata-only
-run, then saves a private local source handoff. No new connector, backend or
-scheduler is required. See the [owner walkthrough](docs/spec/contacts-manual-retrieval.md)
-for auth/unavailable-source behavior, output inspection and the still-required
-owner live trial. Source-API retrieval is not remote-AI processing; unsupported
-routes remain explicit. **This does not enable private import or aggregation.**
+Heartbeat project session. It inspects source-tool capabilities, uses normal
+client sign-in and obtains source/account, field and per-run approval before
+saving a bounded metadata-only handoff. Follow the
+[owner walkthrough](docs/spec/contacts-manual-retrieval.md) for local protection,
+retention/deletion, unavailable sources and the still-required owner live trial.
+Approved source-API retrieval is not permission for remote-AI processing.
+**This path does not enable private import or aggregation.**
 
-The CONTACTS-001 through CONTACTS-004 baseline provides six composable collection
-skills, a strict metadata-handoff importer, atomic JSON persistence, provenance,
-coverage, replay/resume, synthetic fixtures and tests. It imports normalized
-Google identity, email, text-message, personal Messenger and WhatsApp metadata.
-**It does not fetch live endpoints or authorize private archive processing.**
-The [CONTACTS-014 Gmail metadata adapter](docs/spec/contacts-email.md)
-also converts synthetic native pages with an injected transport, separate native
-cursors and explicit partial coverage. Its CLI cannot access real accounts.
-The [CONTACTS-018 Messenger converter](docs/spec/contacts-messenger.md)
-projects declared synthetic JSON snapshot shards into metadata-only handoffs,
-with stable local IDs, overlap rejection and explicit unknown history. It rejects
-private runs and does not support encrypted backups or arbitrary archive layouts.
-It also provides a [synthetic-only text XML converter](docs/spec/contacts-text-messages.md)
-for the one profile selected by CONTACTS-015. **It does not fetch live endpoints
-or authorize processing real vendor archives.**
-The [CONTACTS-020 WhatsApp converter](docs/spec/contacts-whatsapp-format-gate.md#contacts-020-operation)
-adds only synthetic iOS Without Media TXT snapshots with reviewed ledgers and
-strict replay/overlap protection (`contacts:whatsapp`), not live WhatsApp access.
+Other commands use synthetic inputs only; private importer and adapter guards
+remain unchanged. Demo/tests access no accounts, devices or real archives.
+Keep inputs, metadata, configuration and outputs out of Git and public shares:
+use ignored `.private/` for synthetic runs and an approved external directory
+for manual retrieval. Nothing sends, hosts or schedules.
+See the [privacy boundary](docs/privacy.md).
 
-CONTACTS-010 records the [owner-approved metadata policy](docs/privacy.md).
-The importer currently accepts **synthetic requests only**: private imports fail
-closed until source/account and each-run approvals plus local protection and
-retention/deletion controls can be verified.
+## Command reference
 
-CONTACTS-012 adds a synthetic-only Google People acquisition adapter with mocked
-pagination, sync/resync, private checkpoints and identity-only importable handoffs:
-`npm run contacts:google -- --config <private-config.json>`. See the
-[configuration, recovery and decision record](docs/spec/contacts-google-capability.md#contacts-012-operation).
-It ships no network transport, credential loader or OAuth flow. Private runs
-fail closed with exit 1 (`private_collection_disabled`) before output access,
-without creating directories, locks, reports or manifests.
+Run `npm run <script> -- <arguments>`. Linked contracts document flags, outputs,
+recovery and decisions; this table does not authorize private data use.
 
-CONTACTS-022 adds the independent `contacts-identity-review` skill and
-`contacts:review` CLI: explicit canonical-person mapping revisions, reviewed
-matches, reversible splits/undo and optional curated household links. It is
-synthetic-only and never rewrites source records or notes. Follow the
-[review workflow and contract](docs/spec/contacts-identity-review.md).
-
-CONTACTS-027 adds `contacts:curate` for synthetic original notes, explicit
-meaningful connections, curated groups and household-specific rhythms. It reuses
-canonical reviewed households and never infers connections from message activity.
-See the [local workflow and decision record](docs/spec/contacts-curated-records.md).
-Real note content remains unauthorized under the metadata-only privacy policy.
-
-CONTACTS-029 adds `contacts:prayer` for user-invoked synthetic prayer requests,
-explicit confirmed status updates and editable ordered plans grounded in unchanged
-original notes. Ambiguous status asks for confirmation; age never implies an
-answered/resolved request. All output is private-local-only, with no outreach
-export. See the [workflow and decisions](docs/spec/contacts-prayer-triage.md).
-
-CONTACTS-030 adds `contacts:audience` for editable synthetic household/member
-selections, explicit reasons and wording preferences, visible address issues and
-a separately reviewed recipient list. It never sends or records donations.
-See the [audience workflow and decisions](docs/spec/contacts-life-update-audience.md).
-
-CONTACTS-023 adds the independent `contacts-aggregate` skill and
-`contacts:aggregate` CLI: deterministic synthetic snapshot reduction with
-explicit mapping revision, per-person/thread/channel/day counts, coverage and
-an auditable source-event ledger. Follow the
-[aggregation contract and decisions](docs/spec/contacts-aggregation.md).
-
-CONTACTS-024 adds `contacts:summary` and the focused `contacts-summary` skill:
-one immutable synthetic `report.json` supplies deterministic summary statements,
-the complete reviewed people cohort, channel counts and coverage-aware daily
-timeline. All views share period/zone/as-of, mapping binding, source freshness,
-coverage and exclusions. See the [reporting contract and decisions](docs/spec/contacts-period-summary.md).
-
-CONTACTS-025 adds `contacts:graph`: a pinned summary becomes a private standalone
-HTML file with inline SVG hub-and-spoke and person-to-thread maps, labeled
-frequency bands, recency, keyboard selection and shared people/channel/timeline
-views. Open locally without a service. See the [graph contract and decisions](docs/spec/contacts-local-graph.md).
-
-For the interactive owner demo, run
-`npm run contacts:demo -- --output .private\contacts\interactive-001`, then open
-that folder's `index.html`. The real generated graphs offer in-context evidence,
-zoom/pan/fit, keyboard navigation and a responsive layout. Its 37 explicitly
-synthetic peers exercise distinct activity levels and coverage; exit 2 honestly
-reports intentionally partial WhatsApp history. A separate email-only graph
-demonstrates covered inactivity within that channel, not across missing history.
-
-CONTACTS-026 adds `contacts:opportunities`: explainable own-baseline direct-activity
-declines under complete matched coverage and separate curated household rhythm
-reminders. All thresholds are explicit tuning proposals, not relationship scores.
-See the [synthetic workflow and decisions](docs/spec/contacts-opportunities.md).
-
-CONTACTS-028 adds `contacts:reconnect` and `contacts-reconnection` for a
-user-invoked synthetic household review: evidence-backed due rhythms and
-commitments, confirmed dates or unknown, original context, existing thread
-references, explicit follow-up completion and rhythm-preserving deferral.
-Optional saved prayer context retains ambiguous status. Reviews can be saved as
-immutable private local reports; nothing sends or schedules. See the
-[workflow and delegated decisions](docs/spec/contacts-reconnection-review.md).
-
-Missing source
-data means unknown, not zero. No private accounts, devices, browser sessions,
-credentials or real data are included by this repository. A manual retrieval
-still requires the owner's exact source/account and each-run approval.
-
-[CONTACTS-032 source operations](docs/spec/contacts-source-operations.md) adds
-`contacts:operate` for explicit synthetic refresh/resync, stale-source inspection,
-inventoried cache retention/deletion and interrupted-purge recovery. Curated files
-are preserved; no private access or recurring job is enabled.
+| Script | Purpose and contract |
+| --- | --- |
+| `contacts:retrieve-save` | [Save approved projected metadata as a local handoff; does not fetch or import](docs/spec/contacts-manual-retrieval.md). |
+| `contacts:collect` | [Import normalized metadata with provenance, coverage and replay/resume](docs/spec/contacts-technical-spec.md). |
+| `contacts:email` | [Convert synthetic native Gmail pages with explicit pagination and coverage](docs/spec/contacts-email.md). |
+| `contacts:google` | [Acquire synthetic Google People identities with mocked sync/resync](docs/spec/contacts-google-capability.md). |
+| `contacts:messenger` | [Convert declared synthetic personal Messenger JSON shards](docs/spec/contacts-messenger.md). |
+| `contacts:text-xml` | [Convert the selected synthetic text-message XML profile](docs/spec/contacts-text-messages.md). |
+| `contacts:operate` | [Refresh/resync, inspect stale sources and recover inventoried cache purges](docs/spec/contacts-source-operations.md). |
+| `contacts:review` | [Review canonical identities, reversible matches/splits and household links](docs/spec/contacts-identity-review.md). |
+| `contacts:whatsapp` | [Convert selected synthetic iOS Without Media TXT snapshots](docs/spec/contacts-whatsapp-format-gate.md#contacts-020-operation). |
+| `contacts:curate` | [Maintain original notes, meaningful connections, groups and household rhythms](docs/spec/contacts-curated-records.md). |
+| `contacts:audience` | [Review household/member selections, wording preferences and recipient lists](docs/spec/contacts-life-update-audience.md). |
+| `contacts:prayer` | [Triage confirmed prayer status and editable plans grounded in original notes](docs/spec/contacts-prayer-triage.md). |
+| `contacts:aggregate` | [Reduce snapshots into mapping-bound counts and an auditable event ledger](docs/spec/contacts-aggregation.md). |
+| `contacts:summary` | [Produce immutable period summaries with shared coverage and exclusions](docs/spec/contacts-period-summary.md). |
+| `contacts:graph` | [Render pinned summaries as standalone local HTML/SVG maps](docs/spec/contacts-local-graph.md). |
+| `contacts:demo` | [Generate interactive synthetic graphs with 37 peers and partial WhatsApp history](docs/spec/contacts-local-graph.md). |
+| `contacts:reconnect` | [Review household rhythms, commitments, context and explicit follow-up](docs/spec/contacts-reconnection-review.md). |
+| `contacts:opportunities` | [Explain matched-coverage activity declines and curated rhythm reminders](docs/spec/contacts-opportunities.md). |
 
 ## Install and run
 
-Install Node.js 20.11.0+ (CI uses 20.11.0, npm 10.2.4) and Git. Repository-local
-TypeScript, Node types and the `tsx` source runtime are pinned in the lockfile:
+Install Node.js 20.11.0+ (CI uses 20.11.0, npm 10.2.4) and Git. TypeScript,
+Node types and the `tsx` source runtime are pinned in the lockfile:
 
 ```powershell
 git clone https://github.com/caltseng/heartbeat.git
@@ -139,11 +67,11 @@ npm run contacts:collect -- --demo --output .private\contacts\demo-001
 npm run contacts:collect -- --request .private\contacts\demo-001\request.synthetic.json
 ```
 
-Choose a fresh demo directory; `--demo` refuses to overwrite an existing one.
-The first run generates five synthetic handoffs and their request, then persists
-`collection.json`; replay keeps four distinct synthetic message events rather than
-duplicating them. Google contacts add identities, not activity. No network is used
-by the demo, importer or tests.
+Choose a fresh directory; the demo refuses overwrites. It generates five handoffs,
+their request and `collection.json`; replay preserves events without duplication.
+Google adds identities, not activity. For interactive graphs, run the demo script with
+`--output .private\contacts\interactive-001`, then open that folder's `index.html`.
+Its intentional partial WhatsApp history exits 2.
 
 For a prepared **synthetic**, contract-conforming metadata request:
 
@@ -151,40 +79,26 @@ For a prepared **synthetic**, contract-conforming metadata request:
 npm run contacts:collect -- --request .private\contacts\run-001\request.json
 ```
 
-This command does not create that request or authorize acquisition. Private
-requests exit 1 with `private_collection_disabled`, without writing a store or
-printing a manifest. Policy approval is not permission to run collection. Follow the
-[request/handoff contract](docs/spec/contacts-technical-spec.md) and each source's
-access gate first. Exit **0** means all supplied snapshots collected for their
-declared scope, **2** means persisted partial/unavailable/failed sources, and
-**1** means fatal request/storage/locking failure. Inspect nonzero exits; never
-hide them. A successful import does not independently certify upstream history.
+This does not create the request or authorize acquisition. Private requests exit
+1 (`private_collection_disabled`) without writing a store or printing a manifest.
+Exit **0** means collection for the declared scope, **2** means persisted
+partial/unavailable/failed sources, and **1** means fatal request/storage/locking
+failure. Inspect nonzero exits; imports do not certify upstream history.
 
 ## Documentation and delivery
 
-- [Architecture, data flow and local JSON layout](docs/architecture.md)
-- [Local workflow, versioned handoffs and recovery](docs/spec/contacts-local-workflow.md)
-- [Privacy, local data and source approval gates](docs/privacy.md)
-- [Development, CI and adding a collector](docs/development.md)
-- [Product specification](docs/spec/contacts-store-spec.md)
-- [Technical contracts and source capability matrix](docs/spec/contacts-technical-spec.md)
-- [Personal Messenger access and synthetic snapshot converter](docs/spec/contacts-messenger.md)
-- [Google identity route and synthetic acquisition adapter; no live access](docs/spec/contacts-google-capability.md)
-- [Text format/access limits and synthetic XML converter](docs/spec/contacts-text-messages.md)
-- [Email access and synthetic Gmail metadata adapter](docs/spec/contacts-email.md)
-- [WhatsApp format/access limits and synthetic TXT converter](docs/spec/contacts-whatsapp-format-gate.md)
-- [Central engineering history and revisit conditions](docs/decisions.md)
-- [Stable CONTACTS work-item register](docs/spec/contacts-work-items.md)
-- [Exact migration provenance](docs/provenance.md)
-- [Approved branding assets and crop decision](docs/spec/heartbeat-branding.md)
-- [Repository rules: topic branches, PRs to main, authorized delivery](AGENTS.md)
+Start with [architecture](docs/architecture.md), the
+[local workflow](docs/spec/contacts-local-workflow.md),
+[product specification](docs/spec/contacts-store-spec.md) and
+[technical contracts](docs/spec/contacts-technical-spec.md).
+See [central decisions](docs/decisions.md), the
+[stable CONTACTS register](docs/spec/contacts-work-items.md),
+[migration provenance](docs/provenance.md) and
+[branding decisions](docs/spec/heartbeat-branding.md).
 
-The bootstrap must be independently reviewed at its exact HEAD, pass the
-`Heartbeat synthetic baseline` GitHub Actions check, and have an authorized merge.
-For explicitly authorized `checked_in` work the retained writer may merge after
-qualified independent exact-final-head review, required CI and GitHub protections;
-explicit ready-only/report targets and draft ceilings remain unchanged. See
-[delivery and active-execution adoption](docs/development.md#delivery-and-active-execution-adoption).
-The owner configures Heartbeat's Phalanx `ready_checks` before merging. An open
-green PR is not checked in; remaining CONTACTS execution stays blocked until the
-bootstrap's merge into `main` is verified. There is no deployment step.
+Follow [repository rules](AGENTS.md) and
+[development and delivery guidance](docs/development.md#delivery-and-active-execution-adoption):
+topic branches, one PR to `main`, independent exact-final-head review and required
+CI (`Heartbeat synthetic baseline`) before an authorized merge. An open green
+PR is not checked in. Ready-only/report targets and draft ceilings remain
+unchanged; there is no deployment step.
