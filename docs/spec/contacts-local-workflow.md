@@ -32,9 +32,13 @@ synthetic. The [approved CONTACTS-010 policy](../privacy.md) requires real stora
 on this computer **outside Git worktrees and cloud-synced folders**, verified
 Windows-user restrictions/encryption, retention/deletion controls, no automatic
 backups, and separate exact-source/account and each-run owner approval.
-Current CLIs fail closed on private requests; no command or configuration bypass
-is provided. Approval alone cannot enable unimplemented protection/retention
-controls. This document makes engineering decisions only, not additional consent
+Existing import/processing CLIs fail closed on private requests; no configuration
+bypass is provided. Approval alone cannot enable their unimplemented controls.
+The owner-authorized [manual retrieval V0](contacts-manual-retrieval.md) is a
+separate handoff-only path: invoke `/contacts-retrieve` in a local Heartbeat
+project session, approve a bounded source-tool read and manually verify safe
+local output. It does not require a future connector/automation/privacy platform
+and does not enable private imports. This document otherwise makes engineering decisions only, not additional consent
 for source/device/browser access, credentials, content/notes, remote AI, sending
 or schedules. Ignored checkout storage is not approved real-data storage.
 
