@@ -105,6 +105,15 @@ for (const [source, channel, connector] of [
       source === 'text-messages' ? { ...first, textArchive: undefined } :
         { ...first, pages: [{ ...first.pages[0], events: [{ ...first.pages[0].events[0], id: 'unlabeled-event' }] }] }
     ];
+    if (source === 'messenger') {
+      for (const id of [`${connector}:${'a'.repeat(64)}:${'0'.repeat(64)}:extra`,
+        `${connector}:${'A'.repeat(64)}:${'0'.repeat(64)}`,
+        `${connector}:${'a'.repeat(64)}:short`]) {
+        rejected.push({ ...first, pages: [{ ...first.pages[0], events: [{ ...first.pages[0].events[0], id }] }] });
+      }
+    } else {
+      assert.deepEqual(Object.values(before.textArchives), [first.textArchive]);
+    }
     for (const input of rejected) {
       assert.equal(run(input).error.code, 'snapshot_conflict');
       assert.deepEqual(f.state().records, before.records);
@@ -285,6 +294,32 @@ test('failed page leaves the previous page and cursor intact, and a repaired pag
   result = f.run();
   assert.equal(result.exitCode, 0);
   assert.equal(events(f.state()).length, 2);
+});
+
+test('paginated direct events reuse committed memberships without leaking a failed page roster', t => {
+  const f = fixture(t);
+  const next = structuredClone(f.input.pages[0]);
+  next.cursor = 'page-2';
+  next.identities = [];
+  next.threads = [];
+  next.memberships = [];
+  next.events[0].id = 'message-2';
+  f.input.pages[0].nextCursor = 'page-2';
+  f.input.pages.push(next);
+  assert.equal(f.run().exitCode, 0);
+  assert.equal(events(f.state()).length, 2);
+  const before = f.state();
+  next.identities.push({ id: 'person-b', idKind: 'local', isSelf: false });
+  next.memberships.push({ threadId: 'thread-1', identityId: 'person-b' });
+  next.events[0].id = 'message-3';
+  assert.equal(f.run().manifest.sources[0].status, 'failed');
+  assert.deepEqual(Object.keys(f.state().records), Object.keys(before.records));
+  assert.deepEqual(events(f.state()).map(row => row.record), events(before).map(row => row.record));
+  next.identities = [];
+  next.memberships = [];
+  f.request.resume = true;
+  assert.equal(f.run().exitCode, 0);
+  assert.equal(events(f.state()).length, 3);
 });
 
 test('group membership and broadcast recipient roles do not manufacture pairwise observations', t => {
