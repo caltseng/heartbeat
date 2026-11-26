@@ -102,10 +102,13 @@ mutation targets/tombstones, historical membership, thread-specific coverage,
 and reviewed different-ID connector translations with retained source evidence.
 Text archive binding tests also reject unbound pre-existing text events after
 explicit revisions, without changing their records or reserving an archive.
-Text, Messenger and WhatsApp snapshot imports use one profile-driven
-`snapshotBinding` function and the shared `snapshot_conflict` error code.
-Profile adapters retain their existing handoff fields, account/thread scopes,
-namespace checks and persisted archive formats; no store migration is required.
+Text, Messenger and WhatsApp snapshot imports normalize to one internal binding
+shape through `snapshotBinding`, with data-only profile descriptors and the shared
+`snapshot_conflict` error code. Messenger's existing labeled IDs are parsed as
+three explicit components, not regex captures; their snapshot digest is retained
+and the absent ledger digest stays null. Existing handoff fields, account/thread
+scopes, namespace checks and persisted archive formats remain unchanged; no store
+migration or new handoff field is required.
 Bindings are reserved only with a validated page. The shared importer tests run
 the same replay, overlap, alternate-route, namespace and rollback cases for text
 and Messenger; converter-local errors remain separate.
@@ -128,7 +131,11 @@ installed reproducibly from `package-lock.json`.
 
 Collector page preparation indexes pending records/revisions, reviewed translations
 and memberships by thread; email acquisition indexes reviewed threads, classifications
-and message IDs. These indexes are transient: array ordering, stored evidence,
+and message IDs. Each source import scans the stored record table once to decode
+source/account keys and build its record and membership indexes. Validated page
+commits extend those indexes; later pages reuse committed memberships instead of
+rebuilding them. Coverage reporting shares one pass over the source index for
+connector and exact-input provenance. These indexes are transient: array ordering, stored evidence,
 duplicate/conflict checks and page-atomic rollback retain the v1 contract.
 The synthetic scale regression acquires and persists single-page 2,000/4,000-event
 imports (40 messages per reviewed direct thread) and prints elapsed milliseconds.

@@ -107,7 +107,7 @@ function reconcile(state) {
     unresolvedTargets: unresolvedTargets.sort(), pendingTargets: pendingTargets.sort() };
   state.manifest.reconciliationRequired = collisions.length > 0 || unresolvedTargets.length > 0;
 }
-function preparePage(page, source, state, provenance) {
+function preparePage(page, source, state, provenance, storedMemberships) {
   object(page, ['cursor', 'nextCursor', 'retrievedAt', 'identities', 'threads', 'memberships', 'events', 'threadCoverage'], 'page');
   cursor(page.cursor); cursor(page.nextCursor);
   requireValue(page.nextCursor === null || page.nextCursor !== page.cursor, 'A page cannot advance to its own cursor.');
@@ -215,9 +215,9 @@ function preparePage(page, source, state, provenance) {
       ...(temporal ? { validFrom, validUntil } : {}) }, membership);
   }
   const memberships = new Map();
-  for (const { record } of [...Object.values<RecordEntry>(state.records), ...additions]) {
+  for (const { record } of additions) {
     if (record.type !== 'membership') continue;
-    if (!memberships.has(record.threadKey)) memberships.set(record.threadKey, []);
+    if (!memberships.has(record.threadKey)) memberships.set(record.threadKey, [...(storedMemberships.get(record.threadKey) || [])]);
     memberships.get(record.threadKey).push(record);
   }
   for (const event of array(page.events, 'page.events')) {
@@ -238,7 +238,9 @@ function preparePage(page, source, state, provenance) {
     const thread = observedThread.record;
     if (thread.kind === 'direct') {
       const time = instant(event.timestamp, 'event.timestamp');
-      const people = new Set((memberships.get(prefix('thread', event.threadId)) || []).filter(record =>
+      const threadMemberships = memberships.get(prefix('thread', event.threadId)) ||
+        storedMemberships.get(prefix('thread', event.threadId)) || [];
+      const people = new Set(threadMemberships.filter(record =>
         (!record.validFrom || record.validFrom <= time) && (!record.validUntil || time < record.validUntil)).map(record => record.identityKey));
       requireValue(people.size === 2 && [...people].filter(id => knownKey(id).record.isSelf).length === 1 &&
         (event.senderId === null || people.has(prefix('identity', event.senderId))) && recipients.every(recipient => people.has(recipient.identityKey)),
@@ -277,142 +279,134 @@ function persist(file, state) {
 }
 interface SnapshotBinding {
   profile: string;
-  archiveRef?: string;
-  threadId?: string;
-  sha256?: string;
-  ledgerDigest?: string;
-  metadataDigest?: string;
-  snapshot?: string;
+  ref: string;
+  scope: string;
+  sha256: string;
+  ledgerDigest: string | null;
+  metadataDigest: string | null;
 }
 interface SnapshotProfile {
   source: string;
   connector: string;
-  field?: string;
-  store?: string;
-  scope: (source: SourceReference, binding?: SnapshotBinding) => string;
-  namespace?: (id: unknown) => string | false;
-  bindings: (state, source: SourceReference, existing?: [string, RecordEntry][]) => [string, SnapshotBinding][];
-  read: (handoff: import('./types.ts').Handoff) => SnapshotBinding;
-  validatePages?: (handoff: import('./types.ts').Handoff) => void;
-  accepts: (entry: [string, RecordEntry], binding: SnapshotBinding, source: SourceReference) => boolean;
-  touches: (handoff: import('./types.ts').Handoff, binding: SnapshotBinding) => boolean;
-  disjoint: (left: SnapshotBinding, right: SnapshotBinding) => boolean;
+  field: 'textArchive' | 'whatsappArchive' | null;
+  store: 'textArchives' | 'whatsappArchives' | null;
 }
 const SNAPSHOT_PROFILES: SnapshotProfile[] = [
-  {
-    source: 'text-messages', connector: 'synctech-xml-metadata-v1',
-    field: 'textArchive', store: 'textArchives',
-    scope: source => JSON.stringify([source.source, source.account]),
-    bindings: (state, source) => Object.entries<SnapshotBinding>(state.textArchives || {})
-      .filter(([id]) => id === JSON.stringify([source.source, source.account])),
-    read(handoff) {
-      const archive = handoff.textArchive;
-      object(archive, ['profile', 'archiveRef', 'sha256', 'ledgerDigest'], 'textArchive');
-      requireValue(typeof archive.archiveRef === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(archive.archiveRef) &&
-        [archive.sha256, archive.ledgerDigest].every(value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)),
-      'Invalid synthetic text archive binding.', 'snapshot_conflict');
-      return archive;
-    },
-    accepts: ([id]) => JSON.parse(id)[2] !== 'event',
-    touches: () => true,
-    disjoint: () => true
-  },
-  {
-    source: 'messenger', connector: 'messenger-json-snapshot-v1',
-    scope: source => JSON.stringify([source.source, source.account]),
-    namespace: id => typeof id === 'string' && /^messenger-json-snapshot-v1:([a-f0-9]{64}):[a-f0-9]{64}$/.exec(id)?.[1],
-    bindings(state, source, existing) {
-      return existing.filter(([, row]) => row.provenance.some(item => item.connector === this.connector))
-        .map(([id]) => [this.scope(source), { profile: this.connector, snapshot: this.namespace(JSON.parse(id)[3]) }]);
-    },
-    read(handoff) {
-      const ids = handoff.pages.flatMap(page => ['identities', 'threads', 'events'].flatMap(kind =>
-        array(page[kind], `page.${kind}`).map(row => row.id)));
-      const snapshot = this.namespace(ids[0]);
-      requireValue(snapshot && ids.every(id => this.namespace(id) === snapshot),
-        'Snapshot IDs must share one labeled immutable namespace.', 'snapshot_conflict');
-      return { profile: this.connector, snapshot };
-    },
-    accepts([id, row], binding) {
-      return row.provenance.every(item => item.connector === this.connector) &&
-        (row.record.type === 'membership' || this.namespace(JSON.parse(id)[3]) === binding.snapshot);
-    },
-    touches: () => true,
-    disjoint: () => true
-  },
-  {
-    source: 'whatsapp', connector: 'whatsapp-ios-txt-metadata-v1',
-    field: 'whatsappArchive', store: 'whatsappArchives',
-    scope: (source, archive) => JSON.stringify([source.account, archive.threadId]),
-    validatePages(handoff) {
-      for (const page of handoff.pages) {
-        object(page, ['cursor', 'nextCursor', 'retrievedAt', 'identities', 'threads', 'memberships', 'events',
-          'threadCoverage'], 'page');
-        array(page.threads, 'page.threads');
-        array(page.events, 'page.events');
-      }
-    },
-    bindings: (state, source) => Object.entries<SnapshotBinding>(state.whatsappArchives || {})
-      .filter(([id]) => JSON.parse(id)[0] === source.account),
-    read(handoff) {
-      const archive = handoff.whatsappArchive;
-      object(archive, ['profile', 'threadId', 'archiveRef', 'sha256', 'ledgerDigest', 'metadataDigest'], 'whatsappArchive');
-      const { whatsappArchive, ...metadata } = handoff;
-      requireValue([archive.threadId, archive.archiveRef].every(value =>
-        typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(value)) &&
-        [archive.sha256, archive.ledgerDigest, archive.metadataDigest].every(value =>
-          typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)) &&
-        archive.metadataDigest === hash(JSON.stringify(metadata)), 'Invalid synthetic archive binding.', 'snapshot_conflict');
-      requireValue(handoff.pages.length === 1 && handoff.pages[0].cursor === null && handoff.pages[0].nextCursor === null &&
-        handoff.pages[0].threads.length === 1 && handoff.pages[0].threads[0]?.id === archive.threadId &&
-        handoff.pages[0].events.every(row => row?.threadId === archive.threadId && row.idKind === 'local' &&
-          typeof row.id === 'string' && row.id.startsWith(`${archive.archiveRef}:record:`)) &&
-        handoff.coverage.completeness === 'unknown', 'Invalid snapshot scope.', 'snapshot_conflict');
-      return archive;
-    },
-    accepts([id, entry], archive, source) {
-      const [, , type, recordId] = JSON.parse(id);
-      return type !== 'event' || versions(entry).every(({ record }) =>
-        record.threadKey !== key(source.source, source.account, 'thread', archive.threadId) &&
-        !recordId.startsWith(`${archive.archiveRef}:record:`));
-    },
-    touches: (handoff, archive) => handoff.pages.some(page =>
-      page.threads.some(row => row?.id === archive.threadId) ||
-      page.events.some(row => row?.threadId === archive.threadId ||
-        (typeof row?.id === 'string' && row.id.startsWith(`${archive.archiveRef}:record:`)))),
-    disjoint: (left, right) => left.archiveRef !== right.archiveRef && left.sha256 !== right.sha256
-  }
+  { source: 'text-messages', connector: 'synctech-xml-metadata-v1', field: 'textArchive', store: 'textArchives' },
+  { source: 'messenger', connector: 'messenger-json-snapshot-v1', field: null, store: null },
+  { source: 'whatsapp', connector: 'whatsapp-ios-txt-metadata-v1', field: 'whatsappArchive', store: 'whatsappArchives' }
 ];
 
-function snapshotBinding(handoff, source, state) {
-  const existing = Object.entries<RecordEntry>(state.records).filter(([id]) => {
-    const [family, account] = JSON.parse(id);
-    return family === source.source && account === source.account;
-  });
+const digest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+function messengerNamespace(id: unknown): string | null {
+  if (typeof id !== 'string') return null;
+  const parts = id.split(':');
+  return parts.length === 3 && parts[0] === 'messenger-json-snapshot-v1' &&
+    digest(parts[1]) && digest(parts[2]) ? parts[1] : null;
+}
+function normalizedBinding(profile: SnapshotProfile, source: SourceReference, archive): SnapshotBinding {
+  return { profile: archive.profile, ref: archive.archiveRef,
+    scope: profile.source === 'whatsapp' ? archive.threadId : JSON.stringify([source.source, source.account]),
+    sha256: archive.sha256, ledgerDigest: archive.ledgerDigest, metadataDigest: archive.metadataDigest ?? null };
+}
+interface IndexedRecord {
+  key: string;
+  type: string;
+  id: string;
+  entry: RecordEntry;
+}
+function snapshotBinding(handoff, source, state, existing: Map<string, IndexedRecord>) {
   let reservation = null;
   for (const profile of SNAPSHOT_PROFILES) {
     const declared = profile.field && handoff[profile.field] !== undefined;
     requireValue(!declared || (source.source === profile.source && source.connector === profile.connector),
       'Snapshot binding does not match the source/connector.', 'snapshot_conflict');
     if (source.source !== profile.source) continue;
-    profile.validatePages?.(handoff);
-    const bindings = profile.bindings(state, source, existing);
+    if (profile.source === 'whatsapp') {
+      for (const page of handoff.pages) {
+        object(page, ['cursor', 'nextCursor', 'retrievedAt', 'identities', 'threads', 'memberships', 'events', 'threadCoverage'], 'page');
+        array(page.threads, 'page.threads');
+        array(page.events, 'page.events');
+      }
+    }
+    const accountScope = JSON.stringify([source.source, source.account]);
+    const bindings = new Map<string, SnapshotBinding>();
+    if (profile.store) {
+      for (const [id, archive] of Object.entries(state[profile.store] || {})) {
+        if (profile.source === 'whatsapp' ? JSON.parse(id)[0] === source.account : id === accountScope) {
+          bindings.set(id, normalizedBinding(profile, source, archive));
+        }
+      }
+    }
     if (source.connector !== profile.connector) {
-      requireValue(bindings.every(([, binding]) => !profile.touches(handoff, binding)),
+      const touches = profile.source === 'whatsapp' ? [...bindings.values()].some(binding => handoff.pages.some(page =>
+        page.threads.some(row => row?.id === binding.scope) ||
+        page.events.some(row => row?.threadId === binding.scope ||
+          (typeof row?.id === 'string' && row.id.startsWith(`${binding.ref}:record:`))))) :
+        bindings.size > 0 || (profile.source === 'messenger' &&
+          [...existing.values()].some(row => row.entry.provenance.some(item => item.connector === profile.connector)));
+      requireValue(!touches,
         'This source scope requires its original snapshot binding.', 'snapshot_conflict');
       continue;
     }
     requireValue(!profile.field || declared, 'This converter requires its snapshot binding.', 'snapshot_conflict');
-    const binding = profile.read(handoff);
+    let binding: SnapshotBinding;
+    if (profile.source === 'messenger') {
+      let namespace: string | null = null;
+      for (const page of handoff.pages) {
+        for (const kind of ['identities', 'threads', 'events']) {
+          for (const row of array(page[kind], `page.${kind}`)) {
+            const observed = messengerNamespace(row.id);
+            requireValue(observed && (namespace === null || observed === namespace),
+              'Snapshot IDs must share one labeled immutable namespace.', 'snapshot_conflict');
+            namespace = observed;
+          }
+        }
+      }
+      requireValue(namespace, 'Snapshot IDs must share one labeled immutable namespace.', 'snapshot_conflict');
+      binding = { profile: profile.connector, ref: namespace, scope: accountScope,
+        sha256: namespace, ledgerDigest: null, metadataDigest: null };
+    } else {
+      const archive = handoff[profile.field];
+      object(archive, profile.source === 'whatsapp' ?
+        ['profile', 'threadId', 'archiveRef', 'sha256', 'ledgerDigest', 'metadataDigest'] :
+        ['profile', 'archiveRef', 'sha256', 'ledgerDigest'], profile.field);
+      if (profile.source === 'whatsapp') {
+        const { whatsappArchive, ...metadata } = handoff;
+        requireValue([archive.threadId, archive.archiveRef].every(value =>
+          typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(value)) &&
+          [archive.sha256, archive.ledgerDigest, archive.metadataDigest].every(digest) &&
+          archive.metadataDigest === hash(JSON.stringify(metadata)), 'Invalid synthetic archive binding.', 'snapshot_conflict');
+        requireValue(handoff.pages.length === 1 && handoff.pages[0].cursor === null && handoff.pages[0].nextCursor === null &&
+          handoff.pages[0].threads.length === 1 && handoff.pages[0].threads[0]?.id === archive.threadId &&
+          handoff.pages[0].events.every(row => row?.threadId === archive.threadId && row.idKind === 'local' &&
+            typeof row.id === 'string' && row.id.startsWith(`${archive.archiveRef}:record:`)) &&
+          handoff.coverage.completeness === 'unknown', 'Invalid snapshot scope.', 'snapshot_conflict');
+      } else {
+        requireValue(typeof archive.archiveRef === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(archive.archiveRef) &&
+          [archive.sha256, archive.ledgerDigest].every(digest),
+        'Invalid synthetic text archive binding.', 'snapshot_conflict');
+      }
+      binding = normalizedBinding(profile, source, archive);
+    }
     requireValue(handoff.dataClass === 'synthetic' && binding.profile === source.connector,
       'Invalid synthetic snapshot profile.', 'snapshot_conflict');
-    const scope = profile.scope(source, binding);
-    const previous = profile.store ? bindings.find(([id]) => id === scope)?.[1] : undefined;
-    requireValue((!previous || isDeepStrictEqual(previous, binding)) &&
-      (previous || existing.every(row => profile.accepts(row, binding, source))) &&
-      bindings.every(([id, other]) => id === scope || profile.disjoint(other, binding)),
+    const scope = profile.source === 'whatsapp' ? JSON.stringify([source.account, binding.scope]) : accountScope;
+    const previous = bindings.get(scope);
+    requireValue((!previous || (isDeepStrictEqual(previous, binding) &&
+      isDeepStrictEqual(state[profile.store][scope], handoff[profile.field]))) &&
+      (previous || [...existing.values()].every(({ type, id, entry }) => {
+        if (profile.source === 'messenger') return entry.provenance.every(item => item.connector === profile.connector) &&
+          (entry.record.type === 'membership' || messengerNamespace(id) === binding.ref);
+        if (type !== 'event') return true;
+        return profile.source === 'whatsapp' && versions(entry).every(({ record }) =>
+          record.threadKey !== key(source.source, source.account, 'thread', binding.scope) &&
+          !id.startsWith(`${binding.ref}:record:`));
+      })) &&
+      [...bindings].every(([id, other]) => id === scope || profile.source !== 'whatsapp' ||
+        (other.ref !== binding.ref && other.sha256 !== binding.sha256)),
     'Changed, overlapping or unbound snapshot history requires explicit reconciliation.', 'snapshot_conflict');
-    if (profile.store) reservation = { store: profile.store, scope, binding };
+    if (profile.store) reservation = { store: profile.store, scope, binding: handoff[profile.field] };
   }
   return reservation;
 }
@@ -431,7 +425,19 @@ function importSource(source, requestFolder, request, period, state, file, repor
   });
   const pages = array(handoff.pages, 'handoff.pages');
   requireValue(pages.length > 0, 'At least one page is required, including for a verified empty result.');
-  const binding = snapshotBinding(handoff, source, state);
+  const sourceRecords = new Map<string, IndexedRecord>();
+  const memberships = new Map<string, import('./types.ts').SourceRecord[]>();
+  for (const [id, entry] of Object.entries<RecordEntry>(state.records)) {
+    const [family, account, type, recordId] = JSON.parse(id);
+    if (family === source.source && account === source.account) {
+      sourceRecords.set(id, { key: id, type, id: recordId, entry });
+    }
+    if (entry.record.type === 'membership') {
+      if (!memberships.has(entry.record.threadKey)) memberships.set(entry.record.threadKey, []);
+      memberships.get(entry.record.threadKey).push(entry.record);
+    }
+  }
+  const binding = snapshotBinding(handoff, source, state, sourceRecords);
   const checkpointKey = sourceKey(source);
   const signature = hash(JSON.stringify(period));
   const previous = state.checkpoints[checkpointKey];
@@ -448,7 +454,7 @@ function importSource(source, requestFolder, request, period, state, file, repor
     const page = pages[index];
     requireValue(page.cursor === expected && !visited.has(page.cursor), 'Page sequence contains a gap or repeated cursor.', 'pagination_error');
     visited.add(page.cursor);
-    const additions = preparePage(page, source, state, { connector: source.connector, inputDigest: input.digest });
+    const additions = preparePage(page, source, state, { connector: source.connector, inputDigest: input.digest }, memberships);
     requireValue(page.nextCursor === null || !visited.has(page.nextCursor), 'Pagination contains a cursor cycle.', 'pagination_error');
     let duplicates = 0;
     const revisionIndexes = new Map();
@@ -457,6 +463,12 @@ function importSource(source, requestFolder, request, period, state, file, repor
       if (!existing) {
         existing = { record: addition.record, provenance: [], revisions: [] };
         state.records[addition.key] = existing;
+        const [, , type, id] = JSON.parse(addition.key);
+        sourceRecords.set(addition.key, { key: addition.key, type, id, entry: existing });
+        if (addition.record.type === 'membership') {
+          if (!memberships.has(addition.record.threadKey)) memberships.set(addition.record.threadKey, []);
+          memberships.get(addition.record.threadKey).push(addition.record);
+        }
       } else if (!existing.revisions) existing.revisions = structuredClone(versions(existing));
       if (!revisionIndexes.has(addition.key)) revisionIndexes.set(addition.key,
         new Map(existing.revisions.map(row => [row.id, row])));
@@ -491,25 +503,32 @@ function importSource(source, requestFolder, request, period, state, file, repor
       break;
     }
   }
-  const imported = Object.entries<RecordEntry>(state.records).filter(([id, row]) =>
-    JSON.parse(id)[0] === source.source && JSON.parse(id)[1] === source.account && row.provenance.some(item =>
-      item.connector === source.connector && item.inputDigest === input.digest));
-  report.threadCoverage = imported.filter(([, row]) => row.record.type === 'threadCoverage').map(([, row]) => row.record);
+  report.threadCoverage = [];
+  const threadKeys = new Set<string>();
+  let explicitThreadCoverage = pages.some(page => page.threadCoverage !== undefined);
+  for (const { key: id, entry } of sourceRecords.values()) {
+    let fromConnector = false, fromInput = false;
+    for (const item of entry.provenance) {
+      if (item.connector !== source.connector) continue;
+      fromConnector = true;
+      if (item.inputDigest === input.digest) fromInput = true;
+    }
+    if (!fromConnector) continue;
+    if (entry.record.type === 'thread') threadKeys.add(id);
+    else if (entry.record.threadKey) threadKeys.add(entry.record.threadKey);
+    if (entry.record.type === 'threadCoverage') {
+      explicitThreadCoverage = true;
+      if (fromInput) report.threadCoverage.push(entry.record);
+    }
+  }
   const coversPeriod = row => row.completeness === 'complete' && row.start !== null && row.end !== null &&
     row.start <= period.start && row.end >= period.end && row.end <= lastRetrieval;
-  const sourceRecords = Object.entries<RecordEntry>(state.records).filter(([id, row]) =>
-    JSON.parse(id)[0] === source.source && JSON.parse(id)[1] === source.account &&
-      row.provenance.some(item => item.connector === source.connector));
-  const threadKeys = [...new Set(sourceRecords.flatMap(([id, row]) => row.record.type === 'thread' ? [id] :
-    row.record.threadKey ? [row.record.threadKey] : []))];
-  const explicitThreadCoverage = pages.some(page => page.threadCoverage !== undefined) ||
-    sourceRecords.some(([, row]) => row.record.type === 'threadCoverage');
   report.threadCoverageMode = explicitThreadCoverage ? 'per-thread' : 'inherited-source-declaration';
   const coveredThreads = new Map();
   for (const row of report.threadCoverage) {
     coveredThreads.set(row.threadKey, (coveredThreads.get(row.threadKey) ?? true) && coversPeriod(row));
   }
-  const threadsCovered = !explicitThreadCoverage || threadKeys.every(threadKey => coveredThreads.get(threadKey) === true);
+  const threadsCovered = !explicitThreadCoverage || [...threadKeys].every(threadKey => coveredThreads.get(threadKey) === true);
   const covered = threadsCovered && declaredCoverage.completeness === 'complete' && (source.source === 'google-contacts' ||
     (declaredCoverage.start <= period.start && declaredCoverage.end >= period.end && declaredCoverage.end <= lastRetrieval));
   Object.assign(report, { status: terminal && covered ? 'collected' : 'partial', coverage: declaredCoverage,
