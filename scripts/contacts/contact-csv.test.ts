@@ -175,6 +175,10 @@ test('private local CSV publication is atomic, preserves input bytes and refuses
   assert.deepEqual(fs.readdirSync(bad), []);
   const repo = path.join(folder, 'repository'); fs.mkdirSync(repo); fs.mkdirSync(path.join(repo, '.git'));
   assert.throws(() => importContactCSV(input, repo), /Git/);
+  fs.writeFileSync(input, csv);
+  const zoned = path.join(folder, 'zoned'); fs.mkdirSync(zoned);
+  assert.throws(() => importContactCSV(input, zoned, undefined, [], undefined, 'Not/AZone'), /IANA time zone/);
+  assert.deepEqual(fs.readdirSync(zoned), []);
 });
 
 test('Muse recency stays separate from message counts and rejects invented native proof or content', t => {

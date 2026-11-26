@@ -113,7 +113,13 @@ function contactSuggestions(snapshot: ContactSnapshot): { evidence: string; peop
     .map(([evidence, people]) => ({ evidence, people: [...people].sort() }));
 }
 
-function importContactCSV(input: string, output: string, observationsFile?: string, museFiles: string[] = [], photosFile?: string) {
+function importContactCSV(input: string, output: string, observationsFile?: string, museFiles: string[] = [], photosFile?: string,
+  timeZone?: string) {
+  if (timeZone !== undefined) {
+    let valid = false;
+    try { valid = new Intl.DateTimeFormat('en-US', { timeZone }).resolvedOptions().timeZone !== undefined; } catch { valid = false; }
+    requireValue(valid, 'Choose a valid IANA time zone.');
+  }
   const folder = manualOutputLocation(path.resolve(output), 'private');
   requireValue(fs.readdirSync(folder).length === 0, 'Choose a fresh empty preview output directory.', 'existing_output');
   const source = path.resolve(input);
@@ -127,7 +133,9 @@ function importContactCSV(input: string, output: string, observationsFile?: stri
   requireValue(new Set(muse.map(snapshot => snapshot.source)).size === muse.length, 'Duplicate Muse source snapshot.');
   const people: Record<string, CanonicalPerson> = Object.fromEntries(snapshot.contacts.map(c => [c.personId, { mergedInto: null }]));
   const photos = photosFile === undefined ? null : readProfilePhotos(photosFile, 'private');
-  const html = renderDashboard(snapshot, observations, contactSuggestions(snapshot), muse, photos);
+  requireValue(timeZone === undefined || observations === null || observations.period.timeZone === timeZone,
+    'The time zone must match the saved observations period.');
+  const html = renderDashboard(snapshot, observations, contactSuggestions(snapshot), muse, photos, timeZone ?? null);
   const linkedPhotos = photos ? photos.photos.filter(photo => html.includes(`href="photos/${photo.file}"`)) : [];
   const staging = path.join(folder, '.staging');
   fs.mkdirSync(staging);
@@ -186,13 +194,14 @@ if (require.main === module) {
     const args = process.argv.slice(2), flags = new Map<string, string>(), museFiles: string[] = [];
     requireValue(args.length % 2 === 0, 'Expected input/output argument pairs.');
     for (let i = 0; i < args.length; i += 2) {
-      requireValue(['--input', '--output', '--observations', '--muse', '--photos'].includes(args[i]) && !flags.has(args[i]), 'Invalid preview arguments.');
+      requireValue(['--input', '--output', '--observations', '--muse', '--photos', '--time-zone'].includes(args[i]) && !flags.has(args[i]), 'Invalid preview arguments.');
       if (args[i] === '--muse') museFiles.push(args[i + 1]);
       else flags.set(args[i], args[i + 1]);
     }
     requireValue(flags.has('--input') && flags.has('--output'),
-      'Usage: contacts:csv --input <owner-provided.csv> --output <fresh-local-directory> [--observations <saved-metadata.json>] [--muse <saved-recency.json>] [--photos <profile-photos.json>]');
-    const result = importContactCSV(flags.get('--input'), flags.get('--output'), flags.get('--observations'), museFiles, flags.get('--photos'));
+      'Usage: contacts:csv --input <owner-provided.csv> --output <fresh-local-directory> [--observations <saved-metadata.json>] [--muse <saved-recency.json>] [--photos <profile-photos.json>] [--time-zone <IANA zone>]');
+    const result = importContactCSV(flags.get('--input'), flags.get('--output'), flags.get('--observations'), museFiles, flags.get('--photos'),
+      flags.get('--time-zone'));
     process.stdout.write('Private contact snapshot and offline dashboard saved locally; source coverage remains partial.\n');
     return result.exitCode;
   }, error => {

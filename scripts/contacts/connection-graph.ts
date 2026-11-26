@@ -19,16 +19,16 @@ interface GraphNode {
   id: string; label: string; initials: string; ring: Ring; ringLabel: string; kind: Kind; lastActivity: string | null;
   lastNote: string; platforms: Platform[]; platformLabels: string[]; chats: string[]; photo: string | null; identityNote: string;
 }
-interface GraphChat { id: string; platform: Platform; kind: 'one-to-one' | 'group' | 'unknown' | 'text'; label: string; latest: string | null; members: string[] }
+interface GraphChat { id: string; platform: Platform; kind: 'one-to-one' | 'group' | 'unknown' | 'text'; label: string; latest: string | null; asOf: string | null; members: string[] }
 interface ConnectionModel { nodes: GraphNode[]; chats: GraphChat[]; linkedPhotos: Photo[]; selfIdentified: boolean; asOf: string | null }
 
 const PLATFORMS: Record<Platform, string> = { messenger: 'Messenger', instagram: 'Instagram', messages: 'Google Messages' };
-// Rings are calendar-day age of the latest shared-chat activity, relative to the snapshot's as-of day.
+// Rings are calendar-day age of the latest shared-chat activity, relative to that chat's own source snapshot day.
 const RINGS: { id: Ring; label: string; base: number; maxAge: number }[] = [
   { id: 'today', label: 'Today', base: 140, maxAge: 0 },
   { id: 'week', label: 'This week', base: 230, maxAge: 6 },
   { id: 'fortnight', label: 'Last two weeks', base: 320, maxAge: 13 },
-  { id: 'month', label: 'Last 30 days', base: 410, maxAge: 30 },
+  { id: 'month', label: 'Last 30 days', base: 410, maxAge: 29 },
   { id: 'older', label: 'Over a month ago', base: 500, maxAge: Infinity },
   { id: 'unknown', label: 'Date unknown', base: 580, maxAge: NaN }
 ];
@@ -101,7 +101,18 @@ function initials(label: string): string {
   return letters.join('').toLocaleUpperCase() || '?';
 }
 
-function connectionModel(observations: TextObservations | null, muse: MuseSource[], photos: PhotoSet | null = null): ConnectionModel {
+function connectionModel(observations: TextObservations | null, muse: MuseSource[], photos: PhotoSet | null = null,
+  zone: string | null = null): ConnectionModel {
+  // Calendar days need the owner's zone; without one, recency stays unknown rather than defaulting to UTC.
+  const timeZone = observations?.period?.timeZone ?? zone;
+  const formatter = timeZone ? new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }) : null;
+  const dayOf = (value: string | null | undefined): string | null => {
+    if (typeof value !== 'string') return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    if (formatter === null || Number.isNaN(Date.parse(value))) return null;
+    const parts = Object.fromEntries(formatter.formatToParts(new Date(value)).map(p => [p.type, p.value]));
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  };
   const nodes = new Map<string, GraphNode & { kinds: Set<GraphChat['kind']>; profile: boolean }>();
   const chats: GraphChat[] = [];
   const photoByKey = new Map((photos?.photos ?? []).map(photo => [photo.key, photo]));
@@ -123,9 +134,10 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     const platform: Platform = source.source;
     const self = new Set((source.selfIds ?? []).map(id => participantKey(platform, id)).filter(Boolean));
     if (self.size) selfIdentified = true;
+    const sourceDay = dayOf(source.retrievedAt);
     source.records.forEach((row, index) => {
       const kind = row.chatType === 'group' ? 'group' : row.chatType === 'unknown' ? 'unknown' : 'one-to-one';
-      const chat: GraphChat = { id: `c${chats.length + 1}`, platform, kind, latest: row.reportedLatestSentAt, members: [],
+      const chat: GraphChat = { id: `c${chats.length + 1}`, platform, kind, latest: row.reportedLatestSentAt, asOf: sourceDay, members: [],
         label: `${PLATFORMS[platform]} ${kind === 'group' ? 'group chat' : kind === 'unknown' ? 'chat' : 'one-to-one chat'} ${index + 1}` };
       chats.push(chat);
       row.participants.forEach((participant, position) => {
@@ -141,43 +153,39 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     const inside = observations.messages.filter(m => m.threadUiId === thread && m.requestedWindowMembership === 'inferred-inside')
       .map(m => m.inferredLocalDate).sort();
     const chat: GraphChat = { id: `c${chats.length + 1}`, platform: 'messages', kind: 'text', members: [],
-      label: `Text conversation ${index + 1}`, latest: inside.at(-1) ?? null };
+      label: `Text conversation ${index + 1}`, latest: inside.at(-1) ?? null,
+      asOf: observations.period ? dayOf(new Date(Date.parse(observations.period.end) - 1).toISOString()) : null };
     chats.push(chat);
     add(`messages|${thread}`, `Conversation ${index + 1}`, 'messages', chat, false, null);
   });
-  const timeZone = observations?.period?.timeZone ?? 'UTC';
-  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
-  const dayOf = (value: string) => {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-    const parts = Object.fromEntries(formatter.formatToParts(new Date(value)).map(p => [p.type, p.value]));
-    return `${parts.year}-${parts.month}-${parts.day}`;
-  };
-  // Deterministic reference day: the latest snapshot time supplied, never the render clock.
-  const references = [...muse.map(m => m.retrievedAt), observations?.period ? new Date(Date.parse(observations.period.end) - 1).toISOString() : null,
-    ...chats.map(c => c.latest)].filter((v): v is string => typeof v === 'string' && !Number.isNaN(Date.parse(v)));
-  const asDay = references.length ? references.map(dayOf).sort().at(-1) : null;
+  // Each chat ages against its own source snapshot day, never the render clock or another source's later snapshot.
+  const sourceDays = [...new Set(chats.map(c => c.asOf).filter((d): d is string => d !== null))].sort();
+  const asOf = sourceDays.length === 0 ? null : sourceDays.length === 1 ? sourceDays[0] : `${sourceDays[0]} to ${sourceDays.at(-1)}`;
+  const direct = (chat: GraphChat) => chat.kind === 'one-to-one' || chat.kind === 'text';
   const result = [...nodes.values()].map(({ kinds, profile, ...node }) => {
     const kind: Kind = kinds.has('one-to-one') ? 'direct' : kinds.has('text') ? 'text' : kinds.has('group') ? 'group' : 'unknown';
-    let last: { day: string; chat: GraphChat } | null = null;
+    let last: { day: string; age: number; chat: GraphChat } | null = null;
     for (const id of node.chats) {
-      const chat = chats.find(c => c.id === id), day = chat.latest === null ? null : dayOf(chat.latest);
-      if (day !== null && (last === null || day > last.day || (day === last.day && chat.kind !== 'group' && last.chat.kind === 'group'))) {
-        last = { day, chat };
-      }
+      const chat = chats.find(c => c.id === id), day = dayOf(chat.latest);
+      if (day === null || chat.asOf === null) continue;
+      const age = Math.max(0, (Date.parse(`${chat.asOf}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86400000);
+      if (last === null || day > last.day || (day === last.day && direct(chat) && !direct(last.chat))) last = { day, age, chat };
     }
-    const age = last === null || asDay === null ? NaN : Math.max(0, (Date.parse(`${asDay}T00:00:00Z`) - Date.parse(`${last.day}T00:00:00Z`)) / 86400000);
-    const ring = Number.isNaN(age) ? RINGS.at(-1) : RINGS.find(r => age <= r.maxAge);
+    const ring = last === null ? RINGS.at(-1) : RINGS.find(r => last.age <= r.maxAge);
+    const age = last?.age;
     return { ...node, ring: ring.id, ringLabel: ring.label, kind, lastActivity: last?.day ?? null,
-      lastNote: last === null ? 'No activity date returned for any shared chat.' :
-        `${last.day} · ${age === 0 ? 'today' : age === 1 ? '1 day ago' : `${age} days ago`} · ${last.chat.kind === 'group' ?
-          'latest group-chat activity, not necessarily with them' : last.chat.kind === 'text' ? 'latest observed message (inferred day)' :
-            'latest one-to-one activity'}`,
+      lastNote: last === null ? (formatter === null && node.chats.some(id => chats.find(c => c.id === id).latest !== null) ?
+        'No time zone supplied, so the activity day is unknown.' : 'No activity date returned for any shared chat.') :
+        `${last.day} · ${age === 0 ? 'same day as' : age === 1 ? '1 day before' : `${age} days before`} its ${last.chat.asOf} snapshot · ${
+          last.chat.kind === 'group' ? 'latest group-chat activity, not necessarily with them' :
+            last.chat.kind === 'unknown' ? 'latest activity in a chat of unknown type, not necessarily with them' :
+              last.chat.kind === 'text' ? 'latest observed message (inferred day)' : 'latest one-to-one activity'}`,
       platformLabels: node.platforms.map(p => PLATFORMS[p]),
       identityNote: kind === 'text' ? 'Participants were not captured; not linked to any contact.' :
         profile ? `Muse-reported profile ID; unverified.${node.photo ? ' Photo attached by exact profile ID match.' : ''}` :
           'No profile ID; this entry is local to one chat and never merged by name.' };
   });
-  return { nodes: result, chats, linkedPhotos: [...linked.values()], selfIdentified, asOf: asDay };
+  return { nodes: result, chats, linkedPhotos: [...linked.values()], selfIdentified, asOf };
 }
 
 const BADGES = `<g id="badge-messenger"><circle r="8" fill="#0a7cff" stroke="#fffdf9" stroke-width="2"/><path d="M-4.6 2.3L-1.2-1.9L1 .4L4.6-2.3L1.2 1.9L-1-.4Z" fill="#fff"/></g>
@@ -212,7 +220,7 @@ aria-label="${escape(`${node.label}: ${node.ringLabel}; ${node.platformLabels.jo
   });
   return `<svg id="connections-svg" xmlns="http://www.w3.org/2000/svg" viewBox="${-extent} ${-extent} ${extent * 2} ${extent * 2}" role="group" aria-labelledby="connections-title connections-desc">
 <title id="connections-title">Your connections in concentric rings</title>
-<desc id="connections-desc">You are at the center. Rings show how recently a shared chat was active${model.asOf ? ` as of ${escape(model.asOf)}` : ''}, closest first. Spokes mark one-to-one or observed text conversations; group-only members have no spoke.</desc>
+<desc id="connections-desc">You are at the center. Rings show how recently a shared chat was active relative to its source snapshot${model.asOf ? ` (${escape(model.asOf)})` : ''}, closest first. Spokes mark one-to-one or observed text conversations; group-only members have no spoke.</desc>
 <defs><clipPath id="avatar-clip"><circle r="22"/></clipPath>${BADGES}</defs>
 ${circles}${spokes.join('')}<circle class="self" r="34"/><text class="self-label" y="6" text-anchor="middle">You</text>${items.join('')}</svg>`;
 }
@@ -289,7 +297,7 @@ function connectionsPanel(model: ConnectionModel): string {
   const platforms = (['messenger', 'instagram', 'messages'] as Platform[]).filter(p => model.nodes.some(n => n.platforms.includes(p)));
   const badge = (p: Platform) => `<svg viewBox="-10 -10 20 20" aria-hidden="true"><use href="#badge-${p}"/></svg>`;
   return `<section class="panel graph-panel" aria-labelledby="graph-heading"><h2 id="graph-heading">Your connections</h2>
-<p class="muted">Rings show when a chat you share was last active${model.asOf ? ` (as of ${escape(model.asOf)})` : ''}: today at the center, older further out. Click a person to see where you talked and who shares those chats. Drag to pan, scroll to zoom.</p>
+<p class="muted">Rings show how recently a chat you share was active, measured from each source's snapshot day${model.asOf ? ` (${escape(model.asOf)})` : ' (unknown: no time zone or dates)'}: most recent at the center, older further out. Click a person to see where you talked and who shares those chats. Drag to pan, scroll to zoom.</p>
 <div class="graph-tools"><input id="connection-search" type="search" placeholder="Find in graph…" autocomplete="off" aria-label="Find in graph">
 ${platforms.map(p => `<label class="chip"><input type="checkbox" data-platform-filter value="${p}" checked>${badge(p)}${PLATFORMS[p]}</label>`).join('')}
 <span class="zoom"><button type="button" data-zoom="in" aria-label="Zoom in">+</button> <button type="button" data-zoom="out" aria-label="Zoom out">−</button> <button type="button" data-zoom="fit">Fit</button></span>

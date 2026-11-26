@@ -199,9 +199,13 @@ participant and the dashboard says so.
 
 The dashboard's **Your connections** panel draws an interactive concentric map
 with you at the center. Each ring is a recency band (today, this week, last two
-weeks, last 30 days, older, date unknown). It is based on the calendar-day age of
-the latest activity in any chat shared with that node, relative to the latest
-snapshot time supplied, never the render clock. Spokes show evidence type: solid
+weeks, last 30 days, older, date unknown). It is based on the local calendar-day
+age of the latest activity in any chat shared with that node, measured against
+that chat's own source snapshot day (Muse `retrievedAt`, observations period end),
+never the render clock or another source's later snapshot. Calendar days need a
+time zone: the saved observations period supplies it, or pass
+`--time-zone <IANA zone>` (which must match the observations if both exist);
+without one, timestamped activity stays in the unknown ring. Spokes show evidence type: solid
 for one-to-one, dashed for Google Messages conversations whose participants are
 unlinked, and none for group-chat-only members. For those members the ring
 reflects group activity, not necessarily interaction with them, and the inspector

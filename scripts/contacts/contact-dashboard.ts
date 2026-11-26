@@ -208,8 +208,9 @@ filter.addEventListener('change',update);update();
 `;
 
 function renderDashboard(snapshot: ContactSnapshot, observations: Observations | null,
-  suggestions: { evidence: string; people: string[] }[], muse: MuseRecency[] = [], photos: PhotoSet | null = null): string {
-  const graph = connectionModel(observations, muse, photos);
+  suggestions: { evidence: string; people: string[] }[], muse: MuseRecency[] = [], photos: PhotoSet | null = null,
+  timeZone: string | null = null): string {
+  const graph = connectionModel(observations, muse, photos, timeZone);
   const graphHash = crypto.createHash('sha256').update(CONNECTIONS_SCRIPT).digest('base64');
   const threads = [...new Set(observations?.messages.map(m => m.threadUiId) ?? [])];
   const days: string[] = [];

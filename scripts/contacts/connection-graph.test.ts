@@ -38,7 +38,7 @@ test('profile keys use exact native Facebook references and never derive identit
 });
 
 test('concentric graph keeps group membership spoke-free, excludes self IDs and attaches faces only by exact profile ID', () => {
-  const model = connectionModel(null, [muse(['https://www.facebook.com/profile.php?id=100001'])], photos);
+  const model = connectionModel(null, [muse(['https://www.facebook.com/profile.php?id=100001'])], photos, 'America/Los_Angeles');
   assert.equal(model.selfIdentified, true);
   assert.ok(!model.nodes.some(node => node.label === 'Owner Fixture'));
   const ada = model.nodes.filter(node => node.label.includes('Ada'));
@@ -54,7 +54,7 @@ test('concentric graph keeps group membership spoke-free, excludes self IDs and 
   assert.equal(ada.find(node => node.kind === 'group').ring, 'unknown', 'no returned date stays unknown, not old');
   const older = model.nodes.find(node => node.label === 'Name Only' && node.lastActivity !== null);
   assert.equal(older.ring, 'fortnight');
-  assert.match(older.lastNote, /10 days ago · latest group-chat activity, not necessarily with them/);
+  assert.match(older.lastNote, /10 days before its 2026-11-26 snapshot · latest group-chat activity, not necessarily with them/);
   const unidentified = connectionModel(null, [muse()], photos);
   assert.equal(unidentified.selfIdentified, false);
   assert.equal(unidentified.nodes.filter(node => node.label === 'Owner Fixture').length, 1);
@@ -65,6 +65,32 @@ test('concentric graph keeps group membership spoke-free, excludes self IDs and 
   assert.equal(html.match(/data-spoke=/g).length, 1, 'only the one-to-one participant gets a spoke');
   assert.ok(!html.includes('<b>Ada</b>'));
   assert.ok(html.includes('never by name or face'));
+});
+
+test('recency rings use local calendar days against each source snapshot and never guess', () => {
+  const chat = (chatType: string, at: string | null) => ({ chatType, reportedChatId: null, reportedLatestSentAt: at,
+    nativeEvidenceVerified: false as const, participants: [{ name: `${chatType} ${at}`, id: null }] });
+  const source = (retrievedAt: string, records: ReturnType<typeof chat>[]) => ({ source: 'messenger' as const, retrievedAt, records });
+  const ring = (model: ReturnType<typeof connectionModel>, label: string) => model.nodes.find(node => node.label === label);
+  const local = connectionModel(null, [source('2026-11-25T17:00:00-08:00', [chat('one_to_one', '2026-11-25T15:00:00-08:00'),
+    chat('unknown', '2026-11-20T10:00:00-08:00'), chat('one_to_one', '2026-10-26T10:00:00-08:00'), chat('one_to_one', '2026-10-27T10:00:00-08:00')])],
+  null, 'America/Los_Angeles');
+  assert.equal(ring(local, 'one_to_one 2026-11-25T15:00:00-08:00').ring, 'today', 'same local day, despite a different UTC day');
+  assert.equal(local.asOf, '2026-11-25');
+  assert.match(ring(local, 'unknown 2026-11-20T10:00:00-08:00').lastNote, /chat of unknown type, not necessarily with them/);
+  assert.equal(ring(local, 'one_to_one 2026-10-26T10:00:00-08:00').ring, 'older', '30 calendar days old is outside the last 30 days');
+  assert.equal(ring(local, 'one_to_one 2026-10-27T10:00:00-08:00').ring, 'month');
+
+  const noZone = connectionModel(null, [source('2026-11-25T17:00:00-08:00', [chat('one_to_one', '2026-11-25T15:00:00-08:00')])]);
+  assert.equal(noZone.nodes[0].ring, 'unknown');
+  assert.match(noZone.nodes[0].lastNote, /No time zone supplied/);
+
+  const text = { period: { end: '2026-11-27T08:00:00.000Z', timeZone: 'America/Los_Angeles' },
+    messages: [{ threadUiId: 't', inferredLocalDate: '2026-11-20', requestedWindowMembership: 'inferred-inside' }] };
+  const mixed = connectionModel(text, [source('2026-10-20T12:00:00-07:00', [chat('one_to_one', '2026-10-20T09:00:00-07:00')])]);
+  assert.equal(ring(mixed, 'one_to_one 2026-10-20T09:00:00-07:00').ring, 'today', 'an older source is not aged by a newer one');
+  assert.equal(ring(mixed, 'Conversation 1').ring, 'week');
+  assert.equal(mixed.asOf, '2026-10-20 to 2026-11-26');
 });
 
 test('saved photos require native friendship evidence, matching digests and image signatures', t => {
