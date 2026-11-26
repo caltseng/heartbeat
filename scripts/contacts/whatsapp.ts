@@ -3,11 +3,12 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { TextDecoder, isDeepStrictEqual } from 'node:util';
 import { hash, stripBOM, hasUnsupportedTextControls, readJSONValue, persistText, openLock, releaseLock,
-  runCLI, outputLocation, CollectionError as ConversionError, createError, isError,
+  runCLI, outputLocation, createConversionError, createError, isError,
   createCodeGuard, createCodeValidators } from './lib.ts';
 import { resolvePeriod } from './collect.ts';
 
 const PROFILE = 'whatsapp-ios-txt-metadata-v1';
+const ConversionError = createConversionError('whatsapp');
 const conversionError = createError('whatsapp');
 const need = createCodeGuard('invalid_manifest', conversionError);
 const { object: shape } = createCodeValidators(need, 'invalid_manifest');

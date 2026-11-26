@@ -40,6 +40,18 @@ function createError(domain: string, message: (code: string) => string = code =>
 function isError(error: unknown, domain: string): error is CollectionError {
   return error instanceof CollectionError && error.domain === domain;
 }
+function createConversionError(domain: string) {
+  // Keep the exported (code, status) constructors without adding error subclasses.
+  return new Proxy(CollectionError, {
+    construct(target, [code, status = 'failed'], newTarget) {
+      return Reflect.construct(target, [code, code, status, false, domain], newTarget);
+    },
+    get(target, property, receiver) {
+      if (property === Symbol.hasInstance) return (error: unknown) => isError(error, domain);
+      return Reflect.get(target, property, receiver);
+    }
+  });
+}
 function need(condition: unknown, code: string, status = 'failed',
   failure = createError('conversion')): void {
   if (!condition) throw failure(code, status);
@@ -210,7 +222,7 @@ async function runCLI(action: () => number | Promise<number>, onError: (error: E
 
 export {
   hash, hashJSON, stripBOM, parseJSON, hasUnsupportedTextControls, errorCode,
-  CollectionError, requireValue, createGuard, createError, isError, need, shape, isText,
+  CollectionError, requireValue, createGuard, createError, createConversionError, isError, need, shape, isText,
   createCodeGuard, createCodeValidators,
   createValidators, object, text, identifier, sourceIdentifier, array, instant, SOURCES, CHANNELS, versions,
   readJSONValue, readJSONWithDigest, readJSON, within, outputLocation,

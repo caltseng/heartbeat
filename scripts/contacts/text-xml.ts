@@ -2,10 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
 import { hash as digest, stripBOM, readJSONValue, runCLI, outputLocation,
-  CollectionError as ConversionError, createError, isError, createCodeGuard, createCodeValidators } from './lib.ts';
+  createConversionError, createError, isError, createCodeGuard, createCodeValidators } from './lib.ts';
 import { resolvePeriod } from './collect.ts';
 
 const PROFILE = 'synctech-xml-metadata-v1';
+const ConversionError = createConversionError('text-xml');
 const conversionError = createError('text-xml');
 const need = createCodeGuard('invalid_manifest', conversionError);
 const { object: shape } = createCodeValidators(need, 'invalid_manifest');

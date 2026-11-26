@@ -27,7 +27,10 @@ record-revision fallback. Commands select validator policies and retain their
 error messages/codes, lock metadata and result formatting. A single `CollectionError`
 type carries status/retryability and an origin domain; adapter catch boundaries
 check that domain so shared infrastructure failures are not mistaken for
-adapter failures. The collector's reconciliation-aware `persist` and its existing helper
+adapter failures. The converters retain their exported `(code, status)`
+constructors and converter-specific `instanceof` checks through shared
+constructor adapters, not additional error classes.
+The collector's reconciliation-aware `persist` and its existing helper
 exports remain compatible; `local-json.ts` re-exports the shared persistence API.
 Collection snapshots use `collection-store.ts` for compact revision-reference
 storage and legacy expansion; use `readCollection` when inspecting record

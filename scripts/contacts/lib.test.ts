@@ -8,6 +8,8 @@ import { spawnSync } from 'node:child_process';
 import { readJSON, readJSONValue, readJSONWithDigest, openLock, releaseLock,
   persist, publishText, CollectionError, createGuard, createValidators,
   createError, isError, createCodeGuard, createCodeValidators, instant } from './lib.ts';
+import { ConversionError as TextConversionError } from './text-xml.ts';
+import { ConversionError as WhatsAppConversionError } from './whatsapp.ts';
 
 function fixture(t) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'heartbeat-lib-'));
@@ -68,6 +70,26 @@ test('one shared error type preserves adapter catch boundaries and retryability'
   assert.equal(isError(new CollectionError('invalid_input'), 'google'), false);
   assert.equal(isError(Object.assign(new Error('external'), { code: 'quota_exhausted' }), 'google'), false);
   assert.equal(email('metadata_incomplete').message, 'Email acquisition failed [metadata_incomplete].');
+});
+
+test('exported converter error constructors retain status arguments and converter-specific instance checks', () => {
+  for (const [Constructor, other, domain] of [
+    [TextConversionError, WhatsAppConversionError, 'text-xml'],
+    [WhatsAppConversionError, TextConversionError, 'whatsapp']
+  ] as const) {
+    for (const status of [undefined, 'requires_setup', 'unsupported']) {
+      const error = new Constructor('missing_time_evidence', status);
+      assert.equal(error.code, 'missing_time_evidence');
+      assert.equal(error.message, 'missing_time_evidence');
+      assert.equal(error.status, status ?? 'failed');
+      assert.ok(error instanceof CollectionError);
+      assert.ok(error instanceof Constructor);
+      assert.equal(error instanceof other, false);
+      assert.equal(isError(error, domain), true);
+    }
+    assert.ok(createError(domain)('invalid_utf8') instanceof Constructor);
+    assert.equal(new CollectionError('invalid_input') instanceof Constructor, false);
+  }
 });
 
 test('JSON helpers accept one leading BOM without changing byte digests or caller error contracts', t => {
