@@ -13,9 +13,11 @@ relationship quality. Missing data means unknown, not zero.
 Heartbeat project session. It inspects source-tool capabilities, uses normal
 client sign-in and obtains source/account, field and per-run approval before
 saving a bounded metadata-only handoff. Follow the
-[owner walkthrough](docs/spec/contacts-manual-retrieval.md) for local protection,
-retention/deletion, unavailable sources and the still-required owner live trial.
-Approved source-API retrieval is not permission for remote-AI processing.
+[owner walkthrough](docs/spec/contacts-manual-retrieval.md) for private output,
+owner-controlled retention, unavailable sources and the still-required owner live trial.
+Manual retrieval does not require disk encryption, ACL/backup audits or fixed
+retention. Muse cloud/AI processing of metadata needs specific per-run approval;
+source sign-in alone does not grant it.
 **This path does not enable private import or aggregation.**
 The [source retrieval plan](docs/spec/contacts-retrieval-plan.md) distinguishes
 API candidates, Android/export alternatives and Muse's device/cloud processing

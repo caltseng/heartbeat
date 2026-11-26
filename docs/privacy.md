@@ -5,21 +5,49 @@
 The [contacts-retrieve skill](spec/contacts-manual-retrieval.md) is a bounded,
 user-invoked exception to older blanket synthetic-only **acquisition** guidance.
 It may use an actually available authenticated source tool after the owner
-approves the exact source/account, metadata fields, interval/as-of and verified
-private local output for EACH run. Client sign-in uses the tool's normal auth
-flow, never secrets in chat/files. Missing capabilities/auth remain explicit;
+approves the exact source/account, metadata fields, interval/as-of, finite budget,
+processing route and private output for EACH run. Client sign-in uses the tool's
+normal auth flow; never extract or paste credentials into chat or project files.
+Missing capabilities/auth remain explicit;
 other approved sources may proceed. No new OAuth connector, backend, bridge,
 automatic retention service, background sync or recurring scheduler is required.
 
-The owner may verify Windows-user access restrictions, encryption and exclusion
-from ordinary shares/sync/backups manually before acquisition; a future automated
-protection platform is not an invocation prerequisite. Unverified protection
-still stops acquisition/storage. The 12-month retention ceiling, deletion of
-temporary inputs and outputs, excluded content, least privilege and per-run
-consent remain. No account or real run is authorized merely by this policy.
-Only source-API retrieval is permitted, not processing collected metadata with
-remote AI. Inspect actual tool behavior, including Muse if present; a name alone
-neither proves a supported source read nor authorizes remote-AI processing.
+**Owner revision, 2026-11-26 (Pacific), manual retrieval only:** the owner
+removed mandatory disk encryption, Windows ACL verification, share/backup/
+cloud-sync exclusion checks, the fixed 12-month retention ceiling and the
+blanket ban on owner-approved Muse processing of metadata. These are policy
+decisions, not engineering defaults or proof of a particular account's access.
+Do not enable or require data-at-rest encryption for this manual workflow.
+Provider TLS and an authenticated client's built-in credential handling are not
+disabled or replaced by this decision.
+
+| Manual boundary | Current requirement |
+| --- | --- |
+| Storage | Choose an ordinary private output directory outside Git worktrees. No encryption, ACL audit or share/sync/backup exclusion audit is required; inability to perform those checks does not block this path. Path validity, fresh output and no-clobber checks still apply. |
+| Retention | The owner chooses retention and may delete inputs and outputs. No fixed 12-month ceiling, deletion-date questionnaire or automated retention service is required for manual handoffs. Existing synthetic retention commands are unchanged. |
+| Processing | Selective source-API retrieval or specifically owner-approved Muse cloud/AI processing of the allowed metadata may be used. Approval must identify the processor, source/account, fields, interval and finite budget for this run. Sign-in alone is not that approval; unrelated remote processors remain unapproved. |
+| Content and secrets | Metadata only. Excluded content must be omitted before retrieval; requesting JSON or stripping bodies afterward is not permission. Never request, display, log or commit passwords, tokens, cookies or credential files. Use normal client sign-in, not credential extraction. |
+| Publication and authority | Keep records/configuration out of Git, PRs, CI, Library, logs and ordinary chat. An approved private Muse conversation may process only the run's approved metadata; do not copy its private records into other chats. No public publication, source mutation, sending, schedules, implicit setup or unrelated access. |
+
+Inspect actual tool behavior, including Muse; a name or narrative answer alone
+does not establish selectable fields, stable record evidence or completeness.
+If the client cannot preserve the approved field/processing/output boundary,
+stop that route before source reads. No account or real run is authorized
+merely by this policy revision.
+
+**Owner-operated canvas exception:** a separately approved Google Messages Web
+trial may allow the web client to fetch/render incidental bodies and previews
+while extracting and saving only selected metadata. Explicitly approve that
+rendering boundary for each bounded trial; it is not permission for body/snippet
+analysis, whole-page snapshots, raw network/app-state dumps or content exports.
+Keep private records out of agent/tool logs. The owner controls normal sign-in,
+pairing and conversation selection; the agent does not extract cookies/tokens,
+pair devices or open unread threads automatically. Opening a thread in the
+provider UI may mark it read: leave that action to the owner, not an automated
+read-only collector. Only inspect the selected metadata DOM nodes and preserve
+unknown IDs, direction, transport, dates and history as explicit gaps.
+This exception does not permit content-bearing API/export acquisition or
+private imports. A future source/UI needs its own approved boundary.
 
 This exception ends at the private local source handoff. It does NOT lift any
 private guard in existing importers, converters, aggregation or rendering.
@@ -36,6 +64,11 @@ questionnaire. **No particular account, tool, device, credential, export or real
 collection run is authorized now.** Policy approval, first-source approval and
 approval of each real run are distinct gates; only the owner grants the latter
 two. Do not request secrets to satisfy a gate.
+
+The table below retains the original requirements for existing adapters,
+converters, importers and downstream workflows. The manual exception above
+supersedes its storage/retention/Muse restrictions only for `contacts-retrieve`.
+It does not lift private guards or authorize raw-content processing.
 
 | Boundary | Approved policy |
 | --- | --- |
@@ -100,14 +133,17 @@ by this change.
 
 Engineering rationale, alternatives and revisit conditions: [CONTACTS-010](decisions.md#contacts-010).
 
-Future first-run review must name the exact private account/source and selected
-read-only route/fields, approved machine/location, ACL/encryption and backup
+Future private-import first-run review must name the exact private account/source
+and selected read-only route/fields, approved machine/location, ACL/encryption and backup
 verification evidence, interval and owner run approval. Keep evidence and account
 identifiers in approved private local storage, never in tracked policy examples.
 If any evidence expires, is missing or cannot be verified, stop before acquisition.
 This checklist is a run gate, not a renewed questionnaire about the approved policy.
 
 ## Source setup/access gates (not granted)
+
+These rows describe the existing synthetic adapters/converters, not additional
+storage or remote-processing restrictions on the manual exception above.
 
 | Source | Current capability | Separate selection / authorization still required |
 | --- | --- | --- |

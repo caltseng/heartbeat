@@ -15,13 +15,15 @@ governs privacy, not engineering history.
 ### Privacy and scope
 
 Owner-approved metadata categories do not approve exact source/account or EACH
-real run (including replay/resume/changed bounds). Real artifacts require verified
+real run (including replay/resume/changed bounds). Except for the manual V0
+exception below, real artifacts require verified
 Windows-user ACL/encryption, this-computer storage outside Git/sync, backup
 exclusion and 12-month deletion across inputs/provenance/cursors/derived files.
 Ignored `.private\contacts` permits synthetic artifacts, not verified real storage.
 No importer/converter/downstream approval flag bypasses private guards.
-Never relabel real input synthetic or share private manifests/configuration/logs/
-IDs/exports/notes/maps in Git, chat, PRs, CI or remote AI.
+Never relabel real input synthetic or publish private manifests/configuration/
+logs/IDs/exports/notes/maps in Git, ordinary chat, PRs or CI. Remote-AI processing
+remains prohibited outside the specifically approved manual Muse exception below.
 
 No implicit account/device/backup/private-browser/other-person access,
 credential/cookie/password acquisition, bridges, pairing, sending/source writes
@@ -31,11 +33,19 @@ Keep development, examples, checks and review synthetic/account-free.
 No hosting/backend/multi-tenancy/product-account or deployment stack.
 
 **Manual V0 exception:** [contacts-retrieve](contacts-manual-retrieval.md) may use
-an inspected available source-API metadata tool, normal client auth and per-run
-owner approval with verified private local output. No new connector/privacy
-platform/scheduler is required. It ends at local handoff, **not private import,
-aggregation or rendering**. Source-API retrieval differs from remote-AI
-processing; Muse/tool name alone proves neither supported fields nor permission.
+an inspected available metadata tool, normal client auth and per-run owner
+approval with private output outside Git. The owner removed mandatory encryption,
+ACL/share/sync/backup verification and the fixed retention ceiling for this path;
+do not enable encryption or block manual retrieval on those checks. Specifically
+approved Muse cloud/AI processing may handle only the run's approved metadata.
+No new connector/privacy platform/scheduler is required. It ends at local handoff,
+**not private import, aggregation or rendering**. Muse/tool name alone proves
+neither selectable fields nor provider-record evidence or permission.
+The separately approved owner-operated Google Messages canvas trial may render
+incidental content while capturing metadata nodes only; see the
+[exact UI boundary](../privacy.md#owner-authorized-manual-v0-retrieval). It does
+not authorize raw content/API/export processing, cookie extraction or automatic
+opening of unread threads.
 
 ### Source workflow
 
