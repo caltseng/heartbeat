@@ -1,5 +1,32 @@
 # Heartbeat privacy and local-data policy
 
+## Owner-authorized manual V0 retrieval
+
+The [contacts-retrieve skill](spec/contacts-manual-retrieval.md) is a bounded,
+user-invoked exception to older blanket synthetic-only **acquisition** guidance.
+It may use an actually available authenticated source tool after the owner
+approves the exact source/account, metadata fields, interval/as-of and verified
+private local output for EACH run. Client sign-in uses the tool's normal auth
+flow, never secrets in chat/files. Missing capabilities/auth remain explicit;
+other approved sources may proceed. No new OAuth connector, backend, bridge,
+automatic retention service, background sync or recurring scheduler is required.
+
+The owner may verify Windows-user access restrictions, encryption and exclusion
+from ordinary shares/sync/backups manually before acquisition; a future automated
+protection platform is not an invocation prerequisite. Unverified protection
+still stops acquisition/storage. The 12-month retention ceiling, deletion of
+temporary inputs and outputs, excluded content, least privilege and per-run
+consent remain. No account or real run is authorized merely by this policy.
+Only source-API retrieval is permitted, not processing collected metadata with
+remote AI. Inspect actual tool behavior, including Muse if present; a name alone
+neither proves a supported source read nor authorizes remote-AI processing.
+
+This exception ends at the private local source handoff. It does NOT lift any
+private guard in existing importers, converters, aggregation or rendering.
+References below to future enforceable controls before private import remain
+true for those commands, not blanket prerequisites to this manual skill.
+Development, tests and review remain synthetic/account-free.
+
 ## CONTACTS-010: owner-approved policy
 
 The owner approved this policy on 2026-11-24 (Pacific), through an explicit
@@ -20,9 +47,9 @@ two. Do not request secrets to satisfy a gate.
 | Retention/deletion | Retain metadata for 12 months, then delete it; explicit local deletion must also be available. Apply deletion to inputs, normalized records, provenance, manifests/history, checkpoints/cursors, temporary files and derived report/graph files, not only visible events. No indefinite identifier cache or automatic restoration. |
 | Backups | No automatic backups, cloud sync or remote copies. Do not assume backup exclusions from `.gitignore`; verify the chosen location is excluded from backup/sync software before use. |
 | Run authority | Explicit owner approval for EACH real collection run, including replay/resume or changed bounds. No scheduled collection, recurring jobs, sending, source writes, credential acquisition, pairing or implicit installation/setup. |
-| Remote processing/publication | No cloud or remote-AI processing of real collection data; Muse/remote-AI acquisition must not process it. Authorized retrieval from a source API after approvals is distinct from sending collected data to remote AI. No hosting, public output, CI data upload, or pasting private manifests/configuration into chats, PRs or issues. |
+| Remote processing/publication | No cloud or remote-AI processing of real collection data. Authorized selective retrieval from a source API through an inspected tool after approvals is distinct from sending collected data to remote AI; a tool's product name does not establish that distinction. No hosting, public output, CI data upload, or pasting private manifests/configuration into chats, PRs or issues. |
 
-## Current enforcement: synthetic only
+## Existing importer enforcement: synthetic only
 
 The [selected text XML converter](spec/contacts-text-converter.md) accepts
 synthetic fixtures only. It rejects private manifests with exit 1 / `private_collection_disabled`

@@ -42,12 +42,19 @@ Source contracts describe implementation and enforcement, not additional consent
 
 ### Privacy and scope
 
+**Manual V0 exception:** [contacts-retrieve](contacts-manual-retrieval.md) supports
+owner-approved, user-invoked source-API metadata retrieval with normal client
+auth and verified private local output. Follow its per-run scope and capability
+inspection. It does not need a new connector/privacy platform or scheduler.
+The synthetic-only workflow statements below govern existing importers,
+converters and downstream processing, not this manual handoff-only path.
+
 Apply the complete [approved policy and synthetic-only enforcement](../privacy.md):
 permitted source categories and metadata fields, excluded content, separate
 first-source/account and EACH-run approvals (including replay/resume/changed
 bounds), verified Windows-user ACLs/encryption, this-computer storage outside Git/
 sync, backup exclusion and 12-month deletion of all inputs/derived artifacts.
-No current workflow enables private requests; no flag, asserted approval or
+No existing importer enables private requests; no flag, asserted approval or
 engineering decision bypasses the guard. Never relabel real data synthetic.
 Raw exports can contain excluded content: metadata projection or "Without Media"
 does not authorize even transient processing of real content. Curated notes and
@@ -56,8 +63,9 @@ prayer content require their own separately approved boundary and remain disable
 Do not implicitly access accounts, other participants' accounts, devices, backups
 or authenticated browser sessions; acquire/request credentials, cookies or backup
 passwords; pair devices; install bridges; send; write sources; schedule work; or
-create automations. No Muse/remote-AI processing of real data. Separately authorized source API
-retrieval is distinct from remote-AI processing, not a currently enabled route.
+create automations. No remote-AI processing of real data. Separately authorized source API
+retrieval is distinct from remote-AI processing; the manual V0 skill can use
+an available supported source read but does not supply a live connector.
 
 Use synthetic fixtures for development, examples, validation and review.
 Operational requests/configuration, exports, metadata, logs, manifests, cursors,
@@ -90,12 +98,13 @@ estimated counts are not observations. One message is one event, not recipient
 fan-out; group membership is not direct interaction or credit for another sender.
 Unknown thread kind stays unknown.
 
-Return the versioned handoff to collection, or import that source alone through
+For synthetic inputs, return the versioned handoff to collection, or import that source alone through
 `contacts:collect` for an independent refresh. Missing access must produce
 `mode: unavailable`, `status: requires_setup` and a reason; unsupported formats/
 unresolved format evidence use `unsupported`. Never omit a requested source or
 manufacture an empty successful page. Snapshot/export/linked-device history and
 cursor exhaustion do not prove complete upstream history or ongoing sync.
+Manual V0 real retrieval stops at its local handoff; do not invoke the private importer.
 Exact immutable replay is distinct from changed/overlapping exports, which need
 [reviewed reconciliation](contacts-source-revisions.md). Different connectors
 require reviewed upstream namespaces/ID translations, not name/text/time deduplication.
