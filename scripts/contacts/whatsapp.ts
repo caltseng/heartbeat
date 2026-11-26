@@ -3,20 +3,15 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { TextDecoder, isDeepStrictEqual } from 'node:util';
 import { hash, stripBOM, hasUnsupportedTextControls, readJSONValue, persistText, openLock, releaseLock,
-  runCLI, outputLocation } from './lib.ts';
+  runCLI, outputLocation, createConversionError, createError, isError,
+  createCodeGuard, createCodeValidators } from './lib.ts';
 import { resolvePeriod } from './collect.ts';
 
 const PROFILE = 'whatsapp-ios-txt-metadata-v1';
-class ConversionError extends Error {
-  constructor(public readonly code: string, public readonly status = 'failed') { super(code); this.code = code; this.status = status; }
-}
-function need(value: unknown, code: string, status?: string) {
-  if (!value) throw new ConversionError(code, status);
-}
-function shape(value, fields) {
-  need(value && typeof value === 'object' && !Array.isArray(value) &&
-    Object.keys(value).every(key => fields.includes(key)), 'invalid_manifest');
-}
+const ConversionError = createConversionError('whatsapp');
+const conversionError = createError('whatsapp');
+const need = createCodeGuard('invalid_manifest', conversionError);
+const { object: shape } = createCodeValidators(need, 'invalid_manifest');
 function id(value) {
   need(typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(value), 'invalid_local_id');
 }
@@ -45,7 +40,7 @@ function timeInstant(wallTime, evidence, offset, retrievedAt) {
     formatter = new Intl.DateTimeFormat('en-GB', { timeZone: evidence.zone, hourCycle: 'h23',
       year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
   } catch (error) {
-    if (error instanceof RangeError) throw new ConversionError('unsupported_source_zone', 'unsupported');
+    if (error instanceof RangeError) throw conversionError('unsupported_source_zone', 'unsupported');
     throw error;
   }
   const local = instant => {
@@ -92,7 +87,7 @@ function convert(bytes, manifest, registry = []) {
     period.asOf <= manifest.retrievedAt && Date.parse(manifest.retrievedAt) <= Date.now(), 'invalid_retrieval_time');
   let txt;
   try { txt = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes); }
-  catch { throw new ConversionError('invalid_utf8'); }
+  catch { throw conversionError('invalid_utf8'); }
   txt = stripBOM(txt);
   need(!hasUnsupportedTextControls(txt), 'unsupported_txt_layout', 'unsupported');
   const lines = txt === '' ? [] : txt.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n');
@@ -199,7 +194,7 @@ function run(argv) {
   fs.mkdirSync(folder, { recursive: true, mode: 0o700 });
   const lock = path.join(folder, 'whatsapp-conversion.lock');
   let fd;
-  fd = openLock(lock, () => new ConversionError('conversion_locked'));
+  fd = openLock(lock, () => conversionError('conversion_locked'));
   try {
     const latest = fs.existsSync(registryFile) ? JSON.parse(fs.readFileSync(registryFile, 'utf8')) : [];
     const { handoff, audit } = convert(bytes, manifest, latest);
@@ -224,7 +219,7 @@ if (require.main === module) {
   runCLI(() => {
     return run(process.argv.slice(2));
   }, error => {
-    const known = error instanceof ConversionError;
+    const known = isError(error, 'whatsapp');
     process.stderr.write(JSON.stringify({ status: known ? error.status : 'failed',
       code: known ? error.code : 'conversion_input_or_io_error' }) + '\n');
     return known && error.status !== 'failed' ? 2 : 1;

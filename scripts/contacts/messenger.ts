@@ -2,26 +2,14 @@ import type { RecordEntry } from './types.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { hash, parseJSON, readJSONValue, writeExclusive, runCLI, outputLocation } from './lib.ts';
+import { hash, parseJSON, readJSONValue, writeExclusive, runCLI, outputLocation,
+  createError, isError, createCodeGuard, createCodeValidators, isText as text } from './lib.ts';
 import { resolvePeriod } from './collect.ts';
 
 const CONNECTOR = 'messenger-json-snapshot-v1';
-class MessengerError extends Error {
-  constructor(public readonly code: string) { super(`Messenger conversion failed [${code}].`); this.code = code; }
-}
-function requireValue(value, code = 'invalid_manifest') {
-  if (!value) throw new MessengerError(code);
-}
-function object(value, keys, code = 'invalid_manifest') {
-  requireValue(value && typeof value === 'object' && !Array.isArray(value) &&
-    Object.keys(value).every(key => keys.includes(key)), code);
-}
-const text = value => typeof value === 'string' && value.trim().length > 0;
-function instant(value) {
-  requireValue(typeof value === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value) &&
-    Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value);
-  return value;
-}
+const messengerError = createError('messenger', code => `Messenger conversion failed [${code}].`);
+const requireValue = createCodeGuard('invalid_manifest', messengerError);
+const { object, instant } = createCodeValidators(requireValue, 'invalid_manifest');
 function synthetic(value) {
   requireValue(value === 'synthetic', value === 'private' ? 'private_conversion_disabled' : 'synthetic_only');
 }
@@ -142,7 +130,7 @@ function convertSnapshot(manifest, readShard): { handoff: import('./types.ts').H
   let root;
   try { root = validateManifest(manifest); }
   catch (failure) {
-    if (!(failure instanceof MessengerError) || !['unsupported_profile', 'unsupported_layout'].includes(failure.code)) throw failure;
+    if (!isError(failure, 'messenger') || !['unsupported_profile', 'unsupported_layout'].includes(failure.code)) throw failure;
     return { handoff: null, report: { status: 'unsupported', profile: CONNECTOR,
       errors: [{ code: failure.code, retryable: false }] }, exitCode: 2 };
   }
@@ -171,7 +159,7 @@ function convertSnapshot(manifest, readShard): { handoff: import('./types.ts').H
       try { native = parseJSON(bytes.toString('utf8')); }
       catch (failure) {
         if (!(failure instanceof SyntaxError)) throw failure;
-        throw new MessengerError('invalid_shard_json');
+        throw messengerError('invalid_shard_json');
       }
       const threadPath = shard.path.slice(root.length).split('/').slice(0, -1).join('/');
       const projected = projectShard(native, manifest.threads.find(thread => thread.threadPath === threadPath),
@@ -191,7 +179,7 @@ function convertSnapshot(manifest, readShard): { handoff: import('./types.ts').H
       convertedShards++;
       excludedEvents += projected.excluded;
     } catch (failure) {
-      if (failure instanceof MessengerError) error(failure.code);
+      if (isError(failure, 'messenger')) error(failure.code);
       else if (['ENOENT', 'EACCES', 'EISDIR', 'EPERM'].includes(failure.code)) error('shard_unreadable');
       else throw failure;
     }
@@ -256,7 +244,7 @@ if (require.main === module) {
     process.stdout.write(`Heartbeat synthetic Messenger conversion: ${result.report.status}; history is unverified.\n`);
     return result.exitCode;
   }, failure => {
-    process.stderr.write(`Messenger conversion failed [${failure instanceof MessengerError ? failure.code : 'input_or_storage_failure'}].\n`);
+    process.stderr.write(`Messenger conversion failed [${isError(failure, 'messenger') ? failure.code : 'input_or_storage_failure'}].\n`);
     return 1;
   });
 }

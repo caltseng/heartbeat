@@ -1,20 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
-import { hash as digest, stripBOM, readJSONValue, runCLI, outputLocation } from './lib.ts';
+import { hash as digest, stripBOM, readJSONValue, runCLI, outputLocation,
+  createConversionError, createError, isError, createCodeGuard, createCodeValidators } from './lib.ts';
 import { resolvePeriod } from './collect.ts';
 
 const PROFILE = 'synctech-xml-metadata-v1';
-class ConversionError extends Error {
-  constructor(public readonly code: string, public readonly status = 'failed') { super(code); this.code = code; this.status = status; }
-}
-function need(condition: unknown, code: string, status?: string) {
-  if (!condition) throw new ConversionError(code, status);
-}
-function shape(value, fields) {
-  need(value && typeof value === 'object' && !Array.isArray(value) &&
-    Object.keys(value).every(key => fields.includes(key)), 'invalid_manifest');
-}
+const ConversionError = createConversionError('text-xml');
+const conversionError = createError('text-xml');
+const need = createCodeGuard('invalid_manifest', conversionError);
+const { object: shape } = createCodeValidators(need, 'invalid_manifest');
 function id(value) { need(typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(value), 'invalid_local_id'); }
 function list(value) { need(Array.isArray(value), 'invalid_manifest'); return value; }
 function xmlChars(value) {
@@ -42,7 +37,7 @@ function parseXML(bytes) {
   need(Buffer.isBuffer(bytes) && bytes.length <= 32 * 1024 * 1024, 'xml_size_limit', 'unsupported');
   let xml;
   try { xml = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
-  catch { throw new ConversionError('invalid_utf8'); }
+  catch { throw conversionError('invalid_utf8'); }
   xmlChars(xml);
   xml = stripBOM(xml);
   const declaration = xml.match(/^<\?xml[\t\r\n ]+version[\t\r\n ]*=[\t\r\n ]*(["'])1\.0\1[\t\r\n ]+encoding[\t\r\n ]*=[\t\r\n ]*(["'])UTF-8\2(?:[\t\r\n ]+standalone[\t\r\n ]*=[\t\r\n ]*(["'])(?:yes|no)\3)?[\t\r\n ]*\?>/);
@@ -274,7 +269,7 @@ if (require.main === module) {
   runCLI(() => {
     return run(process.argv.slice(2));
   }, error => {
-    const known = error instanceof ConversionError;
+    const known = isError(error, 'text-xml');
     process.stderr.write(JSON.stringify({ status: known ? error.status : 'failed', code: known ? error.code : 'conversion_input_or_io_error' }) + '\n');
     return known && error.status !== 'failed' ? 2 : 1;
   });

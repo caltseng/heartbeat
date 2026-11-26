@@ -3,30 +3,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { hashJSON, readJSONValue as readJSON, createGuard, persist, openLock, releaseLock, runCLI,
-  outputLocation } from './lib.ts';
+  outputLocation, createValidators } from './lib.ts';
 import { curate } from './curated.ts';
 
 const STATUSES = ['unknown', 'active', 'paused', 'answered', 'resolved'];
 const requireValue = createGuard('invalid_prayer');
-function object(value, fields) {
-  requireValue(value && typeof value === 'object' && !Array.isArray(value) &&
-    Object.keys(value).every(key => fields.includes(key)), 'Invalid prayer fields.');
-}
-function text(value) {
-  requireValue(typeof value === 'string' && value.trim().length > 0, 'Expected nonempty prayer text.');
-  return value;
-}
-function identifier(value) {
-  requireValue(typeof value === 'string' && /^[a-z][a-z0-9-]{0,95}$/.test(value), 'Invalid prayer identifier.');
-  return value;
-}
+const { object, text, identifier, instant } = createValidators(requireValue, {
+  fieldsMessage: 'Invalid prayer fields.',
+  textMessage: 'Expected nonempty prayer text.',
+  identifierMessage: 'Invalid prayer identifier.',
+  canonicalInstant: true, instantMessage: 'Invalid prayer capture instant.'
+});
 function references(values, records, minimum = 0) {
   requireValue(Array.isArray(values) && values.length >= minimum && new Set(values).size === values.length &&
     values.every(id => typeof id === 'string' && Object.hasOwn(records, id)), 'Invalid prayer references.');
-}
-function instant(value) {
-  requireValue(typeof value === 'string' && Number.isFinite(Date.parse(value)) &&
-    new Date(value).toISOString() === value, 'Invalid prayer capture instant.');
 }
 function date(value) {
   requireValue(value === null || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) &&

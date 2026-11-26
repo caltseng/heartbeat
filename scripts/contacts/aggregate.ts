@@ -1,22 +1,19 @@
 import type { CanonicalPerson, RecordEntry } from './types.ts';
 import fs from 'node:fs';
 import path from 'node:path';
-import { hash, readJSONWithDigest as readJSON, createGuard, publish, runCLI, outputLocation } from './lib.ts';
+import { hash, readJSONWithDigest as readJSON, createGuard, createValidators, CHANNELS,
+  publish, runCLI, outputLocation } from './lib.ts';
 import { resolvePeriod } from './collect.ts';
 import { expandCollection } from './collection-store.ts';
 
-const CHANNELS = {
-  email: ['email'], 'text-messages': ['sms', 'mms', 'rcs', 'imessage'],
-  messenger: ['messenger'], whatsapp: ['whatsapp'], 'google-contacts': []
-};
 const ROLES = ['to', 'cc', 'bcc', 'recipient'];
 const sorted = (values: Iterable<string>): string[] => [...new Set(values)].sort();
 const accountKey = (source, account) => JSON.stringify([source, account]);
 const requireValue = createGuard('invalid_aggregation');
-function object(value, fields, label) {
-  requireValue(value && typeof value === 'object' && !Array.isArray(value), `${label} must be an object.`);
-  requireValue(Object.keys(value).every(key => fields.includes(key)), `${label} contains unsupported fields.`);
-}
+const { object } = createValidators(requireValue, {
+  objectMessage: label => `${label} must be an object.`,
+  fieldsMessage: label => `${label} contains unsupported fields.`
+});
 function namespace(key, type?: string) {
   let tuple;
   try { tuple = JSON.parse(key); }

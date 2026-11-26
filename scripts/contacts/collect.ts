@@ -4,14 +4,9 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { writeDemo } from './demo.ts';
 import { CollectionError, requireValue, object, text, array, instant, hash, readJSON, within,
+  SOURCES, CHANNELS, versions, sourceIdentifier as identifier,
   outputLocation, openLock, releaseLock, runCLI } from './lib.ts';
 import { readCollection, persistCollection } from './collection-store.ts';
-
-const SOURCES = ['google-contacts', 'email', 'text-messages', 'messenger', 'whatsapp'];
-const CHANNELS = {
-  email: ['email'], 'text-messages': ['sms', 'mms', 'rcs', 'imessage'],
-  messenger: ['messenger'], whatsapp: ['whatsapp'], 'google-contacts': []
-};
 
 export type PeriodPreset = '7d' | '30d' | 'custom';
 export interface PeriodRequest {
@@ -103,14 +98,6 @@ function coverage(input, source) {
   requireValue(input.completeness !== 'complete' || source === 'google-contacts' || (start !== null && end !== null), 'Complete activity coverage requires explicit boundaries.');
   return { kind: source === 'google-contacts' ? 'identity-snapshot' : 'activity-interval',
     start, end, completeness: input.completeness, basis: text(input.basis, 'coverage.basis') };
-}
-function identifier(record, fields, label) {
-  object(record, ['id', 'idKind', 'revision', ...fields], label);
-  text(record.id, `${label}.id`);
-  requireValue(['provider', 'local'].includes(record.idKind), `${label}.idKind must distinguish provider and local IDs.`);
-}
-function versions(entry) {
-  return entry.revisions || [{ id: '$initial', supersedes: null, record: entry.record, provenance: entry.provenance }];
 }
 function heads(entry) {
   const rows = versions(entry);
