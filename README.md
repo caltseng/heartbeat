@@ -83,6 +83,14 @@ HTML file with inline SVG hub-and-spoke and person-to-thread maps, labeled
 frequency bands, recency, keyboard selection and shared people/channel/timeline
 views. Open locally without a service. See the [graph contract and decisions](docs/spec/contacts-local-graph.md).
 
+For the interactive owner demo, run
+`npm run contacts:demo -- --output .private\contacts\interactive-001`, then open
+that folder's `index.html`. The real generated graphs offer in-context evidence,
+zoom/pan/fit, keyboard navigation and a responsive layout. Its 37 explicitly
+synthetic peers exercise distinct activity levels and coverage; exit 2 honestly
+reports intentionally partial WhatsApp history. A separate email-only graph
+demonstrates covered inactivity within that channel, not across missing history.
+
 CONTACTS-026 adds `contacts:opportunities`: explainable own-baseline direct-activity
 declines under complete matched coverage and separate curated household rhythm
 reminders. All thresholds are explicit tuning proposals, not relationship scores.

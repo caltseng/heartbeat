@@ -271,6 +271,15 @@ recency, direct/group/membership separation, interval membership bounds, unknown
 coverage, identical report filters across views, cohort pagination, native
 keyboard links, responsive scrolling, HTML escaping, private denial, immutable
 publication and CLI 0/2/1. No browser dependency or service is required at runtime.
+The progressive offline graph adds a single CSP-hash-pinned browser program,
+in-context evidence selection, bounded camera controls and a complete native
+fallback. `graph.test.ts` checks that exact script allowlist and generated demo
+bindings. For interaction verification, generate `contacts:demo` and inspect the
+actual HTML in a browser at 320px/375px portrait, 812px landscape and desktop:
+verify no document overflow, 44px camera controls, all-person/sheet reachability,
+selection/focus return, +/-/arrow/Home navigation, pointer cancellation, no
+motion and the script-disabled fallback. These checks do not authorize any real
+source or require a browser dependency in the shipped local tool.
 
 The [CONTACTS-026 opportunity report](spec/contacts-opportunities.md) adds
 `contacts:opportunities`, `opportunities.test.ts` and `check:opportunities` to CI.

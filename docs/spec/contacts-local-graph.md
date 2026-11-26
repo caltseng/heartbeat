@@ -4,8 +4,32 @@ Implemented: synthetic-only TypeScript `contacts:graph` reads the exact
 CONTACTS-024 `report.json` and emits one private local `graph.html` containing
 inline SVG maps, person-to-thread diagrams, accessible tables and evidence.
 Open it directly in a browser with `file:`; no server, Muse, Main Branch route,
-network assets, JavaScript, telemetry, account or deployment is involved.
-This proves behavior, not a polished product interface.
+network assets, telemetry, account or deployment is involved. A fixed inline
+JavaScript program progressively enhances navigation; its exact SHA-256 is
+allowlisted in the file's CSP. Report text never enters executable code.
+Network connections remain denied. Without scripts, the complete static map,
+native links, tables and evidence remain usable.
+
+## Owner demo
+
+```powershell
+npm run contacts:demo -- --output .private\contacts\interactive-001
+Start-Process .private\contacts\interactive-001\index.html
+```
+
+Choose a fresh ignored directory. Exit **2 is intentional**: the synthetic
+WhatsApp handoff declares incomplete history. The generated index links two
+actual collector → identity-review → summary → graph pipelines over the same
+collection and mapping: all four communication channels, and email-only.
+There are 37 distinct synthetic peers and 48 observed messages, with differing
+direct-date frequencies, sent/received directions, group posts, passive membership,
+same-name identities and no observed activity. No same-name merge is made.
+The all-channel report labels no-activity peers unknown and positive counts
+lower-bound. The separate email-only report demonstrates declared-covered
+inactivity **within email only**, not across sources. The reducer conservatively
+uses shared selected-source coverage for person certainty; a single uncertain
+selected source prevents claiming covered inactivity for any person. These
+are separate frozen reports, not a browser filter pretending to recompute data.
 
 ## CLI and frozen input
 
@@ -85,14 +109,26 @@ overlapping the period; absent validity bounds remain explicitly unspecified.
 Unobserved threads are not fabricated or treated as inactive. Membership-only
 edges never become participation or peer-to-peer relationships.
 
-Native links work with Tab/Enter, fragment navigation, Back and visible focus;
-all selection sections remain available without scripts. On mobile portrait or
-landscape the document fits the viewport and maps/tables have independently
-scrollable, keyboard-focusable regions. Full-size linked tables are the text
-alternative to panning the map; a native center link brings You into view.
-At most six people per band per sheet keep nodes
-separate; every sheet repeats the centered user and labels, never silently
-truncating the cohort.
+With scripts enabled, clicking/tapping a node or linked person opens a copy of
+its already-escaped evidence beside the map (below it on narrow screens), without
+long-page navigation. Tab/Enter and the full-cohort person selector use the same
+inspector; selection moves focus into the inspector without forcing page scroll.
+Return to selection and Clear restore focus. The selected node has visible
+highlighting and `aria-current`, and selection is announced by a live status.
+No new metrics are calculated in the browser.
+
+Zoom in/out, pan buttons and Fit work with mouse, touch and keyboard. Empty-space
+drag pans with a mouse or one finger; native browser pinch zoom remains enabled.
+Focus the map for arrow-key pan, +/- zoom and Home to fit. Camera changes are
+instant, with no animation; reduced-motion preferences explicitly disable
+animation, transitions and smooth scrolling. A wrapping text legend remains
+readable independently of zoom. Each sheet fits the available width; tables and
+thread evidence scroll within their own bounded regions, never the whole page.
+At most six people per band per sheet keep nodes separate. Sheet controls and
+the all-cohort person selector reach every person, automatically switching sheets.
+All sheets, native fragment links and original evidence remain available without
+scripts and in print. Browser Back applies to native fallback links, not enhanced
+in-context selection.
 
 ## Delegated engineering decisions (not privacy consent)
 
@@ -100,7 +136,7 @@ truncating the cohort.
 | --- | --- | --- |
 | Render the pinned shared report, not collection records or newly calculated totals. Require exact report-byte SHA-256. | Reject independently filtered maps and stale cached graph reuse. Assumes the saved summary is the authoritative generation. | Synthetic pipeline tests pin bytes, preserve inputs and exercise 7d/30d/custom/channel changes. Revisit only with a versioned shared interactive-filter contract. |
 | Use direct-date proportion with 50%/20% cutoffs, retaining partial dates. Put group-only/unknown/inactive in explicit categorical rings. | Reject message-volume closeness scores and force-layout distance. Thresholds are delegated tuning defaults, not owner-approved relationship tiers; incomplete coverage is not normalized into invented history. | Exact 50%/20%/positive/zero fixtures plus partial/unknown cases. Revisit based on synthetic usability feedback or a specified metric/coverage change. |
-| Static HTML with inline SVG, native fragment selection and six nodes per ring per sheet. | Reject hosted dashboards, browser fetches, remote assets, JS frameworks and clipped/overlapping large cohorts. Assumes a browser with standard SVG and fragment support. | Synthetic link/escaping/pagination tests and viewport inspection; revisit for measured large-store size or demonstrated accessibility limitations, without adding hosting. |
+| Progressive offline inline SVG navigation, a fixed hash-pinned script, native fallback and six nodes per ring per sheet. This explicitly supersedes the former no-script-only graph contract. | Reject hosted dashboards, browser fetches, remote assets, JS frameworks, executable data interpolation and clipped/omitted cohorts. Assumes standard SVG, Pointer Events and CSP hash support; native fallback requires no scripts. | Synthetic pipeline/hash/escaping/pagination tests plus actual browser mouse, keyboard, touch-event, viewport and reduced-motion checks. Revisit for measured large-store size without adding hosting or lifting private guards. |
 | Use canonical IDs and short report-order labels rather than rereading raw display names. | Reject name-based merges and extra source reads. Labels may change between report generations; canonical IDs remain visible. | Same-name synthetic identities remain separate. Revisit only with a reviewed report-level display-label contract. |
 | Reuse atomic no-replace local publishing for text; extend private-artifact guards for graph requests/staging. | Reject overwrites, remote exports and a new persistence subsystem. | CLI replay, private denial, output-path and boundary tests. Revisit only with a specified generation/retention contract. |
 
