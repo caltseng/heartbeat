@@ -171,7 +171,7 @@ button,select{font:inherit;min-height:44px;max-width:100%;padding:.4rem .7rem;bo
 button{cursor:pointer}button:hover{background:#e8f1fa}label{font-weight:600}
 .interactive{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:1rem;align-items:start}
 .interactive .map svg{width:100%;min-width:0;height:auto;aspect-ratio:1;touch-action:pinch-zoom;user-select:none;background:#f8fafc;border:1px solid #8c959f;border-radius:.5rem}
-.interactive .map{margin:0;overflow:hidden}.interactive .band-label{display:none}.interactive svg text{font-size:23px}
+.interactive .map{margin:0;overflow:hidden}.interactive .band-label{display:none}.interactive .map svg text{font-size:23px}
 .inspector{border:1px solid #8c959f;border-radius:.5rem;padding:1rem;max-height:48rem;overflow:auto;background:#f8fafc}
 .inspector .selection{border:0;padding:0}.inspector h3{margin-top:0}.inspector .threads{min-width:30rem}
 .legend{display:flex;flex-wrap:wrap;gap:.4rem 1rem;padding:0;list-style:none}.legend li{border-left:4px solid #305c84;padding-left:.5rem}

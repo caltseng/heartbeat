@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { collect } from './collect.ts';
 import { handoff } from './demo.ts';
 import { review } from './identity-review.ts';
@@ -216,6 +217,94 @@ test('owner demo composes actual collector, reviewed mapping, bound reports and 
   const replay = spawnSync(process.execPath, args, { encoding: 'utf8' });
   assert.equal(replay.status, 1);
   assert.match(replay.stderr, /empty output directory/);
+});
+test('browser keeps main-map labels enlarged and inspector thread labels readable on small screens', t => {
+  const browser = process.env.HEARTBEAT_BROWSER || [
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+  ].find(file => fs.existsSync(file));
+  if (!browser) {
+    t.skip('No Chromium browser found; set HEARTBEAT_BROWSER to run the rendering regression.');
+    return;
+  }
+  const f = fixture(t);
+  const graph = run(f.graphRequest, f.folder);
+  const harness = path.join(f.folder, 'browser.html');
+  // The separate harness reads the real generated file without changing its CSP or program.
+  fs.writeFileSync(harness, `<!doctype html><meta charset="utf-8"><body>
+<pre id="result">pending</pre><script>
+const results = [];
+for (const width of [320, 375, 812, 1280]) {
+  const frame = document.createElement('iframe');
+  frame.style.cssText = 'border:0;height:900px;width:' + width + 'px';
+  frame.onload = () => {
+    try {
+      const doc = frame.contentDocument, win = frame.contentWindow;
+      const link = doc.querySelector('.map a[data-person]');
+      link.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+      const inspector = doc.querySelector('#inspector');
+      const labels = [...inspector.querySelectorAll('.threads text')];
+      const svg = inspector.querySelector('.threads');
+      const scroll = svg.parentElement;
+      scroll.scrollLeft = scroll.scrollWidth;
+      const box = doc.querySelector('.inspector').getBoundingClientRect();
+      const map = doc.querySelector('.map svg');
+      const originalView = map.getAttribute('viewBox');
+      map.dispatchEvent(new win.KeyboardEvent('keydown', { key: '+', bubbles: true }));
+      const zoomed = map.getAttribute('viewBox') !== originalView;
+      map.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+      results.push({
+        width, viewport: win.innerWidth,
+        mainFont: win.getComputedStyle(link.querySelector('text')).fontSize,
+        inspectorFonts: labels.map(label => win.getComputedStyle(label).fontSize),
+        labelsFit: labels.length === 3 && labels.every(label => {
+          const b = label.getBBox();
+          return b.x >= 0 && b.x + b.width <= svg.viewBox.baseVal.width;
+        }),
+        labelLineSpacing: labels[2].y.baseVal[0].value - labels[1].y.baseVal[0].value >=
+          parseFloat(win.getComputedStyle(labels[1]).fontSize),
+        noDocumentOverflow: doc.documentElement.scrollWidth <= win.innerWidth,
+        inspectorContained: box.left >= 0 && box.right <= win.innerWidth,
+        inspectorBelowMap: width > 900 || box.top >= map.getBoundingClientRect().bottom,
+        internalScroll: width > 375 || (scroll.scrollWidth > scroll.clientWidth && scroll.scrollLeft > 0),
+        focused: doc.activeElement === inspector,
+        selected: link.getAttribute('aria-current') === 'true',
+        zoomed, fitted: map.getAttribute('viewBox') === '0 0 1080 1080'
+      });
+      doc.querySelector('#clear-selection').click();
+      results[results.length - 1].cleared = !inspector.children.length &&
+        doc.activeElement === doc.querySelector('#person-picker');
+    } catch (error) {
+      results.push({ width, error: String(error) });
+    }
+    if (results.length === 4) document.querySelector('#result').textContent = JSON.stringify(results.sort((a,b) => a.width-b.width));
+  };
+  frame.src = ${JSON.stringify(pathToFileURL(graph.file).href)};
+  document.body.append(frame);
+}
+</script></body>`);
+  const result = spawnSync(browser, ['--headless', '--disable-gpu', '--no-first-run',
+    '--no-default-browser-check', '--allow-file-access-from-files',
+    `--user-data-dir=${path.join(f.folder, 'browser-profile')}`, '--dump-dom',
+    '--virtual-time-budget=10000', pathToFileURL(harness).href],
+  { encoding: 'utf8', timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
+  assert.equal(result.status, 0, result.error?.message || result.stderr);
+  const output = result.stdout.match(/<pre id="result">([^<]+)<\/pre>/)?.[1];
+  assert.ok(output && output !== 'pending', result.stdout);
+  const rows = JSON.parse(output);
+  assert.equal(rows.length, 4);
+  for (const row of rows) {
+    assert.equal(row.error, undefined, JSON.stringify(row));
+    assert.equal(row.viewport, row.width);
+    assert.equal(row.mainFont, '23px');
+    assert.deepEqual(row.inspectorFonts, ['16px', '16px', '16px']);
+    for (const key of ['labelsFit', 'labelLineSpacing', 'noDocumentOverflow', 'inspectorContained',
+      'inspectorBelowMap', 'internalScroll', 'focused', 'selected', 'zoomed', 'fitted', 'cleared']) {
+      assert.equal(row[key], true, `${row.width}px ${key}: ${JSON.stringify(row)}`);
+    }
+  }
 });
 test('CLI is immutable, pins exact input bytes, denies private input before reads and rejects unsafe output', t => {
   const f = fixture(t);
