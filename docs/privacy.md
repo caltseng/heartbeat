@@ -51,7 +51,7 @@ two. Do not request secrets to satisfy a gate.
 
 ## Existing importer enforcement: synthetic only
 
-The [selected text XML converter](spec/contacts-text-converter.md) accepts
+The [selected text XML converter](spec/contacts-text-messages.md) accepts
 synthetic fixtures only. It rejects private manifests with exit 1 / `private_collection_disabled`
 before inspecting the raw archive path; no transient body read is authorized.
 
@@ -75,10 +75,11 @@ or writing a handoff. Approval alone never makes unverified protection acceptabl
 
 No Windows protection verifier ships, so no private import is enabled.
 
-The earlier future-retention/deletion decisions below are now exercised by that
-synthetic CLI; their real-data verification and consent gates remain unchanged.
+The earlier [retention/deletion rationale](decisions.md#contacts-010) is now
+exercised by that synthetic CLI; real-data verification and consent gates remain
+unchanged.
 
-The [Messenger JSON converter](spec/contacts-messenger-converter.md) also rejects
+The [Messenger JSON converter](spec/contacts-messenger.md) also rejects
 private conversion before reading native shards. Its synthetic content projection
 does not authorize transient handling of real native exports, which may contain
 content excluded by the approved metadata-only policy.
@@ -97,13 +98,7 @@ rules are not access control. Never force-add private paths or copy another
 checkout's data. No accounts/devices/browser sessions or credentials are acquired
 by this change.
 
-## Engineering decisions (delegated, not additional consent)
-
-| Decision / rationale | Alternatives and assumptions | Validation / revisit condition |
-| --- | --- | --- |
-| Deny all private imports at the shared importer entry, before writes; reuse the repository's typed fatal error and CLI exit 1. This closes the existing private-class path without pretending OS protection or approval is verified. | Rejected boolean consent flags and user-supplied encryption claims; they cannot prove effective controls. Assumes no authorized private run or real store needs migration. Preserves schema version 1 and synthetic collection behavior. | Synthetic tests cover all five source families, unavailable-only requests, unchanged existing snapshot/no lock, unrecognized approval claims and actual CLI denial without manifest/account output. Revisit only with independently reviewed source authorization and enforceable local controls. |
-| Future retention uses a rolling 12-calendar-month ceiling at time of use; source event time anchors activity expiry, retrieval time anchors identity-only snapshots. Unknown age must not be imported indefinitely. Replaying/retrieving an old event must not extend its lifetime. | A fixed 365-day window can differ from 12 months; expiry based only on reimport would keep old metadata forever. This is a conservative implementation proposal, not owner approval to store a particular identifier. | No retention code or scheduler ships here. CONTACTS-032 must test month-end/leap-year boundaries and purge dependent/derived files and orphan identifiers; obtain owner clarification for any proposed retention beyond the approved ceiling. |
-| Future explicit deletion is local, user-invoked, scoped to a verified private store and its inventoried artifacts; expire/rebuild affected derived files and reset affected cursors rather than restoring erased metadata. | Do not recursively delete a checkout/root or assume deleting one event removes copies. Ordinary deletion is not guaranteed secure erase on SSDs; verified disk encryption remains mandatory. | No real data is present or deleted by this item. Before enabling real storage, validate expiry and explicit-delete paths, safe path containment, interruption recovery and backup exclusions using synthetic copies. |
+Engineering rationale, alternatives and revisit conditions: [CONTACTS-010](decisions.md#contacts-010).
 
 Future first-run review must name the exact private account/source and selected
 read-only route/fields, approved machine/location, ACL/encryption and backup
@@ -117,9 +112,9 @@ This checklist is a run gate, not a renewed questionnaire about the approved pol
 | Source | Current capability | Separate selection / authorization still required |
 | --- | --- | --- |
 | Google contacts | Synthetic normalized identity import plus CONTACTS-012 acquisition | [CONTACTS-011/012](spec/contacts-google-capability.md) selects read-only `people.connections.list`, not connected access. No network transport, OAuth or credential loader ships. Private acquisition fails closed before output access (`private_collection_disabled`, exit 1), with no artifacts. Exact source/account and each-run approval plus verified local controls remain required under approved CONTACTS-010 policy. Revisions/deletions stay staged and partial pending 021. |
-| Email | Synthetic normalized handoff import plus [014 synthetic Gmail metadata adapter](spec/contacts-email-adapter.md), following [013's selected route](spec/contacts-email-access.md) | Exact Gmail account/source and each-run approval plus verified local controls remain required; no HTTP transport, connected tool or credentials. The adapter rejects private runs. `gmail.metadata` excludes bodies and search `q`; self/aliases, hidden BCC, partial history and classifications remain explicit. |
-| SMS/MMS/RCS/iMessage | Synthetic normalized text metadata import plus [synthetic SMS/MMS XML conversion](spec/contacts-text-converter.md) | [CONTACTS-015](spec/contacts-text-format-gate.md) selects Android 14/SyncTech 10.30.009 full XML; 016 implements only that synthetic profile. Exact source/account and each-run approval, local controls, actual device/SIM/self/protocol evidence and history limits remain required. Raw-export/content processing is not authorized by this metadata-only policy. Real conversion is rejected; no device or backup inspection is authorized. |
-| Personal Messenger | Synthetic normalized handoff import plus [018 JSON snapshot converter](spec/contacts-messenger-converter.md) | [CONTACTS-017](spec/contacts-messenger-capability.md) selects local versioned conversion, not a personal API. Private conversion is disabled; exact source/account and each-run approval, verified local controls and actual producer-shape validation remain required. Raw-export/content processing is not authorized by the metadata-only policy. Producer version, encrypted-backup layout and history coverage are unverified. Business APIs/Muse queries do not establish personal access; real-data remote-AI processing is prohibited. |
+| Email | Synthetic normalized handoff import plus [014 synthetic Gmail metadata adapter](spec/contacts-email.md), following [013's selected route](spec/contacts-email.md) | Exact Gmail account/source and each-run approval plus verified local controls remain required; no HTTP transport, connected tool or credentials. The adapter rejects private runs. `gmail.metadata` excludes bodies and search `q`; self/aliases, hidden BCC, partial history and classifications remain explicit. |
+| SMS/MMS/RCS/iMessage | Synthetic normalized text metadata import plus [synthetic SMS/MMS XML conversion](spec/contacts-text-messages.md) | [CONTACTS-015](spec/contacts-text-messages.md) selects Android 14/SyncTech 10.30.009 full XML; 016 implements only that synthetic profile. Exact source/account and each-run approval, local controls, actual device/SIM/self/protocol evidence and history limits remain required. Raw-export/content processing is not authorized by this metadata-only policy. Real conversion is rejected; no device or backup inspection is authorized. |
+| Personal Messenger | Synthetic normalized handoff import plus [018 JSON snapshot converter](spec/contacts-messenger.md) | [CONTACTS-017](spec/contacts-messenger.md) selects local versioned conversion, not a personal API. Private conversion is disabled; exact source/account and each-run approval, verified local controls and actual producer-shape validation remain required. Raw-export/content processing is not authorized by the metadata-only policy. Producer version, encrypted-backup layout and history coverage are unverified. Business APIs/Muse queries do not establish personal access; real-data remote-AI processing is prohibited. |
 | Personal WhatsApp | Synthetic normalized metadata import and selected synthetic TXT converter | [CONTACTS-019/020](spec/contacts-whatsapp-format-gate.md) implement iOS Without Media TXT profile v1, immutable archive-local registry/binding and reviewed boundary/sender/source-zone evidence. Private conversion fails before native/registry/output access. No real producer/device certified or live access. Approved CONTACTS-010 policy does not permit real raw-content export processing; that needs a separate content boundary, exact source/account and each-run approval plus verified local controls. Linked-device history is not full history; no pairing or business-API equivalence. |
 
 ## Missing data is not zero

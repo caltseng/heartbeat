@@ -6,8 +6,7 @@ description: Prepare email metadata with Gmail-specific recipient roles, classif
 # Email activity
 
 Required: [shared operating rules and source workflow](../../../docs/spec/contacts-technical-spec.md#shared-operating-rules),
-[CONTACTS-013 access map](../../../docs/spec/contacts-email-access.md) and
-[CONTACTS-014 adapter](../../../docs/spec/contacts-email-adapter.md).
+[CONTACTS-013/014 access and adapter contract](../../../docs/spec/contacts-email.md).
 
 1. Run `npm run contacts:email -- --synthetic-request <request.json>` for the
    Gmail fixture transport. The selected `gmail.metadata` route excludes search

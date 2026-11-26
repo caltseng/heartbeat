@@ -6,7 +6,7 @@ description: Prepare personal WhatsApp TXT snapshot metadata with reviewed sende
 # WhatsApp activity
 
 Required: [shared operating rules and source workflow](../../../docs/spec/contacts-technical-spec.md#shared-operating-rules)
-and [CONTACTS-019/020 format and operation contract](../../../docs/spec/contacts-whatsapp-format-gate.md#contacts-020-operation-and-delegated-decisions).
+and [CONTACTS-019/020 format and operation contract](../../../docs/spec/contacts-whatsapp-format-gate.md#contacts-020-operation).
 
 1. Use the iOS Without Media UTF-8 `whatsapp-ios-txt-metadata-v1` profile:
 
