@@ -46,6 +46,7 @@ recovery and decisions; this table does not authorize private data use.
 | --- | --- |
 | `contacts:retrieve-save` | [Save approved projected metadata as a local handoff; does not fetch or import](docs/spec/contacts-manual-retrieval.md). |
 | `contacts:csv` | [Project an owner-provided Google CSV and optional saved UI observations into a private offline preview](docs/spec/contacts-retrieval-plan.md#csv-preview-operation). |
+| `contacts:photos` | [Save a directly requested, bounded Facebook-browser profile-picture round to a source-bound private gallery](.github/skills/contacts-profile-photos/SKILL.md). No canonical contact matching or face analysis. |
 | `contacts:collect` | [Import normalized metadata with provenance, coverage and replay/resume](docs/spec/contacts-technical-spec.md). |
 | `contacts:email` | [Convert synthetic native Gmail pages with explicit pagination and coverage](docs/spec/contacts-email.md). |
 | `contacts:google` | [Acquire synthetic Google People identities with mocked sync/resync](docs/spec/contacts-google-capability.md). |

@@ -15,6 +15,7 @@
   "scripts": {
     "contacts:retrieve-save": "node --import tsx scripts/contacts/manual-retrieval.ts",
     "contacts:csv": "node --import tsx scripts/contacts/contact-csv.ts",
+    "contacts:photos": "node --import tsx scripts/contacts/profile-photos.ts",
     "contacts:collect": "node --import tsx scripts/contacts/collect.ts",
     "contacts:email": "node --import tsx scripts/contacts/email.ts",
     "contacts:google": "node --import tsx scripts/contacts/google.ts",

@@ -27,7 +27,7 @@ disabled or replaced by this decision.
 | Retention | The owner chooses retention and may delete inputs and outputs. No fixed 12-month ceiling, deletion-date questionnaire or automated retention service is required for manual handoffs. Existing synthetic retention commands are unchanged. |
 | Processing | Selective source-API retrieval or specifically owner-approved Muse cloud/AI processing of the allowed metadata may be used. Approval must identify the processor, source/account, fields, interval and finite budget for this run. Sign-in alone is not that approval; unrelated remote processors remain unapproved. |
 | Content and secrets | Metadata only. Excluded content must be omitted before retrieval; requesting JSON or stripping bodies afterward is not permission. Never request, display, log or commit passwords, tokens, cookies or credential files. Use normal client sign-in, not credential extraction. |
-| Publication and authority | Keep records/configuration out of Git, PRs, CI, Library, logs and ordinary chat. An approved private Muse conversation may process only the run's approved metadata; do not copy its private records into other chats. No public publication, source mutation, sending, schedules, implicit setup or unrelated access. |
+| Publication and authority | Keep records/configuration out of Git, PRs, CI, Library, ordinary replies and public logs. Explicitly requested inline JSON/copy-and-save includes the necessary selected metadata transfer through agent tool history; do not request redundant transfer approval. An approved private Muse conversation may process only the run's approved metadata. No public publication, source mutation, sending, schedules, implicit setup or unrelated access. |
 
 Inspect actual tool behavior, including Muse; a name or narrative answer alone
 does not establish selectable fields, stable record evidence or completeness.
@@ -40,7 +40,8 @@ trial may allow the web client to fetch/render incidental bodies and previews
 while extracting and saving only selected metadata. Explicitly approve that
 rendering boundary for each bounded trial; it is not permission for body/snippet
 analysis, whole-page snapshots, raw network/app-state dumps or content exports.
-Keep private records out of agent/tool logs. The owner controls normal sign-in
+Avoid private record dumps; necessary selected metadata transfer is covered by
+an explicit inline/copy-and-save request. The owner controls normal sign-in
 and pairing and may delegate bounded conversation selection/navigation. Opening
 a thread may change read markers; if the owner explicitly accepts that effect,
 do not block on unread state. Otherwise do not open unread threads automatically.
@@ -88,6 +89,32 @@ participants are not automatically matched to contacts or treated as historical
 recipients. Synthetic validation
 and independent implementation review remain required before the private preview.
 See the [selected design and CSV operation](spec/contacts-retrieval-plan.md#csv-preview-operation).
+
+### Owner-requested one-round Facebook profile pictures
+
+The owner's direct request on 2026-11-26 separately authorizes one bounded
+current-profile-picture pass through their Facebook browser, not Muse. Use only
+selected native profile/friend-card references, names and associated current profile-picture
+URLs, with at most 25 image attempts. Name search may locate candidates; verify
+native friendship and exclude all non-friends before saving. Expand the current
+profile picture through its native viewer to obtain the displayed full-size
+image rather than guessing a URL. This is a narrow image-content exception,
+not permission for posts, bios, captions, message content, historical media,
+whole-page snapshots, credentials, strangers or other accounts.
+Normal browser rendering may incidentally show content; do not extract it.
+
+The [contacts-profile-photos skill](../.github/skills/contacts-profile-photos/SKILL.md)
+and dedicated `contacts:photos` saver keep metadata, raster assets and a
+source-bound gallery outside Git and Library. Necessary selected metadata
+transfer through tools is part of this invoked capture; keep image bytes out
+of tool history and ordinary replies. Fetch only observed HTTPS Facebook image
+CDN URLs without credentials; stop rather than bypass authentication, challenges
+or rate limits. Preserve failed/missing/unresolved evidence and partial coverage.
+No face recognition, biometric inference, embeddings or matching by image or
+display name. Photos do not establish interaction or canonical contact identity.
+No contact attachment, private generic import, schedule, sending or publication
+is enabled. Synthetic validation and independent implementation review precede
+the dedicated live asset-saving command.
 
 ## CONTACTS-010: owner-approved policy
 

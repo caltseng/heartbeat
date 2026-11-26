@@ -118,7 +118,9 @@ the approved scope. Both one-to-one and group chats are required for Facebook
 Messenger and Instagram; the successful group example is not a group-only limit.
 The owner prefers inline JSON followed by agent-managed local transfer, not
 manual Download clicks per batch. Automate that transfer using an approved local
-write capability without copying record values into ordinary chat/tool logs.
+write capability without copying record values into ordinary replies. The
+owner's explicit inline JSON/copy-and-save instruction covers necessary selected
+metadata transfer through agent tool history; do not add a redundant approval.
 Normal client permissions are distinct from per-batch download work. Confirm
 actual local persistence, and use an already downloaded file rather than making
 the owner retrieve the same result again.
@@ -128,7 +130,23 @@ example returned structured metadata, and a subsequent small Messenger batch
 returned both one-to-one and group chat kinds, participant lists, reported chat
 IDs and timestamp values. This verifies the conversational JSON route, not native
 enumeration completeness or independent ID/timestamp corroboration. Instagram
-is being checked separately. Private output must preserve those evidence limits.
+reported not connected in its associated response. No Instagram records were
+saved; this does not block Messenger. Private output preserves those limits.
+
+### Current profile pictures
+
+The owner separately requested a one-round profile-picture pass, explicitly
+using Facebook browser control rather than Muse. The
+[dedicated skill](../../.github/skills/contacts-profile-photos/SKILL.md) selects
+native profile/friend-card references, verifies native friendship and excludes
+non-friends. Name search is candidate discovery only. Expand the current profile
+picture in its native full-screen viewer and retain its photo reference and
+displayed full-size image URL, with a 25-image attempt budget.
+`contacts:photos` saves only observed Facebook-CDN
+raster assets to a fresh private external bundle and offline gallery. Missing
+photos, source failures, partial enumeration and unresolved canonical contact
+links remain explicit. No image-based or display-name identity matching,
+historical media, profile content, source writes or recurring refresh.
 
 ### CSV preview operation
 
