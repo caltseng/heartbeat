@@ -3,25 +3,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { hashJSON as digest, createGuard, persist, publish, openLock, releaseLock, runCLI, outputLocation,
-  readJSON } from './lib.ts';
+  readJSON, createValidators } from './lib.ts';
 import { summary } from './summary.ts';
 import { curate } from './curated.ts';
 import { prayer } from './prayer.ts';
 import { readCollection } from './collection-store.ts';
 
 const requireValue = createGuard('invalid_reconnection');
-function object(value, fields) {
-  requireValue(value && typeof value === 'object' && !Array.isArray(value) &&
-    Object.keys(value).every(key => fields.includes(key)), 'Unsupported reconnection fields.');
-}
-function text(value) {
-  requireValue(typeof value === 'string' && value.trim().length > 0, 'Expected nonempty text.');
-  return value;
-}
-function identifier(value) {
-  requireValue(typeof value === 'string' && /^[a-z][a-z0-9-]{0,95}$/.test(value), 'Invalid identifier.');
-  return value;
-}
+const { object, text, identifier } = createValidators(requireValue, {
+  fieldsMessage: 'Unsupported reconnection fields.',
+  textMessage: 'Expected nonempty text.'
+});
 function date(value) {
   requireValue(typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
     Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value,

@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { readJSONValue, persist, openLock, releaseLock, runCLI, outputLocation } from './lib.ts';
+import { readJSONValue, persist, openLock, releaseLock, runCLI, outputLocation,
+  createError, isError, createCodeGuard, isText as text } from './lib.ts';
 import type { HandoffRecord } from './types.ts';
 
 interface GoogleEvidence {
@@ -54,13 +55,8 @@ const PARAMETERS: Readonly<GoogleParameters> = Object.freeze({ personFields: 'me
 const BASIS = 'Contact-only current identity snapshot; no activity/history, Other Contacts, directory or profiles. ' +
   'Optional absent fields are unknown; email/phone fields are limited to 100 each. No point-in-time consistency guarantee.';
 
-class AdapterError extends Error {
-  constructor(public readonly code: string, public readonly retryable = false) { super(code); this.code = code; this.retryable = retryable; }
-}
-function check(condition, code = 'invalid_page') {
-  if (!condition) throw new AdapterError(code);
-}
-const text = value => typeof value === 'string' && value.trim().length > 0;
+const adapterError = createError('google');
+const check = createCodeGuard('invalid_page', adapterError);
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const has = (value, key) => Object.hasOwn(value, key);
 const sorted = (values: Iterable<string>): string[] => [...new Set(values)].sort();
@@ -152,17 +148,17 @@ async function acquire(options: GoogleOptions, { transport, previous = null, now
   const cursors = new Set();
   try {
     while (true) {
-      if (report.pages >= (options.maxPages || 100)) throw new AdapterError('page_budget_exhausted', true);
+      if (report.pages >= (options.maxPages || 100)) throw adapterError('page_budget_exhausted', 'failed', true);
       const parameters: Record<string, string | number | boolean> = { ...PARAMETERS };
       if (incremental) parameters.syncToken = previous.syncToken;
       if (pageToken !== undefined) parameters.pageToken = pageToken;
       let response;
       for (let retry = 0; ; retry++) {
         try { response = await transport({ url: ENDPOINT, parameters: { ...parameters } }); }
-        catch { throw new AdapterError('transport_failed', true); }
+        catch { throw adapterError('transport_failed', 'failed', true); }
         check(record(response) && Number.isInteger(response.status));
         if (response.status !== 429 && response.status < 500) break;
-        if (retry === 2) throw new AdapterError(response.status === 429 ? 'quota_exhausted' : 'upstream_unavailable', true);
+        if (retry === 2) throw adapterError(response.status === 429 ? 'quota_exhausted' : 'upstream_unavailable', 'failed', true);
         await delay(50 * (2 ** retry));
       }
       report.pages++;
@@ -177,7 +173,7 @@ async function acquire(options: GoogleOptions, { transport, previous = null, now
         cursors.clear();
         continue;
       }
-      if (response.status !== 200) throw new AdapterError(response.status === 410 ? 'full_sync_expired' : 'http_failure');
+      if (response.status !== 200) throw adapterError(response.status === 410 ? 'full_sync_expired' : 'http_failure');
       const body = response.body;
       check(record(body));
       const next = token(body.nextPageToken);
@@ -196,7 +192,7 @@ async function acquire(options: GoogleOptions, { transport, previous = null, now
       pageToken = next;
     }
   } catch (error) {
-    if (!(error instanceof AdapterError)) throw error;
+    if (!isError(error, 'google')) throw error;
     return fail('failed', error.code, error.retryable);
   }
   const current = incremental ? structuredClone(previous.current) : Object.create(null);
@@ -267,7 +263,7 @@ async function run(configFile) {
   fs.mkdirSync(output, { recursive: true, mode: 0o700 });
   const lock = path.join(output, 'google-acquisition.lock');
   let lockFd;
-  lockFd = openLock(lock, () => new AdapterError('store_locked'));
+  lockFd = openLock(lock, () => adapterError('store_locked'));
   try {
     const file = path.join(output, 'google-acquisition.json');
     const saved = fs.existsSync(file) ? readPrivate(file) : null;
@@ -278,7 +274,7 @@ async function run(configFile) {
       check(record(fixture) && fixture.dataClass === 'synthetic' && Array.isArray(fixture.responses), 'invalid_fixture');
       let index = 0;
       transport = async () => {
-        if (index >= fixture.responses.length) throw new AdapterError('fixture_exhausted');
+        if (index >= fixture.responses.length) throw adapterError('fixture_exhausted');
         return fixture.responses[index++];
       };
     }
@@ -303,7 +299,7 @@ if (require.main === module) {
       errors: result.report.errors }) + '\n');
     return result.exitCode;
   }, error => {
-    process.stderr.write(`Google acquisition failed [${error instanceof AdapterError ? error.code : 'local_io_or_config_failure'}].\n`);
+    process.stderr.write(`Google acquisition failed [${isError(error, 'google') ? error.code : 'local_io_or_config_failure'}].\n`);
     return 1;
   });
 }

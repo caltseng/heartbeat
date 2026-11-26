@@ -1,26 +1,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { hashJSON, readJSONValue, writeExclusive, runCLI, outputLocation } from './lib.ts';
+import { hashJSON, readJSONValue, writeExclusive, runCLI, outputLocation,
+  createError, isError, createCodeGuard, createCodeValidators, isText as text } from './lib.ts';
 import { resolvePeriod } from './collect.ts';
 
 const CONNECTOR = 'gmail-metadata-v1';
 const HEADERS = ['From', 'To', 'Cc', 'Bcc', 'Date', 'List-Id', 'Precedence', 'Auto-Submitted'];
 const FIELDS = 'id,threadId,labelIds,historyId,internalDate,payload(headers)';
-class EmailError extends Error {
-  constructor(public readonly code: string) { super(`Email acquisition failed [${code}].`); this.code = code; }
-}
-function requireValue(value, code = 'metadata_incomplete') {
-  if (!value) throw new EmailError(code);
-}
+const emailError = createError('email', code => `Email acquisition failed [${code}].`);
+const requireValue = createCodeGuard('metadata_incomplete', emailError);
+const { object } = createCodeValidators(requireValue, 'metadata_incomplete');
 function requireSynthetic(dataClass) {
   requireValue(dataClass === 'synthetic', dataClass === 'private' ? 'private_collection_disabled' : 'synthetic_only');
 }
-function object(value, keys) {
-  requireValue(value && typeof value === 'object' && !Array.isArray(value) &&
-    Object.keys(value).every(key => keys.includes(key)));
-}
-const text = value => typeof value === 'string' && value.trim().length > 0;
 const token = value => value === null || text(value);
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
@@ -156,13 +149,13 @@ function validateConfig(config) {
   return resolvePeriod(config.period);
 }
 function upstream(error, operation) {
-  if (error instanceof EmailError) return { code: error.code, retryable: false };
+  if (isError(error, 'email')) return { code: error.code, retryable: false };
   if (error?.status === 401 || error?.status === 403) return { code: 'requires_setup', retryable: false };
   if (error?.status === 400) return { code: operation === 'list' ? 'cursor_expired' : 'metadata_incomplete', retryable: false };
   if (error?.status === 404) return { code: operation === 'list' ? 'source_unavailable' : 'message_unavailable', retryable: false };
   if (error?.status === 429) return { code: 'rate_limited', retryable: true };
   if (Number.isInteger(error?.status) && error.status >= 500) return { code: 'upstream_unavailable', retryable: true };
-  throw new EmailError('transport_failure');
+  throw emailError('transport_failure');
 }
 function validateSavedEvent(event, period) {
   object(event, ['id', 'idKind', 'eventType', 'threadId', 'senderId', 'timestamp', 'channel', 'recipients', 'classification']);
@@ -358,7 +351,7 @@ if (require.main === module) {
     process.stdout.write('Synthetic email acquisition persisted; coverage is partial.\n');
     return result.exitCode;
   }, error => {
-    process.stderr.write(`Email acquisition failed [${error instanceof EmailError ? error.code : 'input_or_storage_failure'}].\n`);
+    process.stderr.write(`Email acquisition failed [${isError(error, 'email') ? error.code : 'input_or_storage_failure'}].\n`);
     return 1;
   });
 }

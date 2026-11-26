@@ -1,22 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { hashJSON as digest, readJSONValue as readJSON, createGuard, persist, openLock, releaseLock, runCLI,
-  outputLocation } from './lib.ts';
+  outputLocation, createValidators } from './lib.ts';
 import { curate } from './curated.ts';
 import { review } from './identity-review.ts';
 
 const requireValue = createGuard('invalid_audience');
-function object(value, fields) {
-  requireValue(value && typeof value === 'object' && !Array.isArray(value) &&
-    Object.keys(value).every(key => fields.includes(key)), 'Unsupported audience fields.');
-}
-function text(value) {
-  requireValue(typeof value === 'string' && value.trim().length > 0, 'Expected nonempty audience text.');
-  return value;
-}
-function identifier(value) {
-  requireValue(typeof value === 'string' && /^[a-z][a-z0-9-]{0,95}$/.test(value), 'Invalid audience reference.');
-}
+const { object, text, identifier } = createValidators(requireValue, {
+  fieldsMessage: 'Unsupported audience fields.',
+  textMessage: 'Expected nonempty audience text.',
+  identifierMessage: 'Invalid audience reference.'
+});
 function email(value) {
   if (typeof value !== 'string' || !/^[^@\s<>;,]+@[^@\s<>;,]+\.[^@\s<>;,]+$/.test(value)) return null;
   return value.toLowerCase();

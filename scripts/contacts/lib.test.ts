@@ -6,13 +6,69 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { readJSON, readJSONValue, readJSONWithDigest, openLock, releaseLock,
-  persist, publishText } from './lib.ts';
+  persist, publishText, CollectionError, createGuard, createValidators,
+  createError, isError, createCodeGuard, createCodeValidators, instant } from './lib.ts';
 
 function fixture(t) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'heartbeat-lib-'));
   t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
   return folder;
 }
+
+test('shared validators retain command messages, identifier bounds and canonical timestamp policies', () => {
+  const validators = createValidators(createGuard('invalid_curation'), {
+    fieldsMessage: label => `Invalid ${label} fields.`,
+    identifierMessage: 'Invalid curated identifier.',
+    canonicalInstant: true, instantMessage: 'Invalid capture instant.'
+  });
+  for (const value of [null, [], 'text', { unexpected: true }]) {
+    assert.throws(() => validators.object(value, ['allowed'], 'note'),
+      { code: 'invalid_curation', message: 'Invalid note fields.' });
+  }
+  validators.object({ allowed: null }, ['allowed'], 'note');
+  assert.equal(validators.text(' original note ', 'note'), ' original note ');
+  assert.throws(() => validators.text(' \n', 'note'),
+    { code: 'invalid_curation', message: 'note must be nonempty text.' });
+  assert.equal(validators.identifier('a' + '1'.repeat(95)), 'a' + '1'.repeat(95));
+  for (const value of ['a'.repeat(97), 'A', 'a_b', 'a b', null]) {
+    assert.throws(() => validators.identifier(value),
+      { code: 'invalid_curation', message: 'Invalid curated identifier.' });
+  }
+  assert.equal(validators.instant('2026-01-02T03:04:05.000Z'), '2026-01-02T03:04:05.000Z');
+  for (const value of ['2026-01-02T03:04:05Z', '2026-01-02T04:04:05.000+01:00', '2026-02-30T00:00:00.000Z', null]) {
+    assert.throws(() => validators.instant(value),
+      { code: 'invalid_curation', message: 'Invalid capture instant.' });
+  }
+  assert.equal(instant('2026-01-02T04:04:05+01:00', 'timestamp'), '2026-01-02T03:04:05.000Z');
+  assert.throws(() => instant('2026-02-30T00:00:00Z', 'timestamp'), { code: 'invalid_input' });
+});
+
+test('code-oriented validators preserve override codes, converter statuses and strict Messenger instants', () => {
+  const failure = createError('messenger', code => `Messenger conversion failed [${code}].`);
+  const guard = createCodeGuard('invalid_manifest', failure);
+  const validators = createCodeValidators(guard, 'invalid_manifest');
+  assert.throws(() => validators.object({ extra: true }, [], 'unsupported_layout'),
+    { code: 'unsupported_layout', message: 'Messenger conversion failed [unsupported_layout].' });
+  for (const value of ['2026-01-02T03:04:05Z', '+010000-01-02T03:04:05.000Z', '2026-02-30T03:04:05.000Z']) {
+    assert.throws(() => validators.instant(value), { code: 'invalid_manifest' });
+  }
+  assert.equal(validators.instant('2026-01-02T03:04:05.000Z'), '2026-01-02T03:04:05.000Z');
+  assert.throws(() => guard(false, 'missing_time_evidence', 'requires_setup'),
+    { code: 'missing_time_evidence', status: 'requires_setup' });
+});
+
+test('one shared error type preserves adapter catch boundaries and retryability', () => {
+  const google = createError('google');
+  const email = createError('email', code => `Email acquisition failed [${code}].`);
+  const error = google('quota_exhausted', 'failed', true);
+  assert.ok(error instanceof CollectionError);
+  assert.equal(error.retryable, true);
+  assert.equal(isError(error, 'google'), true);
+  assert.equal(isError(error, 'email'), false);
+  assert.equal(isError(new CollectionError('invalid_input'), 'google'), false);
+  assert.equal(isError(Object.assign(new Error('external'), { code: 'quota_exhausted' }), 'google'), false);
+  assert.equal(email('metadata_incomplete').message, 'Email acquisition failed [metadata_incomplete].');
+});
 
 test('JSON helpers accept one leading BOM without changing byte digests or caller error contracts', t => {
   const file = path.join(fixture(t), 'input.json');

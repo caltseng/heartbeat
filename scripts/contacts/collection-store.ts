@@ -1,11 +1,8 @@
-import type { CompactRecordEntry, ReconciliationReference, RecordEntry, StoredRevision } from './types.ts';
+import type { CompactRecordEntry, ReconciliationReference, RecordEntry } from './types.ts';
 import { isDeepStrictEqual } from 'node:util';
-import { requireValue, persistText, readJSON } from './lib.ts';
+import { requireValue, persistText, readJSON, versions } from './lib.ts';
 
 const STORAGE = 'revision-references-v1';
-const versions = (entry: RecordEntry): StoredRevision[] => entry.revisions ||
-  [{ id: '$initial', supersedes: null, record: entry.record, provenance: entry.provenance }];
-
 function expandCollection(state) {
   if (state.recordStorage === undefined) return state;
   requireValue(state.recordStorage === STORAGE, 'Unsupported collection record storage.', 'invalid_store');

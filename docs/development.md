@@ -21,9 +21,13 @@ invalid synthetic fixtures.
 Shared contacts infrastructure lives in `scripts/contacts/lib.ts`: JSON parsing
 with a single leading BOM removed, exact-byte versus serialized-JSON SHA-256,
 output-path guards, exclusive locks, durable atomic replacement, no-clobber
-publication and synchronous/asynchronous CLI error handling. Keep command-specific
-validation, error messages/codes, lock metadata and result formatting in each
-command. The collector's reconciliation-aware `persist` and its existing helper
+publication and synchronous/asynchronous CLI error handling. It also owns the
+shared object/text/identifier/instant validators, source/channel constants and
+record-revision fallback. Commands select validator policies and retain their
+error messages/codes, lock metadata and result formatting. A single `CollectionError`
+type carries status/retryability and an origin domain; adapter catch boundaries
+check that domain so shared infrastructure failures are not mistaken for
+adapter failures. The collector's reconciliation-aware `persist` and its existing helper
 exports remain compatible; `local-json.ts` re-exports the shared persistence API.
 Collection snapshots use `collection-store.ts` for compact revision-reference
 storage and legacy expansion; use `readCollection` when inspecting record

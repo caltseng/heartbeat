@@ -3,30 +3,22 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { hash as digest, readJSONWithDigest as readJSON, createGuard, persist, openLock, releaseLock, runCLI,
-  outputLocation } from './lib.ts';
+  outputLocation, createValidators, SOURCES } from './lib.ts';
 import { expandCollection } from './collection-store.ts';
 
-const SOURCES = ['google-contacts', 'email', 'text-messages', 'messenger', 'whatsapp'];
 const own = (value, key) => Object.hasOwn(value, key);
 const requireValue = createGuard('invalid_review');
-function object(value, fields, label) {
-  requireValue(value && typeof value === 'object' && !Array.isArray(value), `${label} must be an object.`);
-  requireValue(Object.keys(value).every(key => fields.includes(key)), `${label} contains unsupported fields.`);
-}
-function text(value, label) {
-  requireValue(typeof value === 'string' && value.trim().length > 0, `${label} must be nonempty text.`);
-  return value;
-}
+const { object, text, identifier } = createValidators(requireValue, {
+  objectMessage: label => `${label} must be an object.`,
+  fieldsMessage: label => `${label} contains unsupported fields.`,
+  identifierMessage: 'Invalid canonical identifier.'
+});
 function list(value, label, minimum = 0) {
   requireValue(Array.isArray(value) && value.length >= minimum && new Set(value).size === value.length,
     `${label} must be an array of distinct values.`);
   return value;
 }
 const personId = key => `person-${digest(key)}`;
-function identifier(value) {
-  requireValue(typeof value === 'string' && /^[a-z][a-z0-9-]{0,95}$/.test(value), 'Invalid canonical identifier.');
-  return value;
-}
 function normalized(type, value) {
   if (type === 'email') {
     const email = value.trim();

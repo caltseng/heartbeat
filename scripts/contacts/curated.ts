@@ -3,22 +3,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { hashJSON, readJSONValue as readJSON, createGuard, persist, openLock, releaseLock, runCLI,
-  outputLocation } from './lib.ts';
+  outputLocation, createValidators } from './lib.ts';
 import { review } from './identity-review.ts';
 
 const requireValue = createGuard('invalid_curation');
-function object(value, fields, label) {
-  requireValue(value && typeof value === 'object' && !Array.isArray(value) &&
-    Object.keys(value).every(key => fields.includes(key)), `Invalid ${label} fields.`);
-}
-function text(value, label) {
-  requireValue(typeof value === 'string' && value.trim().length > 0, `${label} must be nonempty text.`);
-  return value;
-}
-function identifier(value) {
-  requireValue(typeof value === 'string' && /^[a-z][a-z0-9-]{0,95}$/.test(value), 'Invalid curated identifier.');
-  return value;
-}
+const { object, text, identifier, instant } = createValidators(requireValue, {
+  fieldsMessage: label => `Invalid ${label} fields.`,
+  identifierMessage: 'Invalid curated identifier.',
+  canonicalInstant: true, instantMessage: 'Invalid capture instant.'
+});
 function dictionary(value) {
   requireValue(value && typeof value === 'object' && !Array.isArray(value), 'Expected a record dictionary.');
 }
@@ -30,10 +23,6 @@ function date(value) {
   requireValue(typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
     Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value,
   'Encounter/connection dates must be real YYYY-MM-DD calendar dates.');
-}
-function instant(value) {
-  requireValue(typeof value === 'string' && Number.isFinite(Date.parse(value)) &&
-    new Date(value).toISOString() === value, 'Invalid capture instant.');
 }
 function validateRecords(records, mapping) {
   object(records, ['groups', 'notes', 'connections', 'rhythms'], 'curated records');
