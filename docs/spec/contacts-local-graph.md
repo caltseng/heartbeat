@@ -33,7 +33,7 @@ are separate frozen reports, not a browser filter pretending to recompute data.
 
 ## CLI and frozen input
 
-After the [summary workflow](contacts-local-workflow.md#synthetic-summary-handoff),
+After the [summary workflow](contacts-local-workflow.md#commands-that-exist-today),
 prepare an ignored local `graph.synthetic.json` next to that summary:
 
 ```json
@@ -140,15 +140,7 @@ bounded small-screen scrolling, selection/focus, zoom and clearing. Set
 the test explicitly skips when none is available. No browser package is added
 to the tool or needed to open its standalone output.
 
-## Delegated engineering decisions (not privacy consent)
-
-| Decision / rationale | Alternatives / assumptions | Validation / revisit |
-| --- | --- | --- |
-| Render the pinned shared report, not collection records or newly calculated totals. Require exact report-byte SHA-256. | Reject independently filtered maps and stale cached graph reuse. Assumes the saved summary is the authoritative generation. | Synthetic pipeline tests pin bytes, preserve inputs and exercise 7d/30d/custom/channel changes. Revisit only with a versioned shared interactive-filter contract. |
-| Use direct-date proportion with 50%/20% cutoffs, retaining partial dates. Put group-only/unknown/inactive in explicit categorical rings. | Reject message-volume closeness scores and force-layout distance. Thresholds are delegated tuning defaults, not owner-approved relationship tiers; incomplete coverage is not normalized into invented history. | Exact 50%/20%/positive/zero fixtures plus partial/unknown cases. Revisit based on synthetic usability feedback or a specified metric/coverage change. |
-| Progressive offline inline SVG navigation, a fixed hash-pinned script, native fallback and six nodes per ring per sheet. This explicitly supersedes the former no-script-only graph contract. | Reject hosted dashboards, browser fetches, remote assets, JS frameworks, executable data interpolation and clipped/omitted cohorts. Assumes standard SVG, Pointer Events and CSP hash support; native fallback requires no scripts. | Synthetic pipeline/hash/escaping/pagination tests plus actual browser mouse, keyboard, touch-event, viewport and reduced-motion checks. Revisit for measured large-store size without adding hosting or lifting private guards. |
-| Use canonical IDs and short report-order labels rather than rereading raw display names. | Reject name-based merges and extra source reads. Labels may change between report generations; canonical IDs remain visible. | Same-name synthetic identities remain separate. Revisit only with a reviewed report-level display-label contract. |
-| Reuse atomic no-replace local publishing for text; extend private-artifact guards for graph requests/staging. | Reject overwrites, remote exports and a new persistence subsystem. | CLI replay, private denial, output-path and boundary tests. Revisit only with a specified generation/retention contract. |
+Engineering rationale, alternatives and revisit conditions: [CONTACTS-025](../decisions.md#contacts-025).
 
 The [owner-approved CONTACTS-010 policy](../privacy.md) is unchanged. Synthetic
 fixtures only; no actual source/account/device/private-browser access, credentials,

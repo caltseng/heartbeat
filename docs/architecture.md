@@ -3,7 +3,8 @@
 ## Delivered and planned stages
 
 ```text
-Separately authorized acquisition / real native conversion [NOT IMPLEMENTED]
+Owner-approved manual source-API retrieval -> local handoff [IMPLEMENTED: V0]
+Private importer / real native conversion [DISABLED]
 Synthetic SyncTech XML -> metadata handoff [IMPLEMENTED: CONTACTS-016]
                          |
 Normalized handoff JSON, or synthetic demo [IMPLEMENTED]
@@ -19,7 +20,7 @@ Deterministic cross-source aggregation [IMPLEMENTED: CONTACTS-023, SYNTHETIC ONL
 Heartbeat period summaries [IMPLEMENTED: CONTACTS-024, SYNTHETIC ONLY]
                          |
 Heartbeat baseline/rhythm signals [IMPLEMENTED: CONTACTS-026, SYNTHETIC ONLY]
-Heartbeat local map [PLANNED: CONTACTS-025]
+Heartbeat local interactive map [IMPLEMENTED: CONTACTS-025, SYNTHETIC ONLY]
 ```
 
 Skills are instructions, not installed provider connectors. `collect.ts` uses
@@ -33,9 +34,11 @@ Managed stores retain non-identifying time fences and use operations refresh/res
 to check retention at time of use; curated files are opaque and unchanged.
 Acquisition and ingestion are separate. No stage requires a hosted service,
 server, dashboard, product login, multi-tenancy or deployment. Future generated
-HTML/SVG/JSON must remain private local files; no renderer exists yet.
+HTML/SVG/JSON remain private local files. Manual [V0 retrieval](spec/contacts-manual-retrieval.md)
+uses inspected available tools and per-run owner approval; it enables no private
+import/aggregation/rendering.
 
-[CONTACTS-014](spec/contacts-email-adapter.md) adds `email.ts`: injected native
+[CONTACTS-014](spec/contacts-email.md) adds `email.ts`: injected native
 Gmail metadata enumeration/conversion with a synthetic-only fixture CLI. A fresh
 private acquisition directory atomically publishes `handoff.json`,
 `checkpoint.json` (native list token and normalized accumulator) and `report.json`.
@@ -78,7 +81,7 @@ tracked paths. External locations still require privacy approval.
 | `records` | Normalized identities, threads, memberships and events keyed by JSON tuples of source/account/type/original ID. Each entry stores only `revisions`: immutable `id`, `supersedes`, `record` and connector/input SHA-256/page/retrieval `provenance`. Each revision's payload and evidence are stored once; base-entry record/provenance aliases exist only in memory. |
 | `reconciliation` | Current revision references (`revision`, `editedBy`, `deletedBy`) keyed by the same source tuple, plus collisions and unresolved/pending targets. Payloads resolve from `records[key].revisions` rather than being copied here; a missing reference fails visibly. |
 | `checkpoints` | Source/account/connector cursor, terminal state and exact resolved-period signature. |
-| `textArchives` (optional) | Synthetic text converter's immutable source/account archive and reviewed-ledger binding; changed/overlapping archives fail pending CONTACTS-021. See the [converter contract](spec/contacts-text-converter.md). |
+| `textArchives` (optional) | Synthetic text converter's immutable source/account archive and reviewed-ledger binding; changed/overlapping archives fail pending CONTACTS-021. See the [converter contract](spec/contacts-text-messages.md). |
 | `manifest` | Current collection time/period, per-source status/coverage/freshness/errors, unresolved identities and explicit implementation limits. |
 | `history` | Prior manifests' period/status/source coverage; not a claim that old data is fresh. |
 
@@ -114,12 +117,11 @@ period/as-of and provide the saved next cursor. To change periods use
 Stale temporary files are not input snapshots. Local-filesystem atomicity is not
 a certification of network-filesystem or full power-loss recovery.
 
-## Future Heartbeat summaries and map
+## Heartbeat summaries and map
 
 The [local workflow contract](spec/contacts-local-workflow.md) connects existing
-commands/configuration/recovery to reserved versioned handoffs for later stages.
-It also specifies the automated no-public-output guard; no renderer or reporting
-command is implemented by that integration.
+commands/configuration/recovery and their versioned handoffs.
+It also specifies the automated no-public-output guard.
 
 The [CONTACTS-023 reducer](spec/contacts-aggregation.md) now reconciles source IDs
 and explicit reviewed mapping revisions before counting. Its immutable structured
@@ -127,11 +129,15 @@ output preserves half-open intervals, time-zone-aware active-day unions,
 direct/group distinctions, exclusions, uncertainty and provenance.
 Every summary and map must use the same structured aggregate dataset.
 Unknown/unavailable coverage cannot become zero or a reconnection decline.
-The [CONTACTS-024 summary](spec/contacts-period-summary.md) now emits private JSON;
-no HTML/SVG map renderer is implemented.
+The [CONTACTS-024 summary](spec/contacts-period-summary.md) emits private JSON;
+[CONTACTS-025](spec/contacts-local-graph.md) renders the pinned report into offline
+interactive HTML/SVG with a hash-pinned script and native fallback.
 
 [CONTACTS-026 opportunities](spec/contacts-opportunities.md) reduce two adjacent
 equal-duration windows from the same bound collection/mapping. Only sufficient,
 fully covered personal direct history can produce decline. Separate curated
 rhythm rows use explicit confirmed connections, never message activity.
 One immutable private `report.json` holds explanations, tuning and evidence.
+
+Source-specific access and implementation contracts live together; historical
+rationale and revisit conditions live in the single [decision log](decisions.md).

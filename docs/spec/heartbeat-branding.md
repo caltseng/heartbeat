@@ -5,7 +5,7 @@ starts the Heartbeat wordmark: straight, slightly lengthened verticals, two shor
 horizontal ping/reply paths, a coral upper-left packet and an ink lower-right
 packet, with no endpoint dots.
 
-## Asset decision
+## Approved asset crops
 
 Use lossless PNG crops of the approved 1536 by 1024 presentation image, not a
 redrawn logo or the labeled board. Coordinates below are zero-based source
@@ -21,17 +21,9 @@ colors and warm background exactly, with modest padding and without labels or
 resampling. The README uses the complete color wordmark with descriptive alt
 text and a repository-relative path. No image or font dependency is required.
 
-Alternatives were faithful vectorization, transparent-background extraction and
-a monochrome crop. Cropping avoids tracing or background-removal changes to the
-approved artwork; the color wordmark retains the approved coral packet. The
-opaque warm background is intentional and keeps the ink lettering legible in
-both light and dark README themes.
-
-Validation compares every output pixel against its source rectangle, inspects
-both rendered crops, verifies local README/asset links and runs `npm run ci`.
-Revisit the raster choice if the owner supplies a vector master, requests
-transparency, or needs larger output than the original pixels support. Any
-replacement must preserve the approved design rather than introduce a redesign.
+The opaque warm background preserves legibility in light/dark themes.
+Engineering alternatives, pixel validation and revisit conditions are recorded
+in the [central history](../decisions.md#branding).
 
 This is a branding-only decision, not a privacy-policy change or authorization
 for source/account access, credentials, collection, remote-AI processing, sending

@@ -1,525 +1,214 @@
-# Heartbeat contacts collection: initial technical approach
+# Heartbeat contacts: shared technical contracts
 
-Migrated from caltseng/churchtree PR #68, exact merge
-`2b222e03ccbe819764eb3a133c318035945f1eac`; see
-[provenance](../provenance.md). `caltseng/heartbeat` is now authoritative.
-Stable CONTACTS IDs, collection skill names and JSON schema are preserved.
-Remaining CONTACTS execution is blocked until this bootstrap is verified checked in.
-
-Status: architecture with a runnable metadata-handoff slice and synthetic-only
-Google/Gmail acquisition adapters (CONTACTS-012/014),
-[text XML conversion](contacts-text-converter.md) (CONTACTS-016) and
-[Messenger JSON conversion](contacts-messenger-converter.md) (CONTACTS-018).
-No accounts are connected, and no live network transport or private native
-archive processing is enabled.
-See the [product specification](contacts-store-spec.md) and
-[work items](contacts-work-items.md).
-CONTACTS-027 adds an independent [synthetic curated JSON store](contacts-curated-records.md)
-for original notes, groups, meaningful connections and rhythms, reusing canonical
-households from CONTACTS-022. Observation records and collection schemas are unchanged.
-CONTACTS-029 layers [synthetic-only prayer requests, explicit status updates and
-editable plans](contacts-prayer-triage.md) over original curated notes in a separate
-private-local-only JSON overlay. It neither changes collection nor exports outreach.
-CONTACTS-030 adds [synthetic local audience review](contacts-life-update-audience.md)
-over those canonical households, with separate exact-input finalization and no sending.
-CONTACTS-026 adds [synthetic opportunity signals](contacts-opportunities.md):
-coverage-gated own-baseline comparisons and separate civil-date curated rhythms.
-It reuses the reducer and current canonical/curated inspection without source
-access, ranking, sending or changing meaningful connection dates.
-CONTACTS-028 adds [synthetic household reconnection review](contacts-reconnection-review.md)
-from current curated records and the shared period dataset, with explicit
-follow-ups, completion, deferral, optional saved prayer context and private
-immutable reports. It does not change collector schemas or create schedules.
+[Product](contacts-store-spec.md), [stable register](contacts-work-items.md),
+[architecture/storage](../architecture.md), [local workflow](contacts-local-workflow.md),
+[provenance](../provenance.md). CONTACTS IDs, contacts-* skills and schema names
+remain stable. Bootstrap is integrated into main; subsequent implementation is
+not authorization for private source access.
 
 ## Shared operating rules
 
-Every `contacts-*` skill and companion specification incorporates this section.
-Read it before using any workflow, including an independently invoked source
-skill. Skills contain task-specific procedures, not separate policy grants.
-[AGENTS.md](../../AGENTS.md) governs repository delivery;
-[CONTACTS-010 privacy policy](../privacy.md) is the authoritative privacy boundary.
-Source contracts describe implementation and enforcement, not additional consent.
+Every contacts-* skill and companion contract incorporates this section.
+[AGENTS.md](../../AGENTS.md) governs delivery; [CONTACTS-010](../privacy.md)
+governs privacy, not engineering history.
 
 ### Privacy and scope
 
-**Manual V0 exception:** [contacts-retrieve](contacts-manual-retrieval.md) supports
-owner-approved, user-invoked source-API metadata retrieval with normal client
-auth and verified private local output. Follow its per-run scope and capability
-inspection. It does not need a new connector/privacy platform or scheduler.
-The synthetic-only workflow statements below govern existing importers,
-converters and downstream processing, not this manual handoff-only path.
+Owner-approved metadata categories do not approve exact source/account or EACH
+real run (including replay/resume/changed bounds). Real artifacts require verified
+Windows-user ACL/encryption, this-computer storage outside Git/sync, backup
+exclusion and 12-month deletion across inputs/provenance/cursors/derived files.
+Ignored `.private\contacts` permits synthetic artifacts, not verified real storage.
+No importer/converter/downstream approval flag bypasses private guards.
+Never relabel real input synthetic or share private manifests/configuration/logs/
+IDs/exports/notes/maps in Git, chat, PRs, CI or remote AI.
 
-Apply the complete [approved policy and synthetic-only enforcement](../privacy.md):
-permitted source categories and metadata fields, excluded content, separate
-first-source/account and EACH-run approvals (including replay/resume/changed
-bounds), verified Windows-user ACLs/encryption, this-computer storage outside Git/
-sync, backup exclusion and 12-month deletion of all inputs/derived artifacts.
-No existing importer enables private requests; no flag, asserted approval or
-engineering decision bypasses the guard. Never relabel real data synthetic.
-Raw exports can contain excluded content: metadata projection or "Without Media"
-does not authorize even transient processing of real content. Curated notes and
-prayer content require their own separately approved boundary and remain disabled.
+No implicit account/device/backup/private-browser/other-person access,
+credential/cookie/password acquisition, bridges, pairing, sending/source writes
+or schedules. Raw exports/Without Media still contain content; transient
+projection and private notes/prayer/wording need separately approved boundaries.
+Keep development, examples, checks and review synthetic/account-free.
+No hosting/backend/multi-tenancy/product-account or deployment stack.
 
-Do not implicitly access accounts, other participants' accounts, devices, backups
-or authenticated browser sessions; acquire/request credentials, cookies or backup
-passwords; pair devices; install bridges; send; write sources; schedule work; or
-create automations. No remote-AI processing of real data. Separately authorized source API
-retrieval is distinct from remote-AI processing; the manual V0 skill can use
-an available supported source read but does not supply a live connector.
-
-Use synthetic fixtures for development, examples, validation and review.
-Operational requests/configuration, exports, metadata, logs, manifests, cursors,
-mapping histories, notes and generated reports/maps must stay untracked; never
-paste identifiers/manifests/configuration into PRs, issues, chats or remote tools.
-Ignored `.private/contacts/` or an external local synthetic folder is suitable
-for fixtures only, not verified real-data storage. Never force-add ignored
-artifacts or copy another checkout's data.
-
-Heartbeat is one user's local tool/store/presentation, not a hosted website,
-dashboard, backend, deployment, multi-tenant or product-account system. Prove the
-flow before polished design. Collection, review, reduction and rendering remain
-separate; preserve stable skills, CONTACTS IDs and storage/schema names.
+**Manual V0 exception:** [contacts-retrieve](contacts-manual-retrieval.md) may use
+an inspected available source-API metadata tool, normal client auth and per-run
+owner approval with verified private local output. No new connector/privacy
+platform/scheduler is required. It ends at local handoff, **not private import,
+aggregation or rendering**. Source-API retrieval differs from remote-AI
+processing; Muse/tool name alone proves neither supported fields nor permission.
 
 ### Source workflow
 
-Establish source/account namespace, requested interval, IANA zone/as-of, output
-and applicable checkpoint scope. Inspect actual tool capabilities before claiming
-access. A provider name, skill, narrative/browser answer, Page/business API or
-discovered integration is not a callable authorized personal-source route.
-No live transport/account connection is supplied. Use the source's implemented
-fixture adapter/converter or a contract-conforming normalized handoff.
+Establish stable source/account namespace, interval/IANA zone/as-of, self evidence,
+output and checkpoint scope. Tool discovery, names, narrative/search estimates,
+browser success or business APIs do not prove a callable personal source.
+Preserve original IDs/timestamps/roles/membership/provenance; missing IDs need
+reviewed labeled local strategy. One message is one event, never group/recipient
+fan-out. Unknown thread kind stays unknown; membership/contact presence is not
+activity. Never merge names or infer households/beliefs/neglect from volume.
 
-Preserve stable namespaced source/account/message/thread/sender IDs, actual
-timestamps and recipient roles, explicit self identities, historical membership,
-retrieval times, provenance, pagination and coverage. Missing IDs require a
-reviewed labeled local-ID strategy, never fabricated provider IDs. Stop a source
-if required evidence cannot be preserved. Narratives, search snippets and
-estimated counts are not observations. One message is one event, not recipient
-fan-out; group membership is not direct interaction or credit for another sender.
-Unknown thread kind stays unknown.
-
-For synthetic inputs, return the versioned handoff to collection, or import that source alone through
-`contacts:collect` for an independent refresh. Missing access must produce
-`mode: unavailable`, `status: requires_setup` and a reason; unsupported formats/
-unresolved format evidence use `unsupported`. Never omit a requested source or
-manufacture an empty successful page. Snapshot/export/linked-device history and
-cursor exhaustion do not prove complete upstream history or ongoing sync.
-Manual V0 real retrieval stops at its local handoff; do not invoke the private importer.
-Exact immutable replay is distinct from changed/overlapping exports, which need
-[reviewed reconciliation](contacts-source-revisions.md). Different connectors
-require reviewed upstream namespaces/ID translations, not name/text/time deduplication.
+Every requested source is explicit: unavailable `requires_setup` or unsupported
+format with reason, never omission/empty success. Immutable replay differs from
+changed/overlapping exports; reviewed connector translations cannot override
+stricter native snapshot bindings. Failed checkpoints never advance; file/token
+exhaustion proves no upstream completeness or live synchronization.
 
 ### Local execution and interpretation
 
-Request paths resolve relative to the request file. Use the
-[period contract](#period-semantics) for 7d/30d/custom bounds. Downstream mapping
-revisions must explicitly bind exact collection bytes; changed snapshots require
-review/rebinding, not latest-revision fallback. Keep source/review inputs unchanged.
-Reports are immutable: choose a fresh output rather than editing/replacing one.
-Never weaken validation to retry. For lock conflicts/interruption, verify the
-recorded writer/PID stopped before removing only the exact stale lock/temp file.
+Paths resolve relative to each request unless its source contract explicitly
+specifies otherwise. Pin exact collection bytes and mapping revision; no latest/
+stale/empty fallback. Reports are immutable, fresh-output generations. Keep
+inputs unchanged; inspect errors, status and limits. Confirm recorded process
+stopped before removing only exact stale locks/temps, never store/root deletion.
 
-Preserve CLI exits: **0** means complete declared evidence for that workflow,
-not live access; **2** retains a usable partial result and its limits; **1** is
-fatal failure, never usable empty success. Inspect source errors and saved status.
-Missing/auth-limited/unsupported/failed history is unknown, not zero. Exact zero
-requires `certainty:"exact"` and `total:0`; incomplete positive observations are
-lower bounds, and absent daily/thread buckets are not known-zero history.
+CLI **0** = complete declared workflow evidence, not live access; **2** = usable
+partial result/limits; **1** = fatal failure, not usable empty success.
+Exact zero requires `certainty:"exact",total:0`; missing buckets remain unknown,
+incomplete positive counts lower bounds. Preserve filters/bounds/zone/as-of,
+current-day state, digest/revision, exclusions/audit, freshness/coverage/errors
+and unresolved/inactive references in every downstream view. Later retrieval
+is not historical reconstruction. Observed activity never resets confirmed
+meaningful-connection dates or becomes relationship quality.
 
-Retain resolved bounds, zone/as-of/current-day state, filters, collection digest,
-mapping revision, exclusions/audit, source freshness/coverage/status/errors and
-unresolved references with downstream outputs. Retrieval after as-of is not
-historical reconstruction. Preserve inactive/unassigned identities and ambiguity;
-never merge people by display name, infer couples/households from chats, infer
-neglect/importance/beliefs from volume, score relationship quality, or reset a
-confirmed meaningful-connection date from observed activity.
+## Invocation and capability state
 
-## 1. Repository fit and first vertical slice
-
-Heartbeat uses Node.js 20+ TypeScript scripts (run with the pinned `tsx` toolchain) and skills in
-`.github/skills/<name>/SKILL.md`. This bootstrap migrates only the existing
-CONTACTS-001 through CONTACTS-004 baseline from the immutable source merge.
-There is no website, backend, OAuth service or deployment stack. Reuse Node's
-standard library and skill format; do not import the source repository's website
-pipeline or add a public route. The JSON snapshot below is the implemented local
-persistence approach, not a reason to provision a server or database service.
-See [architecture](../architecture.md), [privacy](../privacy.md) and
-[development/CI](../development.md) for executable commands and local boundaries.
-
-The smallest delivered slice is:
-
-1. Invoke `contacts-collect` with explicitly authorized sources and an interval.
-2. Delegate acquisition instructions to the five focused source skills.
-3. Use a separately authorized, already available tool to produce the metadata
-   handoff below, or explicitly record that source as unavailable. Discovery is
-   not authorization to connect an account or install a bridge.
-4. Run `scripts/contacts/collect.ts` to validate and durably import handoff pages.
-5. Inspect `collection.json`: one machine-readable snapshot containing both its
-   manifest and normalized, namespaced records. Any missing source remains visible.
-
-Steps 3-4 are intentionally separate: the implemented adapter is a **local
-metadata-handoff reader**, not a fetcher for five remote APIs. It currently reads
-only synthetic contract-conforming input. CONTACTS-010's
-[owner-approved policy](../privacy.md) does not authorize an account or run;
-private requests fail closed until local controls and approvals can be verified.
-Arbitrary vendor exports are not contract-conforming by default. A source skill
-describes acquisition/normalization and the setup gate; it
-does not manufacture endpoint access. Collection is separate from future identity
-review, deterministic aggregation, and rendering.
-
-## 2. Invocation and capability state
-
-Run the account-free demonstration in a **fresh** output folder:
+Node 20.11.0+ TypeScript with pinned tsx, standard-library local JSON scripts and
+independent `.github/skills/<name>/SKILL.md`; [development](../development.md)
+defines checks. Fresh synthetic demo/replay:
 
 ```powershell
 npm run contacts:collect -- --demo --output .private\contacts\demo-001
-```
-
-This writes five labeled synthetic handoffs, `request.synthetic.json`, and
-`collection.json`. It never uses the network, credentials, devices, browser sessions,
-or real contacts. Rerun its generated request to exercise idempotency:
-
-```powershell
 npm run contacts:collect -- --request .private\contacts\demo-001\request.synthetic.json
-npm run test:contacts
 ```
 
-For prepared synthetic collection, use the same `--request` command. Private
-requests are disabled, including unavailable-only manifests, and exit 1 without
-writing output. Inputs/output resolve relative to the request
-file. Every desired source must have an entry, even if it is unavailable.
+Demo writes five handoffs/request/collection. Collection validates normalized
+metadata; native acquisition/conversion is separate.
 
-| Source skill | Implemented, callable now (synthetic only) | Setup/access gate and limitations |
-| --- | --- | --- |
-| `contacts-google-identities` | Validate/import identities; `contacts:google` exercises the selected People route using synthetic pages | [CONTACTS-011/012](contacts-google-capability.md), with `contacts.readonly` and contact-only fields. No authorized Google tool, network transport or OAuth client ships. Private acquisition is disabled before output access (exit 1); revisions/deletions stay private and partial pending 021. Snapshot completeness is not historical completeness. |
-| `contacts-email-activity` | Validate/import email metadata handoffs; [014 synthetic native Gmail adapter/CLI](contacts-email-adapter.md) | [CONTACTS-013](contacts-email-access.md) selects Gmail API `gmail.metadata` enumeration (no search `q`), not connected access. 014 implements injected metadata transport, list-token paging and conservative role/class normalization; no HTTP/OAuth transport or private runs. Native cursors stay separate and coverage stays partial. |
-| `contacts-text-activity` | Validate/import SMS/MMS/RCS/iMessage handoffs; [synthetic-only selected XML conversion](contacts-text-converter.md) | [CONTACTS-015](contacts-text-format-gate.md) selects Android 14 / SyncTech 10.30.009 full XML v1 for SMS/MMS with explicit protocol evidence. CONTACTS-016 implements that synthetic profile only; no device/actual export is verified. RCS/iMessage/other native backups remain unsupported; private conversion fails closed before XML access. |
-| `contacts-messenger-activity` | Validate/import metadata handoffs; [018 synthetic-only JSON snapshot converter](contacts-messenger-converter.md) with local IDs and overlap guard | [CONTACTS-017 selects local JSON conversion](contacts-messenger-capability.md), not a structured personal reader. Private conversion is disabled; producer version and encrypted-backup layout remain unverified. Page/business APIs and Muse queries do not establish personal-inbox history; no private session reuse or real-data remote AI processing. |
-| `contacts-whatsapp-activity` | Validate/import WhatsApp metadata; `contacts:whatsapp` converts the selected synthetic TXT snapshot | [CONTACTS-019/020](contacts-whatsapp-format-gate.md) implement only iOS Without Media UTF-8 profile `whatsapp-ios-txt-metadata-v1`, with immutable archive-local IDs/registry, reviewed identity/boundary/time ledgers and unknown history. Private conversion fails before native reads/registry/output. No real producer certified, personal tool connected or live refresh implemented. Approved metadata policy does not permit real raw export/content processing. Business Groups API access does not establish existing personal-group access. |
+| Source skill | One source contract / current synthetic route |
+| --- | --- |
+| contacts-google-identities | [011/012 Google](contacts-google-capability.md): contact-only People mock transport, sync generations and staged revisions, no HTTP/OAuth. |
+| contacts-email-activity | [013/014 email](contacts-email.md): gmail.metadata fixture transport, no search q; native list cursor and partial coverage, no HTTP/history sync. |
+| contacts-text-activity | [015/016 texts](contacts-text-messages.md): selected Android/SyncTech XML SMS/MMS with explicit transport/SIM/thread evidence; no RCS/iMessage/native alternatives or real device validation. |
+| contacts-messenger-activity | [017/018 Messenger](contacts-messenger.md): declared JSON snapshot shards/local IDs, strict account-level overlap gate; no personal reader/encrypted-backup certification. |
+| contacts-whatsapp-activity | [019/020 WhatsApp](contacts-whatsapp-format-gate.md): selected synthetic iOS TXT, reviewed boundary/sender/zone ledger and account/thread binding; no certified producer/live route. |
 
-All five are **synthetic-import-capable**, not live-connected, under the
-[shared operating rules](#shared-operating-rules).
+All five support synthetic normalized import; no existing CLI supplies live
+transport. Manual V0 availability is separately inspected each run.
 
-## 3. Request contract
+## Request contract
 
-The [CONTACTS-032 operations contract](contacts-source-operations.md) layers
-explicit synthetic refresh/resync, stale-source inspection and managed-cache
-retention/deletion/recovery over these same handoffs. It does not change the
-source capability matrix or authorize private runs. Managed stores require
-`contacts:operate` refresh/resync so their retention clock is checked.
-
-Example with one available synthetic input and one explicitly unavailable source:
+Strict schemaVersion 1: dataClass synthetic/private (private disabled), period,
+output, sources, optional resume/maxPages/overlapReview. Mixing store classes or
+unknown/body/credential/approval fields fails. Desired sources:
+google-contacts/email/text-messages/messenger/whatsapp; stable account is upstream
+namespace, connector acquisition route. Modes metadata-import (input path) or
+unavailable (requires_setup/unsupported + reason).
 
 ```json
 {
   "schemaVersion": 1,
   "dataClass": "synthetic",
-  "period": {
-    "preset": "7d",
-    "timeZone": "America/Los_Angeles",
-    "asOf": "2026-11-24T20:00:00Z"
-  },
+  "period": {"preset": "7d", "timeZone": "America/Los_Angeles", "asOf": "2026-11-24T20:00:00Z"},
   "output": ".",
   "resume": false,
   "maxPages": 10,
   "sources": [
-    {
-      "source": "email",
-      "account": "fixture-account",
-      "connector": "synthetic-handoff",
-      "mode": "metadata-import",
-      "input": "email.synthetic.json"
-    },
-    {
-      "source": "messenger",
-      "account": "fixture-messenger",
-      "connector": "none",
-      "mode": "unavailable",
-      "status": "requires_setup",
-      "reason": "No verified authorized personal-inbox tool."
-    }
+    {"source": "email", "account": "fixture-account", "connector": "synthetic-handoff", "mode": "metadata-import", "input": "email.synthetic.json"},
+    {"source": "messenger", "account": "fixture-messenger", "connector": "none", "mode": "unavailable", "status": "requires_setup", "reason": "No verified authorized personal reader."}
   ]
 }
 ```
 
-`dataClass` distinguishes `synthetic` and `private`; mixing classes in a store is
-rejected. The schema preserves both labels for compatibility, but the current
-importer rejects ALL private requests with `private_collection_disabled` before
-handoff reads or output writes. Approval fields/flags are not part of this contract.
-Source families are `google-contacts`, `email`, `text-messages`, `messenger`, and
-`whatsapp`. Account values are reviewed, stable upstream account references, never
-tokens, passwords, or connector-specific aliases. Connector names identify the
-acquisition route and are separate from source identity.
-
-`mode` is `metadata-import` or `unavailable`. Unavailable states are
-`requires_setup` or `unsupported`, with a clear reason. Runtime import errors use
-`failed`; successful but incomplete imports use `partial`. `collected` means the
-supplied metadata snapshot covers the requested interval according to its declared
-coverage, not that a remote account is connected or independently audited.
-For activity, a source-wide complete interval must be covered by every included
-thread; differing or unverified thread histories require partial/unknown source
-coverage. [CONTACTS-021](contacts-source-revisions.md) adds explicit per-thread
-evidence and conservative completeness checks; legacy inherited source-wide
-declarations remain labeled as such.
-
-`maxPages` is an optional positive per-source page budget. `resume:true` starts at
-the last committed cursor for the same source/account/connector and exact resolved
-period. A changed interval or as-of instant requires `resume:false`; existing
-records remain and replay deduplicates them. An already finished source replays
-from the beginning rather than claiming that an old snapshot is freshly fetched.
-The handoff must contain the saved cursor; otherwise collection reports an error.
+Private denial occurs before handoff/output access, even unavailable-only
+requests. Runtime failed/partial sources remain in manifest. collected describes
+declared snapshot coverage, not independent upstream audit.
+maxPages is positive per-source budget. Resume requires same source/account/
+connector/resolved period/as-of and supplied saved cursor. Changed period needs
+resume:false; finished-source replay starts again, deduplicates, not fresh fetch.
+Managed CONTACTS-032 stores use operations refresh/resync for retention checks.
 
 ### Period semantics
 
-`7d` and `30d` include the current calendar day in the selected IANA time zone
-and the preceding 6 or 29 days, respectively. Their exclusive end is the required
-as-of instant; label the current day partial. Resolve local dates through
-`Intl.DateTimeFormat`, not a fixed `N * 24 hours` subtraction across DST.
+7d/30d = current selected-zone calendar day plus preceding 6/29, ending at
+required asOf, current day partial. Use local calendar boundaries through Intl,
+not fixed N*24 hours across DST. custom requires offset-bearing start/end,
+timeZone/asOf; nonempty start-inclusive/end-exclusive, end <= asOf.
+Reject nonexistent start dates, never shift them. Persist resolved UTC bounds/
+zone/preset/as-of; collection retains instants, downstream applies filters.
 
-`custom` instead requires `start` and `end` ISO timestamps with explicit offsets,
-plus `timeZone` and `asOf`. All intervals are start-inclusive/end-exclusive and
-must be nonempty with `end <= asOf`. The resolved UTC bounds, selected zone,
-preset, and as-of instant are persisted. A nonexistent start calendar day is
-rejected rather than silently shifted. Collection retains original event instants;
-downstream aggregation, not ingestion, applies interval filters.
+## Adapter/handoff contract
 
-## 4. Adapter/handoff contract
+Envelope: schemaVersion, dataClass, source/account/connector, coverage,
+optional sanitized errors `[{code,retryable}]`, pages. Each page has cursor/
+nextCursor (null at boundaries), retrievedAt and all four arrays, even empty:
 
-An acquisition adapter supplies a JSON envelope:
-
-```json
-{
-  "schemaVersion": 1,
-  "dataClass": "synthetic",
-  "source": "email",
-  "account": "fixture-account",
-  "connector": "synthetic-handoff",
-  "coverage": {
-    "start": "2026-11-01T00:00:00Z",
-    "end": "2026-11-24T20:00:00Z",
-    "completeness": "complete",
-    "basis": "Synthetic fixture only."
-  },
-  "errors": [],
-  "pages": [
-    {
-      "cursor": null,
-      "nextCursor": null,
-      "retrievedAt": "2026-11-24T20:00:00Z",
-      "identities": [
-        {"id": "self", "idKind": "local", "isSelf": true},
-        {"id": "peer", "idKind": "local", "isSelf": false}
-      ],
-      "threads": [
-        {"id": "thread-1", "idKind": "local", "kind": "direct"}
-      ],
-      "memberships": [
-        {"threadId": "thread-1", "identityId": "self"},
-        {"threadId": "thread-1", "identityId": "peer"}
-      ],
-      "events": [
-        {
-          "id": "event-1",
-          "idKind": "local",
-          "eventType": "message",
-          "threadId": "thread-1",
-          "senderId": "peer",
-          "timestamp": "2026-11-23T12:00:00Z",
-          "channel": "email",
-          "recipients": [{"identityId": "self", "role": "to"}],
-          "classification": "interpersonal"
-        }
-      ]
-    }
-  ]
-}
-```
-
-Use the demo generator for complete executable examples across all five families.
-Input objects use allowlisted fields; unknown fields fail rather than being
-silently dropped. The helper is deliberately not a general email/message archive
-parser. Do not pass full vendor payloads, bodies, snippets, attachments, subjects,
-credentials, access cookies, or raw browser transcripts.
-
-The selected synthetic text converter additionally supplies an optional
-`textArchive` binding. The importer validates it and pins the original archive
-and reviewed mapping digests for that source/account with its first valid page.
-Changed or overlapping archives, changed mappings and unbound legacy text events
-fail explicitly; there is no automatic overlap reconciliation. Other handoffs
-retain their original contract. See the [converter contract](contacts-text-converter.md)
-for the exact fields, private registry, unknown coverage and exit behavior.
-
-| Record | Fields and invariants |
+| Record | Fields / invariants |
 | --- | --- |
-| Identity | `id`, `idKind: provider/local`, explicit `isSelf`; optional `displayName` and `addresses: [{type: email/phone, value}]`. Self identity must be established, not inferred from a name. |
-| Thread | `id`, `idKind`, `kind: direct/group/broadcast/unknown`; optional `title`. A two-person direct thread must include exactly one self identity and one other identity before direct events are accepted. |
-| Membership | `threadId`, `identityId`; both records must already exist or be in this page. Optional `validFrom`/`validUntil` preserve historical half-open intervals. Legacy unbounded records do not establish historical rosters. Membership alone creates no activity. |
-| Observation | `id`, `idKind`, `eventType: message/reaction/membership/edit/deletion`, thread, sender (nullable for non-message events), timestamp, channel, recipients and classification. Edits/deletions require `targetId`; unresolved targets stay visible. Messages require a known sender; references must resolve. No event can occur after its retrieval timestamp. |
-| Recipient | Identity plus `to/cc/bcc/recipient` role; preserve email roles and never turn a multi-recipient event into one direct message per recipient. |
-| Classification | `interpersonal/bulk/automated/unclassified`; collection retains all classes. Later summaries explicitly exclude bulk/automated and disclose unclassified records; no classifier is implemented yet. |
-| Coverage | `start/end` (nullable when unknown), `completeness: complete/partial/unknown`, and a human-readable basis. Contact coverage is an identity snapshot, not an activity interval; complete identity snapshots may have null bounds. |
-| Error | Optional envelope `errors: [{code, retryable}]`; codes must not contain secret payloads. Upstream errors keep the final source status partial even if its cursor is exhausted. |
+| Identity | id, idKind provider/local, explicit isSelf; optional displayName/addresses `{type:email/phone,value}`. No inferred self/canonical match. |
+| Thread | id/idKind, kind direct/group/broadcast/unknown; optional synthetic title, not permission for real content. Direct requires exactly self and peer at event time. |
+| Membership | threadId/identityId resolve already or in page; optional half-open validFrom/validUntil. Unbounded legacy membership is not historical roster certification. |
+| Event | id/idKind, eventType message/reaction/membership/edit/deletion, threadId, senderId (nullable only non-message), timestamp <= retrieval, channel, recipients, classification. Messages need known sender; edits/deletions need targetId. |
+| Recipient/class | Identity + to/cc/bcc/recipient; interpersonal/bulk/automated/unclassified retained. Reducer discloses exclusions; native email classification is separately evidenced. |
+| Coverage | Nullable start/end, completeness complete/partial/unknown, explicit basis. Complete identity snapshots may have null temporal bounds; activity completeness needs requested interval and current included-thread evidence. |
 
-Channels are `email`, `sms`, `mms`, `rcs`, `imessage`, `messenger`, and `whatsapp`.
-Google contacts must not contain threads, memberships, or observations.
-Each page includes all four arrays, even when empty. An explicit empty terminal
-page with complete coverage can establish an empty snapshot; a missing file cannot.
+Channels email/sms/mms/rcs/imessage/messenger/whatsapp. Google has no threads,
+memberships/events. Strict normalized allowlist rejects vendor/content/credential
+fields. Verified complete empty terminal handoff differs from missing file.
+Upstream errors retain partial status even with terminal cursor.
 
 ### Identity, overlap, and mutation
 
-Stored keys are JSON-encoded tuples `[source, account, recordType, originalId]`;
-membership keys include the thread/identity tuple. Provider IDs are never replaced
-by display names. If only local IDs exist, label them `local`, preserve them across
-reimports of the same acquisition, and retain unresolved matches. Native export
-converters must define a stable local-ID strategy before use; matching text or
-participant names is not a deduplication strategy.
+Keys JSON tuples `[source,account,recordType,originalId]`; membership keys include
+thread/identity. Provider IDs remain original; stable local IDs carry acquisition
+evidence. Same-ID replay deduplicates and accumulates provenance. Different
+connectors exposing same source need reviewed upstream namespace/ID translations,
+not text/time/name heuristics; separate cross-channel messages stay separate.
 
-Overlapping connectors use the same reviewed source/account namespace. Matching
-IDs deduplicate with both provenances; different IDs require an explicit private
-`overlapReview` before import. Translations are connector-specific and persisted,
-not inferred from names, text or timestamps. Separate messages on different
-channels remain separate. Unreviewed different IDs do not certify distinct
-messages or reconciled cross-connector totals.
-The `messenger-json-snapshot-v1` route retains a stricter snapshot gate: changed
-snapshots and other Messenger connectors in the same account are rejected in
-either order. The shared `overlapReview` machinery does not lift that gate;
-reviewed snapshot translation needs a separate route extension. See the
-[converter contract](contacts-messenger-converter.md).
+[CONTACTS-021](contacts-source-revisions.md) owns append-only revision DAG,
+tombstones, mutation targets, historical membership, per-thread evidence and
+immutable connector-specific overlapReview. Same ID/revision conflict fails page;
+branches/broken present targets set reconciliationRequired. Absent historical
+targets are informational pending links. Revisions/mutations are not extra
+messages and never overwrite curated files. Text/Messenger/WhatsApp native
+bindings remain independent hard gates even with shared translations.
 
-Conflicting metadata under the same ID/revision fails the page without replacing
-the old record. Optional explicit identity/thread/event revisions preserve an
-append-only ancestry and expose branches instead of last-write-wins. Read the
-unique current versions through `reconciliation.records`, retaining original
-`records` as evidence. Tombstones, mutation targets, historical membership,
-per-thread coverage, translation examples and delegated decisions are defined in
-the [CONTACTS-021 contract](contacts-source-revisions.md). Edit/deletion/membership
-events and revisions are never additional messages. Honor
-`manifest.reconciliationRequired` before claiming reconciled output.
+Use `readCollection` from collection-store.ts to expand compact
+revision-references-v1 or legacy snapshots; read current reconciliation projection,
+not first raw observation. Digests bind exact disk bytes, not expanded JSON.
+Provenance includes connector/input SHA-256/page/retrieval and observed event-time
+thread version. IdentityMappingRevision remains null in collection; separate
+[022 overlay](contacts-identity-review.md) pins exact bytes/revision and preserves
+unresolved/inactive identities, explicit review/refresh and split/undo.
 
-Every stored record has provenance containing connector, SHA-256 input digest,
-page cursor and retrieval instant; its key supplies source/account/original ID.
-Keep the authorized handoff privately if exact digest-to-file reproduction is needed.
-Source-opening URLs and provider-native payload archives are intentionally deferred.
+## Storage, atomicity, and recovery
 
-No automatic person merge or household inference runs during collection.
-`identityMappingRevision:null` and all non-self `unresolvedIdentityKeys` are explicit.
-CONTACTS-022 now persists user-reviewed links in a separate synthetic-only
-[identity-review overlay](contacts-identity-review.md), with an exact collection
-digest, explicit mapping revision, reversible splits/undo and optional curated
-households. It never rewrites source evidence or source availability. Real runs
-remain blocked pending the separate privacy/source approvals and implementation
-of an approved private-run boundary.
+collection.json atomically combines records/revisions/reconciliation/checkpoints/
+manifest/history and optional archive/operations state. Exclusive collection.lock;
+validate page in memory, flush same-directory temp, atomically replace page and
+cursor together. Failed pages retain checkpoints; committed prior/other-source
+pages survive. Fatal I/O aborts. Interrupted manifest is in_progress, processed
+source partial, unprocessed sources pending.
 
-## 5. Storage, atomicity, and recovery
+Output inside checkout only ignored .private/contacts after link resolution;
+tracked/docs/assets/data/dist paths fail. External synthetic output is not real
+protection certification. No native raw-data copy or force-add. Confirm dead
+writer, remove exact stale lock, resume original coherent request/handoff.
+Temps are not snapshots; local rename/POSIX modes certify neither network
+filesystems, full power-loss durability nor Windows controls.
 
-Use a private local JSON store for this single-user tool, not a database/server
-dependency. Prove acquisition, normalization, summaries and local graph files
-before choosing polished UI design; there is no hosted dashboard to deploy.
-Default synthetic location is a chosen subdirectory of ignored
-`.private/contacts/`; an explicitly selected folder outside this checkout is also
-allowed for synthetic runs. Real storage must instead be outside Git worktrees
-and cloud-synced folders and pass the approved policy's verification gates.
-Outputs within any other checkout path, including `docs/`, `assets/`,
-`data/`, and `dist/`, are rejected after resolving existing directory links.
-Inputs and manifests remain private even when they contain metadata only.
+[032 operations](contacts-source-operations.md) retains maintenance/cutoff/
+deletion time fences and exact pending purge inventory. Whole-cache purge
+removes metadata/provenance/reviews/archives/history/cursors/derived copies,
+preserves separately located curated files and resumes explicitly without
+restoring erased data. Pending purge blocks import; no schedule/private enabling.
 
-The collector stores **normalized metadata only**. Native raw exports stay in
-their separately authorized private location; do not copy them into the repo.
-The synthetic demo inputs are generated at runtime, never acquired from accounts.
-Do not force-add private outputs to git or share them in a PR.
+## Manifest and downstream handoff
 
-`collection.json` contains `records`, per-connector `checkpoints`, `manifest`, and
-prior manifests' period/source coverage in `history`, in one generation. Historical
-coverage is retained for later comparable-period checks, not reused as current
-freshness. An exclusive `collection.lock` prevents concurrent writers.
-Each valid page is staged in memory, then written with its checkpoint to a new
-same-directory file, flushed, and atomically renamed over the snapshot. A failed
-page does not advance its checkpoint. Already committed pages survive later source
-failures, and unrelated sources continue. I/O failures abort rather than returning
-a success-shaped empty collection.
-
-An interrupted snapshot retains `manifest.status: in_progress`, the processed
-source's partial status, and pending entries for all remaining requested sources.
-On recovery, first confirm the collector process is no longer running, then remove
-only that store's exact stale `collection.lock` and run the matching request with
-`resume:true`. Never delete the store to clear a lock. Atomic rename is a
-single-host/local-filesystem assumption; network filesystems and full power-loss
-durability are not certified. Stale temporary files are not input snapshots.
-
-Node requests owner-only POSIX file/directory modes, not verified Windows ACLs
-or encryption. CONTACTS-010 records owner-approved policy for those protections,
-retention/deletion and backup behavior; it does not implement their verification
-or authorize a real account/run. The private-request guard stays closed until
-these controls are implemented and verified. Git ignore and build exclusion are
-not access control. See the policy's engineering decisions and revisit conditions.
-
-CONTACTS-032's synthetic `operations` snapshot member holds only maintenance
-time/cutoff, an optional deletion time fence and, during interrupted purge, the
-pending exact-file inventory. An approved whole-cache purge erases normalized
-records, provenance/revisions, history, reviews, archives and cursors together,
-then removes inventoried cache/derived files. Curated files are outside purge
-targets. Direct import is refused while purge recovery is pending; explicit
-operations recovery finishes without restoring erased metadata. The
-[managed layout and decision record](contacts-source-operations.md) define this
-bounded local lifecycle, not real protection or machine-wide deletion.
-
-## 6. Manifest and downstream handoff
-
-See the [CONTACTS-031 local workflow](contacts-local-workflow.md) for executable
-synthetic commands, request-as-configuration, recovery and reserved versioned
-handoffs to later identity/reducer/report/graph implementations. Its publication
-guard runs in CI without introducing a public build or changing collection v1.
-
-The manifest records data class, collection time, exact period, each requested
-source/account/connector, status, coverage/basis, retrieval time, pagination state,
-next cursor, duplicate-record count, persisted-page count, upstream errors or
-validation failure, unresolved identity keys, and implementation limitations.
-The CLI prints the manifest and output path, not message content or full records;
-the manifest can still contain private account/identity references.
-
-Exit codes: **0** = every supplied snapshot collected for its declared scope,
-**2** = persisted partial collection (including failed/unavailable sources),
-**1** = invalid request, storage/locking failure, or unexpected fatal error.
-Exit 2 is not success and should not be hidden with a shell success fallback.
-No stale previous source status is reused as current evidence.
-
-A terminal cursor proves only completion of supplied pages, not complete upstream
-history. Declared coverage must contain the requested activity interval and must
-not extend beyond retrieval to get `collected`; contact snapshots are separate.
-The [CONTACTS-023 reducer](contacts-aggregation.md) now computes synthetic-only
-person/thread/channel/day aggregates using explicit reviewed mapping revisions.
-It preserves this collection contract and never renders UI. Downstream
-consumers must treat unobserved values as unknown, source-limited counts as lower
-bounds, and interrupted manifests as incomplete.
-
-## 7. Next stages and acceptance
-
-1. **Collection first:** run synthetic five-source imports, replay and resume
-   safely; disclose missing tools/formats. Add each real acquisition route only
-   after its separate access gate and privacy approval.
-2. **Identity and aggregation (synthetic implementation):** review canonical people mappings; run a pure,
-   deterministic reducer over message events and manifest coverage. Preserve
-   To/CC roles, group-only participation, direct activity, channel breakdowns,
-   active-day unions, exclusions and unresolved records. Reconcile all totals
-   before generating narrative or charts.
-3. **Heartbeat summary and local map:** [CONTACTS-024](contacts-period-summary.md)
-   implements shared synthetic 7/30/custom datasets and the focused presentation
-   skill as local CLI/file output, with full coverage context.
-   [CONTACTS-025](contacts-local-graph.md) renders that pinned report into a private
-   standalone HTML file with inline SVG: a locally generated user-centered
-   hub-and-spoke map with labeled frequency bands, visible recency, known people
-   without recent observations, and a supporting person-to-thread view. The
-   initial proposed radius metric is distinct direct-communication days, not
-   emotional closeness. Household rollups deduplicate events. Keep generated
-   HTML/SVG/JSON files private and local; no website route, server or hosting.
-4. **Opportunities/outliers:** compare a person's own covered baseline or curated
-   reconnection rhythm, not population rankings. Never turn absent history or a
-   newly disconnected channel into an apparent decline.
-
-`npm run test:contacts` covers synthetic all-source import, cross-connector
-deduplication and provenance, replay, page-budget/resume, changed-interval rejection,
-failed-page rollback and recovery, body rejection, explicit missing-source states,
-empty-versus-unknown history, group/broadcast evidence, event conflicts, DST/custom
-periods, lock/output safety and actual CLI exit semantics. No live endpoint
-validation is implied. The [work-item register](contacts-work-items.md) makes the
-remaining gates, dependencies and objectively checkable deliverables explicit.
+Manifest preserves data class/time/period, all requested source/account/connector
+statuses/coverage/basis/retrieval/cursor/terminal/errors, page/duplicate counts,
+unresolved identities and limitations; CLI manifest/paths are private too.
+Terminal pagination alone is not collected history. [Workflow](contacts-local-workflow.md)
+maps current review/reducer/summary/graph/curated commands and input pins;
+renderers use saved shared report, never independent narrative counts.
+`npm run ci` exercises schema, synthetic multi-source replay/resume/rollback,
+coverage/unknowns, DST/custom periods, privacy/output/locks and CLI 0/2/1.

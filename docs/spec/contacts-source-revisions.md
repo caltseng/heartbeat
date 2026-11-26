@@ -167,7 +167,7 @@ Different unreviewed IDs remain distinct observations, not proof of distinct
 messages; see the manifest limitation. No cross-connector total is certified
 until the relevant overlap review is complete.
 
-The [synthetic text converter's archive binding](contacts-text-converter.md)
+The [synthetic text converter's archive binding](contacts-text-messages.md)
 remains an independent gate. A review does not permit a changed/overlapping
 archive, ledger replacement, or connector switch on a bound text account.
 Pre-existing unbound text event keys still prevent initial archive binding,
@@ -177,15 +177,7 @@ preserves the Google/Gmail adapters, source-specific Messenger/WhatsApp gates,
 and synthetic-only acquisition policy; it does not automatically connect their
 staged revision/deletion formats to this shared revision contract.
 
-## Delegated decision record
-
-| Decision / rationale | Alternatives and assumptions | Synthetic validation | Revisit condition |
-| --- | --- | --- | --- |
-| Additive schema-v1 revision DAG and separate current projection preserve old consumers' raw evidence without destructive replacement. | Rejected last-retrieved-wins and in-place updates; assumes stable source revision IDs or deliberately assigned local revision IDs. | Changing profile/thread/message, replay, fork and explicit multi-head resolution; original records unchanged. | An adapter cannot supply stable revision ancestry or a versioned downstream consumer needs stricter schema migration. |
-| Target links and tombstone flags retain evidence; absent historical targets are informational pending links, while broken present targets block reconciled output. | Rejected replacing/deleting originals, counting mutations as messages, or making every later period partial until out-of-window history is imported; assumes metadata-only events. | Targeted edit/deletion, pending target/later arrival, unrelated-source and later-period success, broken links, profile tombstone, rejected untargeted mutation. | CONTACTS-023 defines deleted-message metrics or CONTACTS-032 implements owner-approved retention. |
-| Explicit thread evidence is conservative and current-handoff scoped; legacy coverage is labeled inherited. | Rejected upgrading partial threads using a source-wide complete claim; assumes the adapter declares its actual history bounds. | Different/missing/empty thread coverage and later full coverage. | A real adapter needs interval unions, thread enumeration certificates, or source-native resync generations. |
-| Membership intervals are append-only observations and never inferred interactions. | Rejected replacing a current roster and applying it backward; assumes explicit validity evidence when historical membership is claimed. | Earlier/later direct members and retained group roster evidence without new activity. | An adapter needs reviewed correction/retraction of conflicting membership intervals. |
-| Private reviewed translations are immutable, connector-specific and applied before import. | Rejected heuristic fuzzy deduplication and retroactive destructive merging; assumes review establishes exact same upstream records/account. | Two different-ID connectors yield one message with both originals; replay cannot forget saved translations; changed review rejected. | A reversible in-store translation review UI or already-imported alias migration is separately specified. |
+Engineering rationale, alternatives and revisit conditions: [CONTACTS-021](../decisions.md#contacts-021).
 
 These defaults are available for owner review, not claims of owner-approved
 privacy/access policy. Run `npm run ci` through the configured checks environment;

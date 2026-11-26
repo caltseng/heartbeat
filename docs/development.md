@@ -69,10 +69,10 @@ lock conflicts and unsafe output rejection. CONTACTS-010 cases additionally
 exercise all-source private denial before handoff reads/output writes,
 unavailable-only private denial, snapshot preservation, rejected approval claims and fatal CLI
 denial without account/manifest disclosure. No live endpoint is verified.
-The [CONTACTS-014 adapter](spec/contacts-email-adapter.md) adds native Gmail
+The [CONTACTS-014 adapter](spec/contacts-email.md) adds native Gmail
 metadata fixtures, separate native/handoff cursors, page rollback, auth/expiry,
 classification and a synthetic-only CLI with immutable private output.
-The [CONTACTS-018 Messenger converter](spec/contacts-messenger-converter.md)
+The [CONTACTS-018 Messenger converter](spec/contacts-messenger.md)
 adds synthetic direct/group JSON shards, stable snapshot-local IDs, conservative
 overlap rejection, interrupted conversion/retry and unsupported history/layout
 cases. Its CLI also rejects private conversion.
@@ -80,7 +80,7 @@ Google tests cover the selected request parameters, duplicates, expiry/resync,
 quota/auth failure, conservative
 revisions/deletions, checkpoint binding and failed atomic writes. No live endpoint
 is called or verified; Google acquisition has only a synthetic transport.
-The [text converter](spec/contacts-text-converter.md)
+The [text converter](spec/contacts-text-messages.md)
 adds synthetic direct/four-person MMS, DST instants, XML failures, role/setup
 ambiguity, content exclusion and immutable archive replay checks. No live
 endpoint or actual device/producer export is verified.
@@ -148,7 +148,7 @@ A synthetic demo/replay/inspect/review CLI integration case additionally verifie
 the versioned overlay pins an unchanged collection and remains ignored locally;
 force-adding its generated mapping fails the Git delivery guard.
 
-The [CONTACTS-020 WhatsApp converter](spec/contacts-whatsapp-format-gate.md#contacts-020-operation-and-delegated-decisions)
+The [CONTACTS-020 WhatsApp converter](spec/contacts-whatsapp-format-gate.md#contacts-020-operation)
 adds synthetic selected iOS TXT parsing, immutable registry/import bindings,
 reviewed multiline/sender/time-zone ledgers, DST folds/gaps, overlap/replay,
 group/exclusion/history limits, sanitized CLI exits and private denial before

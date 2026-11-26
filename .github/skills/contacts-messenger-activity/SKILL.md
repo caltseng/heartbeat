@@ -6,8 +6,7 @@ description: Prepare personal Messenger snapshot metadata with explicit shard, p
 # Messenger activity
 
 Required: [shared operating rules and source workflow](../../../docs/spec/contacts-technical-spec.md#shared-operating-rules),
-[CONTACTS-017 capability decision](../../../docs/spec/contacts-messenger-capability.md)
-and [CONTACTS-018 converter](../../../docs/spec/contacts-messenger-converter.md).
+[CONTACTS-017/018 access and converter contract](../../../docs/spec/contacts-messenger.md).
 
 1. Run `npm run contacts:messenger -- --synthetic-request <request.json>` with
    the declared `messenger-json-snapshot-v1` manifest. It writes immutable
