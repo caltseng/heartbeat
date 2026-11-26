@@ -116,6 +116,12 @@ instead of demanding a complete collector contract in the first prompt: obtain a
 small result, request JSON, inspect its fields and provenance, then expand within
 the approved scope. Both one-to-one and group chats are required for Facebook
 Messenger and Instagram; the successful group example is not a group-only limit.
+The owner prefers inline JSON followed by agent-managed local transfer, not
+manual Download clicks per batch. Automate that transfer using an approved local
+write capability without copying record values into ordinary chat/tool logs.
+Normal client permissions are distinct from per-batch download work. Confirm
+actual local persistence, and use an already downloaded file rather than making
+the owner retrieve the same result again.
 Latest sent-message timestamps establish chat-level recency, not total message
 counts or individual interaction with every group member. A small Messenger JSON
 example returned structured metadata, and a subsequent small Messenger batch
