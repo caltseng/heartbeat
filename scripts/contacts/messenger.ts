@@ -2,9 +2,10 @@ import type { RecordEntry } from './types.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { hash, parseJSON, readJSONValue, writeExclusive, runCLI, outputLocation,
+import { hash, parseJSON, readJSONValue, outputLocation,
   createError, isError, createCodeGuard, createCodeValidators, isText as text } from './lib.ts';
-import { resolvePeriod } from './collect.ts';
+import { resolvePeriod } from './period.ts';
+import { writeHandoffBundle, runConverter } from './converter.ts';
 
 const CONNECTOR = 'messenger-json-snapshot-v1';
 const messengerError = createError('messenger', code => `Messenger conversion failed [${code}].`);
@@ -220,22 +221,12 @@ function runRequest(request, folder) {
   requireValue(!fs.existsSync(output), 'output_exists');
   const result = convertSnapshot(request.manifest,
     relative => readLocalShard(path.resolve(folder, request.inputRoot), relative));
-  fs.mkdirSync(path.dirname(output), { recursive: true, mode: 0o700 });
-  const staging = fs.mkdtempSync(path.join(path.dirname(output), '.messenger-staging-'));
-  try {
-    fs.chmodSync(staging, 0o700);
-    for (const [name, value] of Object.entries({ 'report.json': result.report,
-      ...(result.handoff ? { 'handoff.json': result.handoff } : {}) })) {
-      writeExclusive(path.join(staging, name), JSON.stringify(value, null, 2) + '\n');
-    }
-    fs.renameSync(staging, output);
-  } finally {
-    if (fs.existsSync(staging)) fs.rmSync(staging, { recursive: true });
-  }
+  writeHandoffBundle(output, result.handoff, { period: request.manifest.period,
+    report: result.report, failure: messengerError });
   return { output, ...result };
 }
 if (require.main === module) {
-  runCLI(() => {
+  runConverter(() => {
     const args = process.argv.slice(2);
     requireValue(args.length === 2 && args[0] === '--synthetic-request', 'invalid_arguments');
     const file = path.resolve(args[1]);
@@ -243,10 +234,7 @@ if (require.main === module) {
     const result = runRequest(request, path.dirname(file));
     process.stdout.write(`Heartbeat synthetic Messenger conversion: ${result.report.status}; history is unverified.\n`);
     return result.exitCode;
-  }, failure => {
-    process.stderr.write(`Messenger conversion failed [${isError(failure, 'messenger') ? failure.code : 'input_or_storage_failure'}].\n`);
-    return 1;
-  });
+  }, { domain: 'messenger', fallback: 'input_or_storage_failure', label: 'Messenger conversion' });
 }
 
 export { convertSnapshot, runRequest };

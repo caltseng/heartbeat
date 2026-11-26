@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { hash, readJSONWithDigest as readJSON, createGuard, createValidators, CHANNELS,
   publish, runCLI, outputLocation } from './lib.ts';
-import { resolvePeriod } from './collect.ts';
+import { resolvePeriod } from './period.ts';
 import { expandCollection } from './collection-store.ts';
 
 const ROLES = ['to', 'cc', 'bcc', 'recipient'];

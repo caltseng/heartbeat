@@ -60,8 +60,10 @@ npm run contacts:text-xml -- --xml .private\contacts\fixture.xml --manifest .pri
 npm run contacts:collect -- --request .private\contacts\converted-001\request.synthetic.json
 ```
 
-Fresh synthetic output contains `text.synthetic.json` and
-`request.synthetic.json`; collection produces `collection.json`. Neither step
+Fresh synthetic output contains the shared `handoff.json`, `report.json` and
+`request.synthetic.json`, plus the byte-identical `text.synthetic.json` alias
+retained by existing requests. The bundle publishes together from staging;
+collection produces `collection.json`. Neither step
 modifies XML or acquires data. Ignored output is not approved real storage.
 
 ```json

@@ -93,13 +93,15 @@ empty success. Retry the unchanged full manifest after interruption; stable
 IDs deduplicate prior events. No native cursor; one terminal null-cursor handoff
 page retains ordinary importer page/checkpoint semantics.
 
-Supported conversion atomically publishes immutable `handoff.json` +
-`report.json`, source/channel messenger, schemaVersion 1, unknown coverage/null
+Supported conversion atomically publishes the shared immutable `handoff.json`,
+`report.json` and `request.synthetic.json`, source/channel messenger,
+schemaVersion 1, unknown coverage/null
 bounds and upstream limits, **partial/exit 2** even empty. No valid shards or
 unsupported profile/layout yields report-only unsupported/2, not importable empty
 handoff. Invalid/private/unsafe/occupied-output/storage failures exit **1**.
 CLI prints generic status/codes, not account/path/native payload. Import the
-handoff with matching account, connector and metadata-import mode; keep
+handoff using the generated `request.synthetic.json` (matching account, connector,
+period and metadata-import mode); collection output stays in the bundle. Keep
 unsupported sources as explicit unavailable entries, never pass native JSON to
 the importer.
 

@@ -30,6 +30,19 @@ check that domain so shared infrastructure failures are not mistaken for
 adapter failures. The converters retain their exported `(code, status)`
 constructors and converter-specific `instanceof` checks through shared
 constructor adapters, not additional error classes.
+`scripts/contacts/converter.ts` owns converter CLI failure formatting and bundle
+publication for text XML, Messenger, WhatsApp and email. Supported results share
+`handoff.json`, `report.json` and `request.synthetic.json`; email also retains its
+native `checkpoint.json`, and text/WhatsApp retain byte-identical legacy handoff
+aliases. Requests preserve the source connector, account, period and existing
+collection output location. Unsupported Messenger results remain report-only,
+never fabricated empty handoffs. New bundles publish from same-parent staging;
+WhatsApp retains its reservation-first, no-clobber exact-replay recovery, with
+the request written last. Source-specific native reading/validation stays local.
+Google uses the shared CLI and persistence primitives but retains its stateful
+identity-acquisition files; it is not a period-bound native message converter.
+`period.ts` owns period types/resolution without loading the collector;
+`collect.ts` re-exports that API for compatibility.
 The collector's reconciliation-aware `persist` and its existing helper
 exports remain compatible; `local-json.ts` re-exports the shared persistence API.
 Collection snapshots use `collection-store.ts` for compact revision-reference

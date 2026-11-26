@@ -275,6 +275,10 @@ test('CLI persists immutable snapshot/registry, replays safely and outputs sanit
   assert.equal(result.status, 2, result.stderr);
   assert.equal(fs.readFileSync(path.join(output, 'whatsapp-registry.synthetic.json'), 'utf8'), registry);
   const bundle = fs.readdirSync(output).find(name => fs.statSync(path.join(output, name)).isDirectory());
+  assert.deepEqual(fs.readdirSync(path.join(output, bundle)).sort(),
+    ['handoff.json', 'report.json', 'request.synthetic.json', 'whatsapp.synthetic.json']);
+  assert.equal(fs.readFileSync(path.join(output, bundle, 'handoff.json'), 'utf8'),
+    fs.readFileSync(path.join(output, bundle, 'whatsapp.synthetic.json'), 'utf8'));
   const collectResult = spawnSync(process.execPath, ['--import', 'tsx', path.join(__dirname, 'collect.ts'),
     '--request', path.join(output, bundle, 'request.synthetic.json')], { encoding: 'utf8' });
   assert.equal(collectResult.status, 2, collectResult.stderr);

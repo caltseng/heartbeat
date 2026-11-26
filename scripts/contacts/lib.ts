@@ -217,6 +217,19 @@ function publishText(file: string, contents: string): void {
   // A hard link publishes atomically without replacing an existing file or symlink.
   writeTemporary(file, contents, temporary, fs.linkSync);
 }
+function publishImmutable(file: string, state: unknown, conflict: () => Error): void {
+  const contents = JSON.stringify(state, null, 2) + '\n';
+  try {
+    writeTemporary(file, contents, `${file}.${crypto.randomUUID()}.tmp`, fs.linkSync);
+  } catch (error) {
+    if (errorCode(error) !== 'EEXIST') throw error;
+    if (fs.lstatSync(file).isSymbolicLink() || fs.readFileSync(file, 'utf8') !== contents) throw conflict();
+  }
+}
+function persistGuarded(file: string, state: unknown, unsafe: () => Error): void {
+  if (fs.existsSync(file) && fs.lstatSync(file).isSymbolicLink()) throw unsafe();
+  persist(file, state);
+}
 async function runCLI(action: () => number | Promise<number>, onError: (error: Error & { code?: string; status?: string }) => number): Promise<void> {
   try { process.exitCode = await action(); }
   catch (error) { process.exitCode = onError(error); }
@@ -228,5 +241,6 @@ export {
   createCodeGuard, createCodeValidators,
   createValidators, object, text, identifier, sourceIdentifier, array, instant, SOURCES, CHANNELS, versions,
   readJSONValue, readJSONWithDigest, readJSON, within, outputLocation,
-  openLock, releaseLock, writeExclusive, persistText, persist, publish, publishText, runCLI
+  openLock, releaseLock, writeExclusive, persistText, persist, publish, publishText,
+  publishImmutable, persistGuarded, runCLI
 };

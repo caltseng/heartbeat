@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { readJSONValue, persist, openLock, releaseLock, runCLI, outputLocation,
+import { readJSONValue, persistGuarded, publish, openLock, releaseLock, outputLocation,
   createError, isError, createCodeGuard, isText as text } from './lib.ts';
+import { runConverter } from './converter.ts';
 import type { HandoffRecord } from './types.ts';
 
 interface GoogleEvidence {
@@ -245,10 +246,6 @@ async function acquire(options: GoogleOptions, { transport, previous = null, now
 function readPrivate(file) {
   return readJSONValue(outputLocation(file));
 }
-function writeAtomic(file, value) {
-  check(!fs.existsSync(file) || !fs.lstatSync(file).isSymbolicLink(), 'unsafe_output');
-  persist(file, value);
-}
 async function run(configFile) {
   const config = readPrivate(configFile);
   check(record(config) && config.schemaVersion === 1 && Object.keys(config).every(key =>
@@ -282,26 +279,24 @@ async function run(configFile) {
     let handoffFile = saved?.handoffFile ?? null;
     if (result.handoff) {
       handoffFile = `google-handoff-${crypto.randomUUID()}.json`;
-      writeAtomic(path.join(output, handoffFile), result.handoff);
+      publish(path.join(output, handoffFile), result.handoff);
     }
-    writeAtomic(file, { schemaVersion: 1, state: result.state, report: result.report, handoffFile });
+    persistGuarded(file, { schemaVersion: 1, state: result.state, report: result.report, handoffFile },
+      () => adapterError('unsafe_output'));
     return result;
   } finally {
     releaseLock(lock, lockFd);
   }
 }
 if (require.main === module) {
-  runCLI(async () => {
+  runConverter(async () => {
     const args = process.argv.slice(2);
     check(args.length === 2 && args[0] === '--config', 'invalid_arguments');
     const result = await run(path.resolve(args[1]));
     process.stdout.write(JSON.stringify({ title: result.report.title, status: result.report.status,
       errors: result.report.errors }) + '\n');
     return result.exitCode;
-  }, error => {
-    process.stderr.write(`Google acquisition failed [${isError(error, 'google') ? error.code : 'local_io_or_config_failure'}].\n`);
-    return 1;
-  });
+  }, { domain: 'google', fallback: 'local_io_or_config_failure', label: 'Google acquisition' });
 }
 
 export { acquire, run, CONNECTOR, ENDPOINT, PARAMETERS };

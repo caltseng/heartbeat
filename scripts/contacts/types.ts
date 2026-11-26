@@ -261,7 +261,7 @@ export interface RequestedSource {
 export interface CollectionRequest {
   schemaVersion: number;
   dataClass: string;
-  period: import('./collect.ts').PeriodRequest;
+  period: import('./period.ts').PeriodRequest;
   output: string;
   sources: RequestedSource[];
   resume?: boolean;

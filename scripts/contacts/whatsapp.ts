@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { TextDecoder, isDeepStrictEqual } from 'node:util';
-import { hash, stripBOM, hasUnsupportedTextControls, readJSONValue, persistText, openLock, releaseLock,
-  runCLI, outputLocation, createConversionError, createError, isError,
+import { hash, stripBOM, hasUnsupportedTextControls, readJSONValue, persist, openLock, releaseLock,
+  outputLocation, createConversionError, createError,
   createCodeGuard, createCodeValidators } from './lib.ts';
-import { resolvePeriod } from './collect.ts';
+import { resolvePeriod } from './period.ts';
+import { writeHandoffBundle, runConverter } from './converter.ts';
 
 const PROFILE = 'whatsapp-ios-txt-metadata-v1';
 const ConversionError = createConversionError('whatsapp');
@@ -172,14 +172,6 @@ function convert(bytes, manifest, registry = []) {
   return { handoff, audit };
 }
 
-function atomic(file, value) {
-  persistText(file, value, `${file}.${crypto.randomUUID()}.tmp`);
-}
-function immutable(file, value) {
-  if (fs.existsSync(file)) {
-    need(!fs.lstatSync(file).isSymbolicLink() && fs.readFileSync(file, 'utf8') === value, 'output_conflict');
-  } else atomic(file, value);
-}
 function run(argv) {
   need(argv.length === 6 && argv[0] === '--txt' && argv[2] === '--manifest' && argv[4] === '--output', 'invalid_arguments');
   const manifest = readJSONValue(argv[3]);
@@ -200,15 +192,12 @@ function run(argv) {
     const { handoff, audit } = convert(bytes, manifest, latest);
     if (!latest.some(entry => entry.account === manifest.account && entry.binding.threadId === manifest.thread.id)) {
       latest.push({ account: manifest.account, binding: handoff.whatsappArchive, audit });
-      atomic(registryFile, JSON.stringify(latest, null, 2) + '\n');
+      persist(registryFile, latest);
     }
     const bundle = path.join(folder, `acquisition-${hash(JSON.stringify([manifest.account, manifest.archive.ref]))}`);
-    fs.mkdirSync(bundle, { recursive: true, mode: 0o700 });
-    need(!fs.lstatSync(bundle).isSymbolicLink(), 'unsafe_output');
-    immutable(path.join(bundle, 'whatsapp.synthetic.json'), JSON.stringify(handoff, null, 2) + '\n');
-    const request = { schemaVersion: 1, dataClass: 'synthetic', period: manifest.period, output: '..', resume: false,
-      sources: [{ source: 'whatsapp', account: manifest.account, connector: PROFILE, mode: 'metadata-import', input: 'whatsapp.synthetic.json' }] };
-    immutable(path.join(bundle, 'request.synthetic.json'), JSON.stringify(request, null, 2) + '\n');
+    writeHandoffBundle(bundle, handoff, { period: manifest.period, output: '..',
+      handoffName: 'whatsapp.synthetic.json', mode: 'replay', failure: conversionError,
+      report: { status: 'partial', code: 'snapshot_unknown_history', live: false } });
     process.stdout.write(JSON.stringify({ status: 'partial', code: 'snapshot_unknown_history', live: false }) + '\n');
     return 2;
   } finally {
@@ -216,14 +205,8 @@ function run(argv) {
   }
 }
 if (require.main === module) {
-  runCLI(() => {
-    return run(process.argv.slice(2));
-  }, error => {
-    const known = isError(error, 'whatsapp');
-    process.stderr.write(JSON.stringify({ status: known ? error.status : 'failed',
-      code: known ? error.code : 'conversion_input_or_io_error' }) + '\n');
-    return known && error.status !== 'failed' ? 2 : 1;
-  });
+  runConverter(() => run(process.argv.slice(2)),
+    { domain: 'whatsapp', fallback: 'conversion_input_or_io_error' });
 }
 
 export { convert, ConversionError };

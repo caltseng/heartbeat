@@ -348,6 +348,10 @@ test('CLI publishes an immutable handoff/checkpoint pair, resumes to a fresh dir
   const cli = spawnSync(process.execPath, ['--import', 'tsx', path.join(__dirname, 'email.ts'), '--synthetic-request', path.join(dir, 'request.json')], { encoding: 'utf8' });
   assert.equal(cli.status, 2, cli.stderr);
   const saved = fs.readFileSync(path.join(dir, 'first', 'handoff.json'), 'utf8');
+  assert.deepEqual(fs.readdirSync(path.join(dir, 'first')).sort(),
+    ['checkpoint.json', 'handoff.json', 'report.json', 'request.synthetic.json']);
+  const importerRequest = JSON.parse(fs.readFileSync(path.join(dir, 'first', 'request.synthetic.json'), 'utf8'));
+  assert.equal(collect(importerRequest, path.join(dir, 'first')).exitCode, 2);
   assert.equal(JSON.parse(saved).pages[0].events.length, 2);
   await assert.rejects(runFixture(request, dir), { code: 'output_exists' });
   request.previous = path.join('first', 'checkpoint.json');
