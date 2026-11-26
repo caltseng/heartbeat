@@ -47,7 +47,9 @@ function createConversionError(domain: string) {
       return Reflect.construct(target, [code, code, status, false, domain], newTarget);
     },
     get(target, property, receiver) {
-      if (property === Symbol.hasInstance) return (error: unknown) => isError(error, domain);
+      if (property === Symbol.hasInstance) return function (error: unknown) {
+        return isError(error, domain) && Function.prototype[Symbol.hasInstance].call(this, error);
+      };
       return Reflect.get(target, property, receiver);
     }
   });

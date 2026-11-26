@@ -89,6 +89,22 @@ test('exported converter error constructors retain status arguments and converte
     }
     assert.ok(createError(domain)('invalid_utf8') instanceof Constructor);
     assert.equal(new CollectionError('invalid_input') instanceof Constructor, false);
+    class SpecificError extends Constructor {}
+    class SiblingError extends Constructor {}
+    class DerivedError extends SpecificError {}
+    const specific = new SpecificError('specific_failure', 'requires_setup');
+    const derived = new DerivedError('derived_failure', 'unsupported');
+    assert.equal(specific.status, 'requires_setup');
+    assert.ok(specific instanceof Constructor);
+    assert.ok(specific instanceof SpecificError);
+    assert.ok(derived instanceof DerivedError);
+    assert.ok(derived instanceof SpecificError);
+    assert.ok(derived instanceof Constructor);
+    assert.equal(new Constructor('base_failure') instanceof SpecificError, false);
+    assert.equal(createError(domain)('base_failure') instanceof SpecificError, false);
+    assert.equal(specific instanceof SiblingError, false);
+    assert.equal(new SiblingError('sibling_failure') instanceof SpecificError, false);
+    assert.equal(derived instanceof SiblingError, false);
   }
 });
 
