@@ -3,7 +3,8 @@ import path from 'node:path';
 import type { Handoff, HandoffPage } from './types.ts';
 import type { PeriodRequest, SourceReference } from './collect.ts';
 import { resolvePeriod } from './collect.ts';
-import { array, errorCode, instant, object, outputLocation, publish, readJSON, requireValue, runCLI, text, within } from './lib.ts';
+import { array, errorCode, instant, object, outputLocation, publish, readJSON, requireValue, runCLI, text, within,
+  SOURCES as sourceNames } from './lib.ts';
 
 interface ManualSource extends SourceReference {
   fields: string[];
@@ -21,7 +22,6 @@ interface ManualRun {
   sources: ManualSource[];
 }
 
-const sourceNames = ['google-contacts', 'email', 'text-messages', 'messenger', 'whatsapp'];
 const recordFields = {
   identities: ['id', 'idKind', 'isSelf', 'addresses'],
   threads: ['id', 'idKind', 'kind'],

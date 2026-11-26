@@ -93,8 +93,7 @@ function sourceIdentifier(record, fields: string[], label: string): void {
 }
 function shape(value: unknown, fields: readonly string[], guard: (condition: unknown, code: string) => void = need,
   code = 'invalid_manifest'): void {
-  guard(value && typeof value === 'object' && !Array.isArray(value) &&
-    Object.keys(value).every(key => fields.includes(key)), code);
+  object(value, fields, undefined, condition => guard(condition, code));
 }
 function createValidators(guard: Guard, options: ValidationOptions = {}) {
   return {
