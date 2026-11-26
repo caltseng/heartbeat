@@ -137,6 +137,20 @@ observations may be preserved in a separate metadata-only input file, without
 pretending that uncertain labels are canonical event timestamps or verified
 in-period records. Do not copy a divider's clock onto every message.
 
+With explicit owner approval, save inferred calendar-day metadata as a useful
+separate observation subset rather than withholding it for lack of native exact
+times. Preserve original date labels with conversation/row provenance, the
+fixed browser-zone date context, inference basis, missing-year assumptions and
+day precision. Respect explicit years; reject impossible dates and weekday
+mismatches, and handle year rollover using chronological constraints.
+Use a calendar-day instant range to label inferred inside/outside, boundary
+overlap or unknown window membership. A boundary-overlapping day is only a
+candidate, not a confirmed in-period message. Missing dividers stay unknown.
+Neither a latest-compatible-year heuristic nor an outgoing UI flag verifies
+native time, successful sending or per-person activity. Keep canonical event
+arrays empty when their required evidence is absent; existing importer guards
+and exact event contracts do not change.
+
 Use automatic browser downloads only after a synthetic routing probe establishes
 the approved local destination without Library capture. Move only the exact
 named private download into the fresh external input folder, preserving original

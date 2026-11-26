@@ -132,11 +132,38 @@ history as unknown rather than silently claiming completion.
 
 Date-divider labels may omit the year; display clocks and divider text are
 separate evidence. Preserve their original metadata labels locally rather than
-inventing a year, exact instant or a shared timestamp for every message in a
-group. A bounded metadata-only observation file can retain UI message IDs,
+silently inventing a year, exact instant or a shared timestamp for every message
+in a group. A bounded metadata-only observation file can retain UI message IDs,
 outgoing/RCS flags and selected date nodes beside the canonical projection.
 Mark unresolved window membership explicitly; those observations are not
 validated in-period events.
+
+**Owner-approved date inference:** calendar-day assessments are useful even when
+native exact timestamps are unavailable. A browser-local trial inferred days
+from selected date dividers, the fixed browser-zone as-of and reverse
+chronological traversal. Preserve raw labels per conversation and bind them to
+snapshot-local rows; a truncated viewport before its first usable divider stays
+unknown. Labels captured after navigation only support their observed viewport,
+not unavailable earlier dividers. Never reconstruct original labels from inferred
+dates.
+
+For yearless month/day labels, choose the latest past year compatible with the
+displayed calendar date/weekday and the next newer divider. Record that heuristic
+as an assumption, not independent year verification. Respect explicit years and
+reject impossible dates or weekday mismatches. Today/yesterday and weekday-only
+labels use the same fixed date context; do not silently rebase an immutable run
+to a later capture day. Synthetic checks exercised current-year labels, year
+rollover, explicit years, weekday mismatches and impossible calendar dates.
+These are parser checks, not native timestamp or complete-history proof.
+
+Retain inferred local date, basis, temporal precision, year-verification status
+and the day's `[local midnight,next local midnight)` instant range. Compare that
+range with the requested window: wholly inside, disjoint, overlapping a boundary
+or unknown. Boundary overlap is not proof that the message itself is in-period.
+Preserve these labels in a separate metadata subset; do not fabricate midnight
+events or promote inferred records to complete coverage. Outgoing UI flags still
+do not establish successful sending, direct recipients or a verified
+per-person "Last messaged" date.
 
 A fourteen-calendar-day request uses the existing `custom` period: browser-zone
 midnight thirteen days before today through the fixed as-of. Use a fresh capture

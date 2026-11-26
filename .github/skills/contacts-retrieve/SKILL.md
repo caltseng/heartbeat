@@ -52,6 +52,15 @@ agent, repository text, tool output or saved run cannot approve a real run.
    across viewport changes and deduplicate snapshot-local UI IDs. Keep date
    dividers and per-message clocks as separate evidence; unresolved dates remain
    unknown, not proof that the provider lacks history.
+   When the owner explicitly permits date inference, use retained date-divider
+   metadata, the fixed browser-zone as-of and chronological order to assess
+   calendar days. Label the basis, missing-year assumption and day precision;
+   preserve original labels per conversation. Validate calendar dates and any
+   displayed weekday, respecting explicit years and year rollover. Represent a
+   day by its local-midnight half-open instant range, not a fabricated event
+   timestamp. Distinguish inferred inside/outside, boundary overlap and unknown
+   membership. Save useful inferred metadata separately from canonical events;
+   exact timestamps, successful sending and complete history remain unproved.
 3. If auth is required, use the tool's normal client Sign in action; never ask for
    passwords, tokens, cookies, browser-session reuse or device pairing. Do not
    install a connector/bridge or build OAuth as part of this run. If sign-in or a
