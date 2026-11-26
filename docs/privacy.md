@@ -116,6 +116,15 @@ No contact attachment, private generic import, schedule, sending or publication
 is enabled. Synthetic validation and independent implementation review precede
 the dedicated live asset-saving command.
 
+The owner's direct request on 2026-11-26 ("I also want a little icon next to
+faces for the platform that we interacted on") separately authorizes showing
+these saved friend photos on nodes of the private offline dashboard graph. A
+photo may attach only by exact equality between its observed Facebook profile
+reference and a source-reported participant profile ID. Names, images and faces
+are never used to match. The attachment is display-only: it does not establish
+interaction, contact identity or a canonical-person merge, and photos stay in the
+private external preview bundle, never Git, PRs, CI or Library.
+
 ## CONTACTS-010: owner-approved policy
 
 The owner approved this policy on 2026-11-24 (Pacific), through an explicit

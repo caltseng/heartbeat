@@ -7,6 +7,8 @@ import type { ManualRun } from './manual-retrieval.ts';
 import { validateManualRun, manualOutputLocation } from './manual-retrieval.ts';
 import { array, object, text, instant, requireValue, hash } from './lib.ts';
 import type { ResolvedPeriod } from './period.ts';
+import type { PhotoSet } from './connection-graph.ts';
+import { connectionModel, connectionsPanel, CONNECTIONS_SCRIPT, CONNECTIONS_STYLE } from './connection-graph.ts';
 
 interface Observation {
   messageUiId: string;
@@ -29,6 +31,7 @@ interface Observations {
 interface MuseRecency {
   source: 'messenger' | 'instagram';
   retrievedAt: string;
+  selfIds?: string[];
   records: {
     chatType: 'group' | 'direct' | 'private' | 'one-to-one' | 'one_to_one' | 'unknown';
     reportedChatId: string | null;
@@ -134,7 +137,7 @@ function readObservations(file: string, dataClass: string): Observations & { ori
 
 function readMuseRecency(file: string, dataClass: string): MuseRecency & { originalBytes: Buffer; inputDigest: string } {
   const { value, ...input } = readMetadata(file, dataClass);
-  object(value, ['schemaVersion', 'dataClass', 'kind', 'source', 'retrievedAt', 'requestedPeriod', 'records', 'coverage', 'gaps', 'request'], 'Muse recency');
+  object(value, ['schemaVersion', 'dataClass', 'kind', 'source', 'retrievedAt', 'requestedPeriod', 'records', 'coverage', 'gaps', 'request', 'selfIds'], 'Muse recency');
   requireValue(value.schemaVersion === 1 && value.dataClass === dataClass &&
     value.kind === 'muse-reported-chat-recency' && ['messenger', 'instagram'].includes(value.source) &&
     value.coverage === 'partial', 'Invalid bounded Muse recency snapshot.');
@@ -162,7 +165,9 @@ function readMuseRecency(file: string, dataClass: string): MuseRecency & { origi
   const gaps = array(value.gaps, 'Muse gaps');
   requireValue(gaps.length > 0, 'Partial Muse snapshots need explicit gaps.');
   gaps.forEach(gap => text(gap, 'Muse gap'));
-  return { source: value.source, retrievedAt, records: rows, gaps, ...input };
+  const selfIds = value.selfIds === undefined ? undefined : array(value.selfIds, 'self IDs');
+  selfIds?.forEach(id => text(id, 'self ID'));
+  return { source: value.source, retrievedAt, ...(selfIds ? { selfIds } : {}), records: rows, gaps, ...input };
 }
 
 const DASHBOARD_SCRIPT = `
@@ -203,7 +208,10 @@ filter.addEventListener('change',update);update();
 `;
 
 function renderDashboard(snapshot: ContactSnapshot, observations: Observations | null,
-  suggestions: { evidence: string; people: string[] }[], muse: MuseRecency[] = []): string {
+  suggestions: { evidence: string; people: string[] }[], muse: MuseRecency[] = [], photos: PhotoSet | null = null,
+  timeZone: string | null = null): string {
+  const graph = connectionModel(observations, muse, photos, timeZone);
+  const graphHash = crypto.createHash('sha256').update(CONNECTIONS_SCRIPT).digest('base64');
   const threads = [...new Set(observations?.messages.map(m => m.threadUiId) ?? [])];
   const days: string[] = [];
   if (observations) {
@@ -225,7 +233,7 @@ function renderDashboard(snapshot: ContactSnapshot, observations: Observations |
 <button class="contact-select" data-index="${index}"><span class="avatar">${escape((c.displayName ?? '?').slice(0, 1))}</span>
 <span><strong>${escape(c.displayName ?? 'Unnamed contact')}</strong><small>${escape(c.addresses.map(a => a.value).join(' · ') || 'No phone/email in export')}</small></span><span class="chevron" aria-hidden="true">›</span></button></li>`).join('');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-${scriptHash}'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-${scriptHash}' 'sha256-${graphHash}'; style-src 'unsafe-inline'; img-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Heartbeat — local contacts preview</title><style>
 *{box-sizing:border-box}body{margin:0;background:#faf7f2;color:#263332;font:15px/1.5 system-ui,sans-serif}
 header,main{max-width:1300px;margin:auto;padding:24px 32px}header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e3ddd4}
@@ -237,6 +245,7 @@ button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visi
 .contact-select{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;border-radius:10px;background:transparent;padding:12px 8px;color:inherit}.contact-select:hover{background:#f4f0e9}.contact-select span:nth-child(2){min-width:0;flex:1}.contact-select small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px}.avatar{display:grid;place-items:center;background:#f0e6dc;color:#735746;width:38px;height:38px;border-radius:50%;flex-shrink:0;font-weight:bold}.chevron{color:#a09b91}
 .toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px}.toolbar select{width:auto;max-width:250px}.timeline{display:flex;align-items:end;gap:8px;min-height:190px;padding:20px 0 6px;overflow:auto}.timeline-day{min-width:32px;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:end;gap:5px;align-self:stretch}.bar{width:100%;max-width:40px;min-height:2px;background:#df806a;border-radius:5px 5px 0 0}.bar-value,.day-label{font-size:10px;color:#777b73}.directions{display:flex;gap:28px;padding-top:15px;border-top:1px solid #ede7dd;margin-top:12px}.directions strong{font-size:22px;display:block}.notice{padding:14px 16px;background:#f4eee3;border-radius:10px;font-size:12px;color:#6a5a40}.source-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid #eee8de}.source-state{font-size:12px;border-radius:20px;background:#f1eee7;padding:5px 9px}.footer{font-size:12px;margin:24px 0;color:#6c7570}
 details{margin:14px 0;font-size:12px}summary{cursor:pointer;font-weight:600}.source-id{font-size:11px;overflow-wrap:anywhere}small{display:block}[hidden]{display:none!important}
+${CONNECTIONS_STYLE}
 @media(max-width:900px){.workspace{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}header,main{padding:18px}.contact-list{max-height:330px}.toolbar{flex-wrap:wrap}}
 </style></head><body><header><div class="wordmark"><span class="dot">●</span> Heartbeat</div><span class="badge">Private · offline · read-only</span></header>
 <main><section class="intro"><div class="label">Your local relationship workspace</div><h1>A first look at your connections</h1>
@@ -246,6 +255,7 @@ details{margin:14px 0;font-size:12px}summary{cursor:pointer;font-weight:600}.sou
 <div class="card"><div class="label">Date-inferred messages</div><div id="inside-count" class="metric">—</div><small>Whole inferred day inside the window</small></div>
 <div class="card"><div class="label">Unresolved dates</div><div id="unknown-count" class="metric">—</div><small>Unknown window membership</small></div>
 <div class="card"><div class="label">Boundary candidates</div><div id="boundary-count" class="metric">—</div><small>Day overlaps the window; not confirmed inside</small></div></section>
+${connectionsPanel(graph)}
 <div class="workspace"><aside><section class="panel"><h2>Contacts</h2><p class="muted" id="contact-count">${snapshot.contacts.length} contacts shown</p>
 <label for="contact-search" class="label">Find a contact</label><input id="contact-search" type="search" placeholder="Name, email or phone…" autocomplete="off">
 <ul class="contact-list">${list}</ul></section></aside><div>
@@ -278,7 +288,8 @@ ${muse.flatMap(source => source.records.map((row, index) => `<div class="source-
 <p class="footer">Saved locally. No network calls, source writes, scheduling or private pipeline bypass. Imported ${escape(snapshot.importedAt)}.</p></main>
 <script id="preview-data" type="application/json">${json({ contacts: snapshot.contacts,
   observations: observations ? { period: observations.period, messages: observations.messages, gaps: observations.gaps } : null,
-  days })}</script><script>${DASHBOARD_SCRIPT}</script></body></html>`;
+  days })}</script><script>${DASHBOARD_SCRIPT}</script>
+${graph.nodes.length ? `<script id="connections-data" type="application/json">${json({ nodes: graph.nodes, chats: graph.chats })}</script><script>${CONNECTIONS_SCRIPT}</script>` : ''}</body></html>`;
 }
 
 export { validateObservations, readObservations, readMuseRecency, renderDashboard, DASHBOARD_SCRIPT };

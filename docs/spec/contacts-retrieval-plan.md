@@ -193,6 +193,39 @@ fields or invented native corroboration. Original bytes and digests are preserve
 The preview presents one-to-one and group recency separately from observed
 message-frequency metrics; it does not link participants by name or force
 Instagram into the Messenger enum. Missing files/results remain unknown.
+An optional top-level `selfIds` array names the owner's own reported participant
+IDs so they are excluded from the graph; without it the owner may appear as a
+participant and the dashboard says so.
+
+The dashboard's **Your connections** panel draws an interactive concentric map
+with you at the center. Each ring is a recency band (today, this week, last two
+weeks, last 30 days, older, date unknown). It is based on the local calendar-day
+age of the latest activity in any chat shared with that node, measured against
+that chat's own source snapshot day (Muse `retrievedAt`, observations period end),
+never the render clock or another source's later snapshot. Calendar days need a
+time zone: the saved observations period supplies it, or pass
+`--time-zone <IANA zone>` (which must match the observations if both exist);
+without one, timestamped activity stays in the unknown ring. Spokes show evidence type: solid
+for one-to-one, dashed for Google Messages conversations whose participants are
+unlinked, and none for group-chat-only members. For those members the ring
+reflects group activity, not necessarily interaction with them, and the inspector
+says so. A missing date stays in the unknown ring rather than being treated as old.
+Each node carries a platform badge (Messenger, Instagram,
+Google Messages). Selecting a node lists its chats and highlights people who share
+those chats; search, platform filters, zoom and pan are local. People are joined
+across chats only by an exact reported profile ID; ID-less participants stay
+local to one chat and are never merged by name. The interaction script is fixed
+and hash-pinned in the CSP.
+
+Add `--photos "<saved profile-photos.json>"` to show saved friend photos from a
+`contacts:photos` round on graph nodes. Each saved row must carry native
+friendship evidence, a contained `profile-photo-<sha256>` file whose digest and
+image signature match, and a distinct Facebook profile reference. A photo attaches
+only when that reference exactly equals a Messenger participant's reported profile
+ID after normalizing `profile.php?id=`, `/people/…/<id>` and vanity paths; never by
+display name, image or face. Only attached photos are copied into
+`preview\photos\` (CSP `img-src 'self'`); `contact-import.json` records the manifest
+digest and saved/linked counts. Unlinked people show initials.
 
 ## Google client and authentication evidence
 
