@@ -124,11 +124,21 @@ instant, with no animation; reduced-motion preferences explicitly disable
 animation, transitions and smooth scrolling. A wrapping text legend remains
 readable independently of zoom. Each sheet fits the available width; tables and
 thread evidence scroll within their own bounded regions, never the whole page.
+Enlarged 23px interactive labels apply only to the main map; inspector thread
+labels retain their 16px styling so the membership text fits its SVG.
 At most six people per band per sheet keep nodes separate. Sheet controls and
 the all-cohort person selector reach every person, automatically switching sheets.
 All sheets, native fragment links and original evidence remain available without
 scripts and in print. Browser Back applies to native fallback links, not enhanced
 in-context selection.
+
+The focused `graph.test.ts` browser regression opens the actual generated synthetic
+HTML in installed headless Chromium at 320px, 375px, 812px and 1280px. It checks
+computed main-map versus inspector font sizes, label bounds/line spacing,
+bounded small-screen scrolling, selection/focus, zoom and clearing. Set
+`HEARTBEAT_BROWSER` to a Chromium executable when it is not in a standard location;
+the test explicitly skips when none is available. No browser package is added
+to the tool or needed to open its standalone output.
 
 ## Delegated engineering decisions (not privacy consent)
 
