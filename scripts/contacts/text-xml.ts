@@ -1,9 +1,9 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import { TextDecoder } from 'node:util';
-import { hash as digest, stripBOM, readJSONValue, runCLI, outputLocation,
-  createConversionError, createError, isError, createCodeGuard, createCodeValidators } from './lib.ts';
-import { resolvePeriod } from './collect.ts';
+import { hash as digest, stripBOM, readJSONValue, outputLocation,
+  createConversionError, createError, createCodeGuard, createCodeValidators } from './lib.ts';
+import { resolvePeriod } from './period.ts';
+import { writeHandoffBundle, runConverter } from './converter.ts';
 
 const PROFILE = 'synctech-xml-metadata-v1';
 const ConversionError = createConversionError('text-xml');
@@ -255,24 +255,15 @@ function run(argv) {
   need(stat.size <= 32 * 1024 * 1024, 'xml_size_limit', 'unsupported');
   const handoff = convert(fs.readFileSync(argv[1]), manifest);
   const folder = outputLocation(argv[5]);
-  fs.mkdirSync(folder, { recursive: true, mode: 0o700 });
-  need(fs.readdirSync(folder).length === 0, 'output_not_empty');
-  fs.writeFileSync(path.join(folder, 'text.synthetic.json'), JSON.stringify(handoff, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
-  fs.writeFileSync(path.join(folder, 'request.synthetic.json'), JSON.stringify({
-    schemaVersion: 1, dataClass: 'synthetic', period: manifest.period, output: '.', resume: false,
-    sources: [{ source: handoff.source, account: handoff.account, connector: PROFILE, mode: 'metadata-import', input: 'text.synthetic.json' }]
-  }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+  writeHandoffBundle(folder, handoff, { period: manifest.period,
+    handoffName: 'text.synthetic.json', mode: 'empty', failure: conversionError,
+    report: { status: 'partial', code: 'unknown_history_metadata_only' } });
   process.stdout.write(JSON.stringify({ status: 'partial', code: 'unknown_history_metadata_only' }) + '\n');
   return 2;
 }
 if (require.main === module) {
-  runCLI(() => {
-    return run(process.argv.slice(2));
-  }, error => {
-    const known = isError(error, 'text-xml');
-    process.stderr.write(JSON.stringify({ status: known ? error.status : 'failed', code: known ? error.code : 'conversion_input_or_io_error' }) + '\n');
-    return known && error.status !== 'failed' ? 2 : 1;
-  });
+  runConverter(() => run(process.argv.slice(2)),
+    { domain: 'text-xml', fallback: 'conversion_input_or_io_error' });
 }
 
 export { convert, ConversionError };

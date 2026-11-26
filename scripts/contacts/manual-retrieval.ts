@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Handoff, HandoffPage } from './types.ts';
 import type { PeriodRequest, SourceReference } from './collect.ts';
-import { resolvePeriod } from './collect.ts';
+import { resolvePeriod } from './period.ts';
 import { array, errorCode, instant, object, outputLocation, publish, readJSON, requireValue, runCLI, text, within,
   SOURCES as sourceNames } from './lib.ts';
 

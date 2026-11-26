@@ -1,9 +1,9 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { hashJSON, readJSONValue, writeExclusive, runCLI, outputLocation,
+import { hashJSON, readJSONValue, outputLocation,
   createError, isError, createCodeGuard, createCodeValidators, isText as text } from './lib.ts';
-import { resolvePeriod } from './collect.ts';
+import { resolvePeriod } from './period.ts';
+import { writeHandoffBundle, runConverter } from './converter.ts';
 
 const CONNECTOR = 'gmail-metadata-v1';
 const HEADERS = ['From', 'To', 'Cc', 'Bcc', 'Date', 'List-Id', 'Precedence', 'Auto-Submitted'];
@@ -326,23 +326,12 @@ async function runFixture(request, folder) {
   const previous = request.previous ? read(request.previous) : null;
   const result = await acquireEmail(request.config, fixtureTransport(read(request.fixture)), previous);
   const output = outputLocation(path.resolve(folder, request.output));
-  requireValue(!fs.existsSync(output), 'output_exists');
-  fs.mkdirSync(path.dirname(output), { recursive: true, mode: 0o700 });
-  const staging = fs.mkdtempSync(path.join(path.dirname(output), '.email-staging-'));
-  try {
-    fs.chmodSync(staging, 0o700);
-    for (const [name, value] of Object.entries({ 'handoff.json': result.handoff,
-      'checkpoint.json': result.checkpoint, 'report.json': result.report })) {
-      writeExclusive(path.join(staging, name), JSON.stringify(value, null, 2) + '\n');
-    }
-    fs.renameSync(staging, output);
-  } finally {
-    if (fs.existsSync(staging)) fs.rmSync(staging, { recursive: true });
-  }
+  writeHandoffBundle(output, result.handoff, { period: request.config.period,
+    checkpoint: result.checkpoint, report: result.report, failure: emailError });
   return { output, exitCode: result.exitCode };
 }
 if (require.main === module) {
-  runCLI(async () => {
+  runConverter(async () => {
     const args = process.argv.slice(2);
     requireValue(args.length === 2 && args[0] === '--synthetic-request', 'invalid_arguments');
     const file = path.resolve(args[1]);
@@ -350,10 +339,7 @@ if (require.main === module) {
     const result = await runFixture(request, path.dirname(file));
     process.stdout.write('Synthetic email acquisition persisted; coverage is partial.\n');
     return result.exitCode;
-  }, error => {
-    process.stderr.write(`Email acquisition failed [${isError(error, 'email') ? error.code : 'input_or_storage_failure'}].\n`);
-    return 1;
-  });
+  }, { domain: 'email', fallback: 'input_or_storage_failure', label: 'Email acquisition' });
 }
 
 export { acquireEmail, fixtureTransport, runFixture };

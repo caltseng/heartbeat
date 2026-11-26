@@ -74,10 +74,13 @@ and `details:{[id]:{id,threadId,payload:{headers:[{name,value}]}}}`.
 is instead a normalized five-event/two-page fixture, not a Gmail response.
 Executable native shapes and assertions are in `email.test.ts`.
 
-Fresh immutable output contains `handoff.json`, `checkpoint.json` (native list
-token plus normalized accumulator), and sanitized `report.json`. Exclusive,
+Fresh immutable output contains the shared `handoff.json`, `report.json` and
+`request.synthetic.json`, plus `checkpoint.json` (native list token and normalized
+accumulator). The generated request preserves the configured period and matching
+email/account/connector; collection output stays in the bundle. Exclusive,
 fsynced same-parent staging followed by directory rename publishes them together.
-Never reuse output or treat `.email-staging-*` as committed acquisition. After
+Never reuse output or treat `.converter-staging-*` (or older `.email-staging-*`)
+as committed acquisition. After
 verifying its process stopped, remove only the exact stale staging directory.
 Filesystem atomicity does not certify Windows protection or power-loss recovery.
 

@@ -246,6 +246,10 @@ test('CLI writes only private metadata bundle, reports partial, imports/replays,
   const result = spawnSync(process.execPath, ['--import', 'tsx', ...args], { encoding: 'utf8' });
   assert.equal(result.status, 2, result.stderr);
   assert.equal(JSON.parse(result.stdout).status, 'partial');
+  assert.deepEqual(fs.readdirSync(output).sort(),
+    ['handoff.json', 'report.json', 'request.synthetic.json', 'text.synthetic.json']);
+  assert.equal(fs.readFileSync(path.join(output, 'handoff.json'), 'utf8'),
+    fs.readFileSync(path.join(output, 'text.synthetic.json'), 'utf8'));
   const request = JSON.parse(fs.readFileSync(path.join(output, 'request.synthetic.json'), 'utf8'));
   assert.equal(collect(request, output).manifest.sources[0].status, 'partial');
   assert.ok(!fs.readFileSync(path.join(output, 'text.synthetic.json'), 'utf8').includes(SECRET));

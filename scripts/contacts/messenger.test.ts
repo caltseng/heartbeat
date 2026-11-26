@@ -255,7 +255,9 @@ test('CLI persists only private synthetic projection, refuses overwrite/private 
   const converted = cli();
   assert.equal(converted.status, 2, converted.stderr);
   assert.match(converted.stdout, /Heartbeat synthetic Messenger conversion: partial/);
-  assert.deepEqual(fs.readdirSync(path.join(dir, 'converted')).sort(), ['handoff.json', 'report.json']);
+  assert.deepEqual(fs.readdirSync(path.join(dir, 'converted')).sort(), ['handoff.json', 'report.json', 'request.synthetic.json']);
+  const importerRequest = JSON.parse(fs.readFileSync(path.join(dir, 'converted', 'request.synthetic.json'), 'utf8'));
+  assert.equal(collect(importerRequest, path.join(dir, 'converted')).exitCode, 2);
   const handoff = fs.readFileSync(path.join(dir, 'converted', 'handoff.json'), 'utf8');
   assert.ok(!handoff.includes('SYNTHETIC BODY'));
   assert.equal(cli().status, 1);

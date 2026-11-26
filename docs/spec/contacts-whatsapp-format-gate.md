@@ -104,7 +104,9 @@ Do not reset registry/store or invent account/thread/connector refs to evade it.
 
 CLI writes `whatsapp-registry.synthetic.json` and
 `acquisition-<SHA256-of-account/archive-reference-tuple>` containing immutable
-`whatsapp.synthetic.json` + `request.synthetic.json`. Run collect separately on
+the shared `handoff.json`, `report.json` and `request.synthetic.json`, plus the
+byte-identical `whatsapp.synthetic.json` alias retained by existing requests.
+Run collect separately on
 that request; parent store receives collection.json. Exact replay reuses files;
 new reporting period uses a separate request referencing unchanged handoff.
 
