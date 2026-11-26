@@ -6,6 +6,7 @@ const ROOT = path.resolve(__dirname, '..');
 const OUTPUT_ROOTS = ['public', 'dist', 'build', 'out', '_site', '.output'];
 const PRIVATE_FILE = /^(?:(?:collection|identity-review|curated|prayer|audience|reconnection|google-acquisition)\.(?:json(?:\.\d+\.tmp)?|lock)|identity-review\.json\.(?:lock|tmp)|google-handoff-.+\.json(?:\.\d+\.tmp)?|(?:request|operation|aggregate|summary|audience|graph|reconnection|opportunities)(?:\.synthetic)?\.json|(?:aggregates|report)\.[a-f0-9-]+\.tmp|config\.local\.json|(?:handoff|checkpoint|aggregates|report)\.json|graph\.(?:html(?:\.[a-f0-9-]+\.tmp)?|svg))$/i;
 const WHATSAPP_FILE = /^(?:(?:whatsapp-registry\.synthetic|whatsapp\.synthetic|request\.synthetic)\.json(?:\.[a-f0-9-]+\.tmp)?|whatsapp-conversion\.lock)$/i;
+const MANUAL_FILE = /^(?:manual-handoff|projected-run)(?:\.synthetic)?(?:\.json|\.[a-f0-9-]+\.tmp)$/i;
 
 function checkBoundary(root = ROOT, extraOutputs = []) {
   for (const output of [...OUTPUT_ROOTS.map(name => path.join(root, name)), ...extraOutputs]) {
@@ -26,7 +27,7 @@ function checkBoundary(root = ROOT, extraOutputs = []) {
     const parts = file.split('/');
     const name = parts[parts.length - 1];
     if (parts.some(part => part.toLowerCase() === '.private' || /^\.email-staging-/i.test(part) ||
-        /^acquisition-[a-f0-9]{64}$/i.test(part)) || PRIVATE_FILE.test(name) || WHATSAPP_FILE.test(name) ||
+        /^acquisition-[a-f0-9]{64}$/i.test(part)) || PRIVATE_FILE.test(name) || WHATSAPP_FILE.test(name) || MANUAL_FILE.test(name) ||
         /^\.env(?:\.|$)/i.test(name) || /\.(?:pem|key|pfx|p12)$/i.test(name)) {
       throw new Error('Private operational artifact is a Git delivery candidate; move it outside tracked paths.');
     }

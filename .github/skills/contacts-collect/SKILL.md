@@ -5,6 +5,11 @@ description: Coordinate focused contacts source workflows and import metadata in
 
 # Contacts collection
 
+For an owner-requested real metadata retrieval, use
+[contacts-retrieve](../contacts-retrieve/SKILL.md) instead. It stops at a private
+local handoff; this importer still rejects private input. The workflow below
+is for synthetic collection, not a prerequisite to manual retrieval.
+
 Required: [shared operating rules](../../../docs/spec/contacts-technical-spec.md#shared-operating-rules),
 [request and handoff contract](../../../docs/spec/contacts-technical-spec.md),
 [product scope](../../../docs/spec/contacts-store-spec.md) and

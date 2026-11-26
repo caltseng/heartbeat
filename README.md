@@ -11,6 +11,15 @@ quality or a confirmed meaningful connection.
 
 ## What runs today
 
+**Manual metadata retrieval V0:** invoke `/contacts-retrieve` in a local
+Heartbeat project session. It inspects actual available source-tool capabilities,
+uses normal client sign-in and obtains approval for each bounded metadata-only
+run, then saves a private local source handoff. No new connector, backend or
+scheduler is required. See the [owner walkthrough](docs/spec/contacts-manual-retrieval.md)
+for auth/unavailable-source behavior, output inspection and the still-required
+owner live trial. Source-API retrieval is not remote-AI processing; unsupported
+routes remain explicit. **This does not enable private import or aggregation.**
+
 The CONTACTS-001 through CONTACTS-004 baseline provides six composable collection
 skills, a strict metadata-handoff importer, atomic JSON persistence, provenance,
 coverage, replay/resume, synthetic fixtures and tests. It imports normalized
@@ -98,7 +107,8 @@ immutable private local reports; nothing sends or schedules. See the
 
 Missing source
 data means unknown, not zero. No private accounts, devices, browser sessions,
-credentials or real data are included or authorized by this repository.
+credentials or real data are included by this repository. A manual retrieval
+still requires the owner's exact source/account and each-run approval.
 
 [CONTACTS-032 source operations](docs/spec/contacts-source-operations.md) adds
 `contacts:operate` for explicit synthetic refresh/resync, stale-source inspection,

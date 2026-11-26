@@ -40,7 +40,13 @@ and normalized record store. Replaying its request deduplicates; missing real
 endpoints must instead appear as unavailable. No account authorization is needed
 for this synthetic slice.
 
-**First real-data slice (not delivered):** enforce the approved CONTACTS-010 policy
+**Manual real-source handoff V0:** [contacts-retrieve](contacts-manual-retrieval.md)
+is a user-invoked, per-run-approved route through available authenticated tools.
+It saves metadata and precise unavailable/partial evidence locally, not an
+imported graph. No new connector or automation platform is a prerequisite.
+This does not relabel any existing CONTACTS adapter as live-capable.
+
+**First real-data import slice (not delivered):** enforce the approved CONTACTS-010 policy
 with verified local protection and retention/deletion controls, obtain private
 source/account and each-run approvals, complete
 the Google/email access gates (011, 013), implement their selected adapters (012,
