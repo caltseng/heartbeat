@@ -34,6 +34,9 @@
 - Never commit private data, requests, configuration, exports, credentials, or
   generated reports/maps. Use ignored `.private/` or an approved external folder.
   Metadata and CLI manifests are private too; do not paste them into PRs.
+  Profile photos and other captured image assets must never be checked in.
+  Keep their source metadata, manifests and galleries private too; real photos
+  belong only in an approved external folder, not Git, PRs, CI or Library.
 - Preserve source IDs, provenance, explicit coverage, unresolved identities and
   nonzero failure exits. Missing data is unknown, not zero. Do not infer direct
   interactions from group membership or merge people by display name.
