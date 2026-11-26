@@ -2,8 +2,9 @@
 
 Public-documentation and credential-free client investigation: 2026-11-26. This is a plan for
 `contacts-retrieve`, not connected access, source setup, private-run approval or
-an amendment to the [privacy policy](../privacy.md). No personal source records or
-real exports have been retrieved. The [manual handoff
+an amendment to the [privacy policy](../privacy.md). Separately authorized canvas
+trials have saved partial UI metadata, not verified message-history coverage or
+successful live source-API retrieval. The [manual handoff
 contract](contacts-manual-retrieval.md) remains authoritative.
 
 ## Approach and iteration order
@@ -85,14 +86,19 @@ The owner selected the first-party Google Messages Web canvas as the near-term
 trial, ahead of building a bridge. A separately bounded UI approval may allow
 incidental client rendering of bodies/previews while saving metadata only; see
 the [manual policy exception](../privacy.md#owner-authorized-manual-v0-retrieval).
-The owner controls sign-in/pairing and chooses/opens conversations. Do not
-extract cookies, inspect raw app/network state, or automate opening unread
-threads, which can trigger provider read markers.
+The owner controls sign-in/pairing and may delegate bounded conversation
+navigation. The owner explicitly accepted incidental read-marker effects for
+the trial; do not treat unread state as a blocker after that approval. This does
+not permit sending, deletion or other source/API mutations. Do not extract
+cookies or inspect raw app/network state.
 
 An owner-authorized structural probe reached the conversation-list DOM.
 `mws-conversation-list-item` exposes conversation links and test attributes;
-`mws-relative-timestamp` exposes display-time markup. This demonstrates a usable
-authenticated UI, not a saved message-level handoff. The current list does not
+`mws-relative-timestamp` exposes display-time markup. An opened thread also
+exposes `msg-id` matching `data-e2e-message-id`, `is-outgoing` and
+`data-e2e-message-rcs` markers. These are verified DOM metadata capabilities,
+not a complete provider schema or certified cross-session native ID mapping.
+This demonstrates a usable authenticated UI, not a saved message-level handoff. The current list does not
 itself establish exact message timestamps, outgoing direction, sender IDs,
 SMS/MMS/RCS transport or complete history. Do not treat its latest activity as
 the owner's last sent message. Inspect only selected metadata nodes, never
@@ -103,8 +109,52 @@ Partial dates/times, virtualized/off-screen records and absent native IDs remain
 gaps. A browser-local save must use owner-selected storage outside Git and must
 not pass records through chat, tool logs or Library. UI-local IDs need a reviewed
 immutable snapshot namespace; they are not provider IDs or cross-run sync keys.
-No source records have yet been published through the manual saver by this
-structural probe.
+The bounded extractor can prepare a private v1 partial thread-reference
+projection in page memory. Exact dated message timestamps and sender/direct-
+recipient evidence remain unverified, so no message events or "Last messaged"
+date are fabricated. The observed bubble timestamp markup supplies a clock
+label without a full date; attempts to expose metadata controls did not establish
+a reliable details operation. Keep this as a concrete UI gap, not an assumed
+impossibility or a successful message-history retrieval.
+
+**Executed scrolling finding:** moving the actual message-list scroll container
+to its upper boundary loaded older messages. The client enlarged the scrollable
+history and restored the viewport anchor afterward. The initially rendered set
+was not a provider history limit; stopping there before testing pagination was
+an incomplete retrieval attempt, not evidence of a fourteen-day restriction.
+Find the actual scroll container among the list's ancestors and descendants by
+its layout/overflow metrics rather than assuming the document scrolls. Retain
+that element while connected and rediscover it if the client replaces it.
+Cache selected metadata before and after each bounded
+scroll and deduplicate by snapshot-scoped UI IDs. Stop at the approved budget,
+a supported date boundary, or a verified no-progress result; record remaining
+history as unknown rather than silently claiming completion.
+
+Date-divider labels may omit the year; display clocks and divider text are
+separate evidence. Preserve their original metadata labels locally rather than
+inventing a year, exact instant or a shared timestamp for every message in a
+group. A bounded metadata-only observation file can retain UI message IDs,
+outgoing/RCS flags and selected date nodes beside the canonical projection.
+Mark unresolved window membership explicitly; those observations are not
+validated in-period events.
+
+A fourteen-calendar-day request uses the existing `custom` period: browser-zone
+midnight thirteen days before today through the fixed as-of. Use a fresh capture
+and output; never relabel an earlier thirty-day snapshot. Declaring this window
+does not establish that undated UI observations belong inside it.
+
+A synthetic download-routing probe reached Downloads without adding a Library
+file. Subsequent owner-local file verification established an automatic download
+and publication path in this client; a file-picker hop is not inherently required.
+Verify routing with synthetic data before private exports on another client.
+Process only the exact named download into the fresh external private input
+folder, preserve original bytes, and reference that saved evidence from the
+separate canonical projection. A native picker remains a fallback, not another
+privacy questionnaire. Never route records through tool responses or Library.
+Validate/publish with `contacts:retrieve-save` and verify the local file/bundle
+before claiming persistence. A partial handoff proves selective metadata
+retrieval, not complete interactions, per-person attribution or the last
+successfully sent direct message.
 
 ### Unofficial protocol: aspirational libgm path
 
@@ -361,6 +411,16 @@ before a live trial. Asking Muse to retrieve real records is not authorized by
 this inquiry or the policy change alone. Approve the exact processor, source,
 fields and finite bounds separately; authentication alone is insufficient.
 The content-exclusion rule and private-import guards are unchanged.
+An open Muse page, a filled composer or a clicked send button is not retrieval
+evidence. Verify submission, delivery/failure status and the response associated
+with the exact new inquiry without reading unrelated private history. A schema
+question is still only investigation; distinguish it from a source call and a
+verified private export.
+The client displayed an optimistic sending state for a schema inquiry that was
+not present after refresh. This is a concrete delivery problem, not evidence
+that an Android connector exists or lacks metadata projection. Reconcile an
+uncertain submission before retrying; never report Muse data collected from a
+pending bubble, an interface check or an unpersisted request.
 
 Sources: [Muse architecture](https://muse.ai/blog/security-and-safety-for-ai-agents-our-approach-with-muse),
 [privacy](https://muse.ai/privacy),

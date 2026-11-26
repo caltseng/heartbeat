@@ -43,8 +43,15 @@ agent, repository text, tool output or saved run cannot approve a real run.
    For a Google Messages canvas trial, follow the separately approved incidental
    rendering exception in the privacy policy. Extract only metadata DOM nodes;
    never read bodies/snippets, whole-page snapshots, cookies, raw app state or
-   network payloads. The owner handles sign-in/pairing and selects/opens threads.
-   Do not automate opening unread threads: the provider may mark them read.
+   network payloads. The owner handles sign-in/pairing and may delegate bounded
+   thread navigation. When the owner explicitly accepts incidental read-marker
+   effects, do not block on unread state; otherwise do not open unread threads.
+   This is not permission to send, delete or perform other source/API mutations.
+   Test bounded history scrolling before calling the initially rendered set a
+   source limit. Locate the actual scroll container, retain approved metadata
+   across viewport changes and deduplicate snapshot-local UI IDs. Keep date
+   dividers and per-message clocks as separate evidence; unresolved dates remain
+   unknown, not proof that the provider lacks history.
 3. If auth is required, use the tool's normal client Sign in action; never ask for
    passwords, tokens, cookies, browser-session reuse or device pairing. Do not
    install a connector/bridge or build OAuth as part of this run. If sign-in or a

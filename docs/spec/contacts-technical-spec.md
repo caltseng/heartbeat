@@ -44,8 +44,9 @@ neither selectable fields nor provider-record evidence or permission.
 The separately approved owner-operated Google Messages canvas trial may render
 incidental content while capturing metadata nodes only; see the
 [exact UI boundary](../privacy.md#owner-authorized-manual-v0-retrieval). It does
-not authorize raw content/API/export processing, cookie extraction or automatic
-opening of unread threads.
+not authorize raw content/API/export processing or cookie extraction. Bounded
+thread navigation may include read-marker effects only when explicitly accepted
+by the owner; no other source mutations are authorized.
 
 ### Source workflow
 

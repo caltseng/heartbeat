@@ -111,14 +111,42 @@ retention policy does not change private-import guards.
 For the separately approved Google Messages canvas trial, the owner may allow
 incidental rendering of content by the first-party web client while the
 extractor reads only metadata DOM nodes. The owner signs in/pairs normally and
-chooses/opens the conversations; do not extract cookies, inspect raw app/network
-state, snapshot the whole private page or automate opening unread threads.
+may delegate bounded conversation navigation, including explicitly accepted
+read-marker effects. Do not add an unread-state gate after that approval.
+Do not extract cookies, inspect raw app/network state or snapshot the whole
+private page; other source mutations remain unauthorized.
 Use the browser's configured zone without another time-zone question. Exact
 IDs/timestamps/direction/transport still need evidence; ambiguous labels and
 conversation-list activity cannot become message events or "last sent" dates.
 An owner-local save must stay outside Git/Library/logs; no content is exported.
 This limited UI exception is not authorization for content-bearing APIs/exports
 or downstream private import.
+
+The initially rendered message set is not an established history limit. Test
+the actual scroll container within the approved budget; older history can load
+at the upper boundary while the client restores the viewport anchor. Preserve
+selected metadata across loads, deduplicate snapshot-local IDs and disclose a
+budget/no-progress stop. Incomplete scrolling and unresolved date parsing are
+retrieval limitations, not proof that Google Messages cannot supply the period.
+
+The near-term DOM projection may publish a partial thread-reference handoff
+without message events when exact timestamps/identity evidence is absent.
+Keep its IDs explicitly snapshot-local and coverage unknown; empty event arrays
+do not establish zero interaction. Selected UI ID/direction/transport/date-label
+observations may be preserved in a separate metadata-only input file, without
+pretending that uncertain labels are canonical event timestamps or verified
+in-period records. Do not copy a divider's clock onto every message.
+
+Use automatic browser downloads only after a synthetic routing probe establishes
+the approved local destination without Library capture. Move only the exact
+named private download into the fresh external input folder, preserving original
+bytes; reference that file from a separate canonical projection. A native file
+picker is a fallback requiring an owner save, not an inherent manual hop.
+Neither route may paste JSON records into tools. The saver then validates/
+publishes the private projection with exit 2 for its declared gaps. Never report
+publication until the file and bundle are verified. New requested bounds require
+a fresh capture/output, not a relabeled earlier snapshot; use the existing
+`custom` period for a fourteen-day window.
 
 On auth failure stop that source and request its normal client sign-in; never
 extract credentials or use another account. On a budget, paging, field or history

@@ -40,11 +40,13 @@ trial may allow the web client to fetch/render incidental bodies and previews
 while extracting and saving only selected metadata. Explicitly approve that
 rendering boundary for each bounded trial; it is not permission for body/snippet
 analysis, whole-page snapshots, raw network/app-state dumps or content exports.
-Keep private records out of agent/tool logs. The owner controls normal sign-in,
-pairing and conversation selection; the agent does not extract cookies/tokens,
-pair devices or open unread threads automatically. Opening a thread in the
-provider UI may mark it read: leave that action to the owner, not an automated
-read-only collector. Only inspect the selected metadata DOM nodes and preserve
+Keep private records out of agent/tool logs. The owner controls normal sign-in
+and pairing and may delegate bounded conversation selection/navigation. Opening
+a thread may change read markers; if the owner explicitly accepts that effect,
+do not block on unread state. Otherwise do not open unread threads automatically.
+This narrow UI effect does not authorize sending, deletion or other source/API
+mutations. Never extract cookies/tokens or pair devices as the agent.
+Only inspect the selected metadata DOM nodes and preserve
 unknown IDs, direction, transport, dates and history as explicit gaps.
 This exception does not permit content-bearing API/export acquisition or
 private imports. A future source/UI needs its own approved boundary.
