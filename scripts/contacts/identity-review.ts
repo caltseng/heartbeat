@@ -19,7 +19,7 @@ function list(value, label, minimum = 0) {
   return value;
 }
 const personId = key => `person-${digest(key)}`;
-function normalized(type, value) {
+export function normalized(type: string, value: string): string | null {
   if (type === 'email') {
     const email = value.trim();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return null;

@@ -23,6 +23,13 @@ The [source retrieval plan](docs/spec/contacts-retrieval-plan.md) distinguishes
 API candidates, Android/export alternatives and Muse's device/cloud processing
 boundary without claiming live access.
 
+**Owner-provided CSV preview:** `contacts:csv` projects selected Google Contacts
+name/email/phone fields and optionally includes an approved saved Google Messages
+capture and Muse-reported chat recency JSON in a standalone offline dashboard. It writes a fresh external local bundle,
+preserves inferred dates and unlinked conversations, and always reports partial
+coverage. See the [CSV-first preview](docs/spec/contacts-retrieval-plan.md#csv-preview-operation).
+It does not fetch accounts, sync contacts or enable the generic private pipeline.
+
 Other commands use synthetic inputs only; private importer and adapter guards
 remain unchanged. Demo/tests access no accounts, devices or real archives.
 Keep inputs, metadata, configuration and outputs out of Git and public shares:
@@ -38,6 +45,7 @@ recovery and decisions; this table does not authorize private data use.
 | Script | Purpose and contract |
 | --- | --- |
 | `contacts:retrieve-save` | [Save approved projected metadata as a local handoff; does not fetch or import](docs/spec/contacts-manual-retrieval.md). |
+| `contacts:csv` | [Project an owner-provided Google CSV and optional saved UI observations into a private offline preview](docs/spec/contacts-retrieval-plan.md#csv-preview-operation). |
 | `contacts:collect` | [Import normalized metadata with provenance, coverage and replay/resume](docs/spec/contacts-technical-spec.md). |
 | `contacts:email` | [Convert synthetic native Gmail pages with explicit pagination and coverage](docs/spec/contacts-email.md). |
 | `contacts:google` | [Acquire synthetic Google People identities with mocked sync/resync](docs/spec/contacts-google-capability.md). |

@@ -57,6 +57,38 @@ References below to future enforceable controls before private import remain
 true for those commands, not blanket prerequisites to this manual skill.
 Development, tests and review remain synthetic/account-free.
 
+### Approved local contacts and dashboard design
+
+On 2026-11-26 the owner approved designing a narrow extension for a
+user-initiated, read-only Google contacts store and offline dashboard using
+approved real metadata. This approves the design direction, not a delivered
+private-data path or a particular source/account invocation.
+Implementation must be independently reviewed and validated with synthetic
+fixtures before a separately bounded live run. Existing importer, adapter,
+identity-review, aggregation and graph private guards remain unchanged.
+
+Keep source contact IDs, names, phone/email matching evidence and minimal
+revision/deletion provenance separate from Heartbeat's canonical-person and
+curated records. Exclude message content, contact notes, photos, birthdays,
+credentials and unrelated source fields. Preserve ambiguity, incomplete
+coverage and inferred-day precision rather than fabricating activity.
+Use local files outside Git, Library and logs under the manual storage/retention
+policy above. No hosting, source writes, recurring schedules, implicit account
+setup or broader processing is approved by this design.
+The owner subsequently supplied a Google Contacts CSV and explicitly selected it
+and the saved Google Messages observations and Muse metadata for the first preview. The narrow
+`contacts:csv` operation handles these supplied local files, not new account reads:
+it projects names/email/phone, keeps original input bytes private, writes a fresh
+external bundle and produces offline HTML. Excluded CSV columns are not displayed,
+analyzed or retained in the normalized store; the owner-provided original remains
+an original private file. The operation does not merge identities, attribute
+anonymous conversations or change existing private guards. Optional Muse recency
+JSON stays supplemental and source-specific, with native evidence unverified;
+participants are not automatically matched to contacts or treated as historical
+recipients. Synthetic validation
+and independent implementation review remain required before the private preview.
+See the [selected design and CSV operation](spec/contacts-retrieval-plan.md#csv-preview-operation).
+
 ## CONTACTS-010: owner-approved policy
 
 The owner approved this policy on 2026-11-24 (Pacific), through an explicit

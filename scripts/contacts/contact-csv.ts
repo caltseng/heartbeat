@@ -1,0 +1,188 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import type { CanonicalPerson, Address } from './types.ts';
+import { normalized } from './identity-review.ts';
+import { manualOutputLocation } from './manual-retrieval.ts';
+import { readObservations, readMuseRecency, renderDashboard } from './contact-dashboard.ts';
+import { hash, instant, requireValue, publish, publishText, runCLI, errorCode } from './lib.ts';
+
+interface PreviewContact {
+  personId: string;
+  sourceKey: string;
+  id: string;
+  idKind: 'local';
+  displayName: string | null;
+  addresses: Address[];
+}
+interface ContactSnapshot {
+  schemaVersion: 1;
+  dataClass: 'private' | 'synthetic';
+  source: 'google-contacts';
+  connector: 'google-contacts-csv-snapshot-v1';
+  inputDigest: string;
+  namespace: string;
+  importedAt: string;
+  contacts: PreviewContact[];
+  ignoredRows: number;
+}
+const allowedColumn = (name: string) => /^(Name|Given Name|Additional Name|Family Name|First Name|Middle Name|Last Name|E-mail \d+ - Value|Email \d+ - Value|Phone \d+ - Value)$/.test(name);
+
+function projectGoogleCSV(bytes: Buffer, dataClass: ContactSnapshot['dataClass'],
+  importedAt = new Date().toISOString()): ContactSnapshot {
+  requireValue(bytes.length <= 10 * 1024 * 1024, 'Contact CSV exceeds the bounded 10 MB import limit.');
+  const inputDigest = hash(bytes), namespace = `csv-export:${inputDigest}`;
+  const decoded = bytes.toString('utf8');
+  requireValue(Buffer.from(decoded, 'utf8').equals(bytes), 'Contact CSV must be valid UTF-8.');
+  const content = decoded.replace(/^\uFEFF/, '');
+  let headers: string[] = [], selected = new Map<string, string>(), cell = '', column = 0, row = 1;
+  let quoted = false, closedQuote = false, started = false, ignoreLF = false, rowStarted = false, ignoredRows = 0;
+  const contacts: PreviewContact[] = [];
+  const retain = () => row === 1 || allowedColumn(headers[column] ?? '');
+  const pushCell = () => {
+    if (row === 1) headers.push(cell.trim());
+    else if (retain()) selected.set(headers[column], cell.trim());
+    column++; cell = ''; closedQuote = false; started = false;
+  };
+  const pushRow = () => {
+    pushCell();
+    requireValue(row <= 5001, 'Contact CSV exceeds the bounded 5,000-row import limit.');
+    if (row === 1) {
+      requireValue(new Set(headers).size === headers.length && headers.some(allowedColumn),
+        'CSV needs distinct supported Google Contacts headers.');
+    } else if (rowStarted) {
+      requireValue(column === headers.length, 'Contact CSV has an inconsistent row width.');
+      const displayName = selected.get('Name') || [
+        selected.get('Given Name') || selected.get('First Name'),
+        selected.get('Additional Name') || selected.get('Middle Name'),
+        selected.get('Family Name') || selected.get('Last Name')
+      ].filter(Boolean).join(' ') || null;
+      const addresses: Address[] = [];
+      for (const [header, value] of selected) {
+        if (!value || !/^(E-mail|Email|Phone) \d+ - Value$/.test(header)) continue;
+        for (const address of value.split(/\s+:::\s+/)) {
+          if (address.trim()) addresses.push({ type: header.startsWith('Phone') ? 'phone' : 'email', value: address.trim() });
+        }
+      }
+      if (displayName || addresses.length) {
+        const id = `csv-row:${row}`, sourceKey = JSON.stringify(['google-contacts', namespace, 'identity', id]);
+        contacts.push({ id, idKind: 'local', sourceKey, personId: `person-${hash(sourceKey)}`, displayName,
+          addresses: [...new Map(addresses.map(a => [JSON.stringify(a), a])).values()] });
+      } else ignoredRows++;
+    }
+    row++; column = 0; selected = new Map(); rowStarted = false;
+  };
+  for (let index = 0; index < content.length; index++) {
+    const char = content[index];
+    if (ignoreLF) { ignoreLF = false; if (char === '\n') continue; }
+    if (quoted) {
+      if (char === '"') {
+        if (content[index + 1] === '"') { if (retain()) cell += '"'; index++; }
+        else { quoted = false; closedQuote = true; }
+      } else if (retain()) cell += char;
+      continue;
+    }
+    if (char === ',') { pushCell(); rowStarted = true; continue; }
+    if (char === '\r' || char === '\n') { pushRow(); ignoreLF = char === '\r'; continue; }
+    requireValue(!closedQuote, 'Unexpected characters after a quoted CSV field.');
+    if (char === '"') {
+      requireValue(!started, 'Unexpected quote in contact CSV.');
+      quoted = true;
+    } else if (retain()) cell += char;
+    started = true; rowStarted = true;
+  }
+  requireValue(!quoted, 'Unterminated quoted field in contact CSV.');
+  if (rowStarted || column > 0 || closedQuote || cell.length) pushRow();
+  requireValue(headers.length > 0, 'Contact CSV is empty.');
+  return { schemaVersion: 1, dataClass, source: 'google-contacts', connector: 'google-contacts-csv-snapshot-v1',
+    inputDigest, namespace, importedAt: instant(importedAt, 'importedAt'), contacts, ignoredRows };
+}
+
+function contactSuggestions(snapshot: ContactSnapshot): { evidence: string; people: string[] }[] {
+  const matches = new Map<string, Set<string>>();
+  for (const contact of snapshot.contacts) {
+    for (const address of contact.addresses) {
+      const value = normalized(address.type, address.value);
+      if (!value) continue;
+      const key = `${address.type}:${value}`;
+      if (!matches.has(key)) matches.set(key, new Set());
+      matches.get(key).add(contact.personId);
+    }
+  }
+  return [...matches].filter(([, people]) => people.size > 1)
+    .map(([evidence, people]) => ({ evidence, people: [...people].sort() }));
+}
+
+function importContactCSV(input: string, output: string, observationsFile?: string, museFiles: string[] = []) {
+  const folder = manualOutputLocation(path.resolve(output), 'private');
+  requireValue(fs.readdirSync(folder).length === 0, 'Choose a fresh empty preview output directory.', 'existing_output');
+  const source = path.resolve(input);
+  manualOutputLocation(path.dirname(source), 'private');
+  requireValue(fs.realpathSync(source) === source && fs.statSync(source).isFile() &&
+    fs.statSync(source).size <= 10 * 1024 * 1024, 'Choose a bounded, non-redirected CSV input.');
+  const bytes = fs.readFileSync(source), snapshot = projectGoogleCSV(bytes, 'private');
+  const observations = observationsFile === undefined ? null : readObservations(path.resolve(observationsFile), 'private');
+  requireValue(museFiles.length <= 2, 'Choose at most one snapshot per Muse source.');
+  const muse = museFiles.map(file => readMuseRecency(path.resolve(file), 'private'));
+  requireValue(new Set(muse.map(snapshot => snapshot.source)).size === muse.length, 'Duplicate Muse source snapshot.');
+  const people: Record<string, CanonicalPerson> = Object.fromEntries(snapshot.contacts.map(c => [c.personId, { mergedInto: null }]));
+  const html = renderDashboard(snapshot, observations, contactSuggestions(snapshot), muse);
+  const staging = path.join(folder, '.staging');
+  fs.mkdirSync(staging);
+  let published = false;
+  try {
+    fs.writeFileSync(path.join(staging, 'contacts.original.csv'), bytes, { flag: 'wx', mode: 0o600 });
+    if (observations) fs.writeFileSync(path.join(staging, 'messages.original.json'), observations.originalBytes, { flag: 'wx', mode: 0o600 });
+    for (const source of muse) fs.writeFileSync(path.join(staging, `muse-${source.source}.original.json`), source.originalBytes, { flag: 'wx', mode: 0o600 });
+    publish(path.join(staging, 'contacts.json'), snapshot);
+    publish(path.join(staging, 'people.json'), { schemaVersion: 1, dataClass: 'private', people });
+    publishText(path.join(staging, 'dashboard.html'), html);
+    publish(path.join(staging, 'contact-import.json'), { schemaVersion: 1, dataClass: 'private',
+      source: snapshot.source, connector: snapshot.connector, inputDigest: snapshot.inputDigest, importedAt: snapshot.importedAt,
+      contactsFile: 'contacts.json', peopleFile: 'people.json', dashboardFile: 'dashboard.html',
+      observations: observations ? { file: 'messages.original.json', inputDigest: observations.inputDigest,
+        period: observations.period, records: observations.messages.length, coverage: 'partial' } : null,
+      museSources: muse.map(source => ({ source: source.source, file: `muse-${source.source}.original.json`,
+        inputDigest: source.inputDigest, records: source.records.length, coverage: 'partial' })),
+      coverage: 'partial', ignoredRows: snapshot.ignoredRows,
+      limitations: ['Provided export snapshot only; export scope/time are not independently verified.',
+        'CSV lacks provider IDs; row IDs are bound to these exact bytes, not cross-export sync keys.',
+        'Contacts do not establish activity; matching evidence remains unresolved.',
+        'Muse sources are supplemental recency snapshots, not native enumeration or canonical interaction events.',
+        'Existing private importer and graph guards unchanged.'] });
+    fs.renameSync(staging, path.join(folder, 'preview'));
+    published = true;
+    return { file: path.join(folder, 'preview', 'dashboard.html'), contacts: snapshot.contacts.length, exitCode: 2 };
+  } finally {
+    if (!published && fs.existsSync(staging)) {
+      for (const name of ['contacts.original.csv', 'messages.original.json', 'muse-messenger.original.json', 'muse-instagram.original.json',
+        'contacts.json', 'people.json', 'dashboard.html', 'contact-import.json']) {
+        const file = path.join(staging, name);
+        if (fs.existsSync(file)) fs.unlinkSync(file);
+      }
+      fs.rmdirSync(staging);
+    }
+  }
+}
+
+if (require.main === module) {
+  runCLI(() => {
+    const args = process.argv.slice(2), flags = new Map<string, string>(), museFiles: string[] = [];
+    requireValue(args.length % 2 === 0, 'Expected input/output argument pairs.');
+    for (let i = 0; i < args.length; i += 2) {
+      requireValue(['--input', '--output', '--observations', '--muse'].includes(args[i]) && !flags.has(args[i]), 'Invalid preview arguments.');
+      if (args[i] === '--muse') museFiles.push(args[i + 1]);
+      else flags.set(args[i], args[i + 1]);
+    }
+    requireValue(flags.has('--input') && flags.has('--output'),
+      'Usage: contacts:csv --input <owner-provided.csv> --output <fresh-local-directory> [--observations <saved-metadata.json>] [--muse <saved-recency.json>]');
+    const result = importContactCSV(flags.get('--input'), flags.get('--output'), flags.get('--observations'), museFiles);
+    process.stdout.write('Private contact snapshot and offline dashboard saved locally; source coverage remains partial.\n');
+    return result.exitCode;
+  }, error => {
+    process.stderr.write(`Contact preview not saved (${errorCode(error) ?? 'contact_preview_failed'}); inspect local inputs/output. No contact details printed.\n`);
+    return 1;
+  });
+}
+
+export { projectGoogleCSV, contactSuggestions, importContactCSV };
+export type { ContactSnapshot, PreviewContact };
