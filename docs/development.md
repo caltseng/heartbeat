@@ -219,6 +219,12 @@ and versions before acting.
 
 ## Adding a collector
 
+For the focused user-invoked retrieval path, follow
+[manual V0](spec/contacts-manual-retrieval.md) instead of building another
+connector. Its `contacts:retrieve-save` helper publishes projected metadata only;
+`manual-retrieval.test.ts` exercises mocked tool results and the unchanged private
+import guard. No real account access is authorized during implementation.
+
 1. Read the [stable register](spec/contacts-work-items.md) and
    [technical contract](spec/contacts-technical-spec.md). Do not start remaining
    CONTACTS work until the bootstrap is verified checked in. Preserve stable IDs.

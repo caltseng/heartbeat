@@ -28,6 +28,9 @@
   pairing, private-source authorization, or recurring schedule belongs here.
 - Never access accounts/devices/browser sessions or install bridges implicitly.
   Use synthetic tests only unless the owner separately authorizes a bounded run.
+  The owner-authorized manual V0 path is `contacts-retrieve`; follow its exact
+  per-run source/field/output approval and local handoff boundary. Existing
+  private importer guards remain unchanged; no account access is needed to build it.
 - Never commit private data, requests, configuration, exports, credentials, or
   generated reports/maps. Use ignored `.private/` or an approved external folder.
   Metadata and CLI manifests are private too; do not paste them into PRs.
