@@ -213,8 +213,10 @@ unlinked, and none for group-chat-only members. For those members the ring
 reflects group activity, not necessarily interaction with them, and the inspector
 says so. A missing date stays in the unknown ring rather than being treated as old.
 Each node carries a platform badge (Messenger, Instagram,
-Google Messages). Selecting a node lists its chats and highlights people who share
-those chats; search, platform filters, zoom and pan are local. People are joined
+Google Messages, Gmail). The platform filter chips and legend use the same source
+icons at a fixed size alongside their text labels. Selecting a node lists its
+chats and highlights people who share those chats; search, platform filters, zoom
+and pan are local. People are joined
 across chats only by an exact reported profile ID or an owner-confirmed photo link
 (below); other ID-less participants stay local to one chat and are never merged
 automatically by name. The interaction script is fixed
