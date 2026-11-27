@@ -4,10 +4,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { hash } from './lib.ts';
-import { profileKey, readProfilePhotos, readPhotoLinks, connectionModel } from './connection-graph.ts';
+import { profileKey, readProfilePhotos, readPhotoLinks, readSelfLinks, connectionModel } from './connection-graph.ts';
 import { projectGoogleCSV, importContactCSV } from './contact-csv.ts';
 import { renderDashboard, readMuseRecency } from './contact-dashboard.ts';
 import { photoLinkCandidates, confirmPhotoLinks } from './photo-links.ts';
+import { selfLinkCandidates, confirmSelfLinks } from './self-links.ts';
 
 const now = '2026-11-26T12:00:00.000Z';
 const png = Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.from('synthetic fixture image')]);
@@ -196,4 +197,39 @@ test('photo-link review proposes unique exact-name pairs, and only approved numb
   assert.match(imported.linkRule, /owner-confirmed/);
   assert.deepEqual([imported.ownerConfirmedLinks.links, imported.ownerConfirmedLinks.inputDigest], [2, hash(fs.readFileSync(links))]);
   assert.deepEqual(fs.readFileSync(path.join(output, 'preview', 'photo-links.original.json')), fs.readFileSync(links));
+});
+
+test('self review hides only owner-approved same-name slots from the graph', t => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'self-link-review-synthetic-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const review = path.join(folder, 'review'), museFile = path.join(folder, 'muse.private.json');
+  fs.mkdirSync(review);
+  const record = (id: string, participants: { name: string; id: string | null }[]) =>
+    ({ chatType: 'group', reportedChatId: id, participants, reportedLatestSentAt: now, nativeEvidenceVerified: false });
+  fs.writeFileSync(museFile, JSON.stringify({ schemaVersion: 1, dataClass: 'private', kind: 'muse-reported-chat-recency', source: 'messenger',
+    retrievedAt: now, requestedPeriod: 'last 14 days', coverage: 'partial', gaps: ['Synthetic gap'], records: [
+      record('g1', [{ name: 'Owner  FIXTURE', id: null }, { name: 'Ada Fixture', id: null }]),
+      record('g2', [{ name: 'Owner Fixture', id: null }, { name: 'Bo Fixture', id: null }]),
+      record('g3', [{ name: 'Owner Fixture', id: null }, { name: 'Owner Fixture', id: 'https://www.facebook.com/owner.other' }])] }));
+  assert.deepEqual(selfLinkCandidates(museFile, 'owner fixture', review), { candidates: 3, withoutChatId: 0 });
+  assert.ok(!fs.readFileSync(path.join(review, 'review.html'), 'utf8').includes('<script'));
+  const candidates = path.join(review, 'self-link-candidates.json'), self = path.join(folder, 'self.json');
+  assert.throws(() => confirmSelfLinks(candidates, '4', self), /candidate numbers/);
+  confirmSelfLinks(candidates, '1,3', self, 'private', now);
+  const muse = readMuseRecency(museFile, 'private');
+  const model = connectionModel(null, [muse], null, 'UTC', null, readSelfLinks(self, 'private'));
+  assert.equal(model.selfIdentified, true);
+  assert.equal(model.nodes.filter(node => node.label.toLowerCase().replace(/\s+/g, ' ') === 'owner fixture').length, 2,
+    'an unapproved same-name slot and a different reported profile both stay');
+  assert.equal(model.chats[0].members.length, 1);
+  const csv = path.join(folder, 'fixture.csv'), output = path.join(folder, 'preview-out');
+  fs.writeFileSync(csv, 'Name\nFixture\n'); fs.mkdirSync(output);
+  importContactCSV(csv, output, undefined, [museFile], undefined, 'UTC', undefined, self);
+  const imported = JSON.parse(fs.readFileSync(path.join(output, 'preview', 'contact-import.json'), 'utf8')).ownerConfirmedSelf;
+  assert.deepEqual([imported.slots, imported.museInputDigest], [2, muse.inputDigest]);
+  assert.deepEqual(fs.readFileSync(path.join(output, 'preview', 'self-links.original.json')), fs.readFileSync(self));
+  const stale = JSON.parse(fs.readFileSync(self, 'utf8'));
+  fs.writeFileSync(self, JSON.stringify({ ...stale, museInputDigest: 'e'.repeat(64) }));
+  const again = path.join(folder, 'preview-again'); fs.mkdirSync(again);
+  assert.throws(() => importContactCSV(csv, again, undefined, [museFile], undefined, 'UTC', undefined, self), /different Muse snapshot/);
 });

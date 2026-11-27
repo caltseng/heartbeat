@@ -136,6 +136,12 @@ interaction claims elsewhere. Unapproved names are never joined. The candidates,
 review page and links file are private and stay outside Git, PRs, CI and Library;
 approve by number so names never enter chat.
 
+The owner also directed that the many same-name entries that are "just me ...
+shouldn't be shown". `contacts:self-links` proposes ID-less slots with exactly the
+owner's supplied name on the same kind of private review page; only approved
+numbers are omitted from the graph as the owner. Unapproved same-name people stay
+visible, and nothing is merged or deleted from source data.
+
 ## CONTACTS-010: owner-approved policy
 
 The owner approved this policy on 2026-11-24 (Pacific), through an explicit

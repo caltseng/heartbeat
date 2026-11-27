@@ -252,6 +252,25 @@ participants stay separate. The preview copies the links file as
 `photo-links.original.json`, and `contact-import.json` records its digest, link
 count and the owner-confirmed link rule.
 
+Without profile IDs, the owner's own Messenger participant slots also appear in
+chats. `contacts:self-links` proposes every ID-less slot whose normalized name
+equals the owner's supplied name on a private review page (chat label plus the
+other participants), and only approved numbers (`all` and `none` allowed) are
+treated as the owner:
+
+```powershell
+npm run contacts:self-links -- --muse "<muse.private.json>" --name "<your display name>" --output "<fresh-existing-external-directory>"
+npm run contacts:self-links -- --candidates "<dir>\self-link-candidates.json" --approve all --output "<new self-links.private.json>"
+npm run contacts:csv -- ... --muse "<muse.private.json>" --self-links "<self-links.private.json>"
+```
+
+The file (`kind: owner-confirmed-self-slots`) is bound to the Muse snapshot digest
+and each exact slot and name; drift, a slot that is also photo-linked, or a
+different snapshot fails the preview. Approved slots are omitted from the graph;
+unapproved same-name participants stay. The preview copies it as
+`self-links.original.json` and records it under `ownerConfirmedSelf` in
+`contact-import.json`.
+
 ## V0 collection runbook
 
 Repeat a collection with this sequence. Every run is owner-invoked and bounded:
@@ -274,7 +293,7 @@ counts; never paste names, IDs or records into chats, PRs or Library.
 Then build the private preview into a fresh folder:
 
 ```powershell
-npm run contacts:csv -- --input "<contacts.csv>" --observations "<messages.private.json>" --muse "<muse.private.json>" --photos "<profile-photos.json>" --photo-links "<photo-links.private.json>" --time-zone America/Los_Angeles --output "<fresh-existing-external-directory>"
+npm run contacts:csv -- --input "<contacts.csv>" --observations "<messages.private.json>" --muse "<muse.private.json>" --photos "<profile-photos.json>" --photo-links "<photo-links.private.json>" --self-links "<self-links.private.json>" --time-zone America/Los_Angeles --output "<fresh-existing-external-directory>"
 ```
 
 Exit 2 is the expected partial result. Check it by counts in
