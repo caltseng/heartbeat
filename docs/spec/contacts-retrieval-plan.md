@@ -194,7 +194,8 @@ The preview presents one-to-one and group recency separately from observed
 message-frequency metrics; it does not link participants by name or force
 Instagram into the Messenger enum. Missing files/results remain unknown.
 An optional top-level `selfIds` array names the owner's own reported participant
-IDs so they are excluded from the graph; unless every supplied source has it, the
+IDs so they are excluded from the graph; unless every supplied source has one that
+resolves to a profile key and matches a participant, the
 owner may appear as a participant and the dashboard says so (with the count of
 entries hidden by owner-confirmed self links or the owner name rule, below).
 

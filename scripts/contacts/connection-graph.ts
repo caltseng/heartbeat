@@ -182,8 +182,9 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
   const chats: GraphChat[] = [];
   const photoByKey = new Map((photos?.photos ?? []).map(photo => [photo.key, photo]));
   const linked = new Map<string, Photo>();
-  // Only reported account IDs in every source identify the owner; name-based hiding can miss differently named slots.
-  const selfIdentified = muse.length > 0 && muse.every(source => (source.selfIds ?? []).length > 0);
+  // Only reported account IDs that resolve and match a participant in every source identify the owner;
+  // name-based hiding can miss differently named slots.
+  let selfIdentified = muse.length > 0;
   let selfHidden = 0;
   const add = (key: string, label: string, platform: Platform, chat: GraphChat, profile: 'reported' | 'confirmed' | null, photo: Photo | null) => {
     let node = nodes.get(key);
@@ -202,6 +203,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     const platform: Platform = source.source;
     const self = new Set((source.selfIds ?? []).map(id => participantKey(platform, id)).filter(Boolean));
     const sourceDay = dayOf(source.retrievedAt);
+    let selfMatched = false;
     source.records.forEach((row, index) => {
       const kind = row.chatType === 'group' ? 'group' : row.chatType === 'unknown' ? 'unknown' : 'one-to-one';
       const chat: GraphChat = { id: `c${chats.length + 1}`, platform, kind, latest: row.reportedLatestSentAt, asOf: sourceDay, members: [],
@@ -209,7 +211,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       chats.push(chat);
       row.participants.forEach((participant, position) => {
         const reported = participantKey(platform, participant.id);
-        if (reported && self.has(reported)) return;
+        if (reported && self.has(reported)) { selfMatched = true; return; }
         const at = `${platform}|${row.reportedChatId}|${position}`;
         if (selfLinks?.ownerName && comparableName(participant.name) === selfLinks.ownerName) {
           requireValue(reported !== null || !photoLinks?.has(at), 'The owner name rule conflicts with a confirmed photo link.');
@@ -233,6 +235,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
           participant.name ?? 'Participant (ID only)', platform, chat, reported ? 'reported' : link ? 'confirmed' : null, photo);
       });
     });
+    if (!selfMatched) selfIdentified = false;
   }
   requireValue(photoLinks === null || usedLinks.size === photoLinks.size, 'A confirmed photo link has no matching chat participant.');
   requireValue(selfLinks === null || usedSelf.size === selfLinks.size, 'A confirmed self link has no matching chat participant.');

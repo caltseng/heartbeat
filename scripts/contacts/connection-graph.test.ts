@@ -60,6 +60,11 @@ test('concentric graph keeps group membership spoke-free, excludes self IDs and 
   const unidentified = connectionModel(null, [muse()], photos);
   assert.equal(unidentified.selfIdentified, false);
   assert.equal(unidentified.nodes.filter(node => node.label === 'Owner Fixture').length, 1);
+  for (const selfIds of [['owner.handle'], ['https://www.facebook.com/profile.php?id=999999']]) {
+    const unresolved = connectionModel(null, [muse(selfIds)], photos);
+    assert.equal(unresolved.selfIdentified, false, 'self IDs that resolve to no drawn participant never claim identification');
+    assert.equal(unresolved.nodes.filter(node => node.label === 'Owner Fixture').length, 1);
+  }
 
   const html = renderDashboard(projectGoogleCSV(Buffer.from('Name\nFixture\n'), 'synthetic', now), null, [], [muse(['100001'])], photos);
   assert.match(html, /script-src 'sha256-[^']+' 'sha256-[^']+'; style-src 'unsafe-inline'; img-src 'self';/);
