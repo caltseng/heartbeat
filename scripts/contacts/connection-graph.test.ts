@@ -10,7 +10,7 @@ import { renderDashboard, readMuseRecency } from './contact-dashboard.ts';
 import { readGmailMetadata } from './gmail-metadata.ts';
 import { peopleLinkCandidates, confirmPeopleLinks } from './people-links.ts';
 import { photoLinkCandidates, confirmPhotoLinks } from './photo-links.ts';
-import { selfLinkCandidates, confirmSelfLinks, saveOwnerNameRule } from './self-links.ts';
+import { selfLinkCandidates, confirmSelfLinks, saveOwnerNameRule, updateNameRule } from './self-links.ts';
 
 const now = '2026-11-26T12:00:00.000Z';
 const png = Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.from('synthetic fixture image')]);
@@ -53,6 +53,8 @@ test('concentric graph keeps group membership spoke-free, excludes self IDs and 
   assert.equal(ada.find(node => node.kind === 'group').photo, null, 'same name with another profile never gets the photo');
   assert.equal(model.nodes.filter(node => node.label === 'Name Only').length, 2, 'ID-less participants stay chat-local');
   assert.equal(model.linkedPhotos.length, 1);
+  assert.deepEqual(direct.reportedOn, ['messenger'], 'the page refuses combining two reported profiles on one platform');
+  assert.equal(model.nodes.find(node => node.label === 'Name Only').reportedOn, undefined);
   assert.equal(model.asOf, '2026-11-26');
   assert.deepEqual([direct.ring, direct.lastActivity], ['today', '2026-11-26'], 'ring is the latest shared-chat day');
   assert.equal(ada.find(node => node.kind === 'group').ring, 'unknown', 'no returned date stays unknown, not old');
@@ -312,6 +314,7 @@ test('Gmail shows only addresses you wrote to, and approved people join entries 
   assert.deepEqual([ada[0].label, ada[0].platforms, ada[0].chats.length, ada[0].kind], ['Ada Fixture', ['messenger', 'gmail'], 5, 'direct']);
   assert.equal(ada[0].lastActivity, '2026-11-26');
   assert.match(ada[0].identityNote, /You confirmed these entries are one person/);
+  assert.equal(ada[0].confirmed, true);
   assert.match(connectionsPanel(model), /1 address\(es\) that only wrote to you are not shown/);
   const output = path.join(folder, 'preview-out'); fs.mkdirSync(output);
   importContactCSV(csv, output, undefined, [museFile], undefined, 'UTC', undefined, rule, gmailFile, links);
@@ -355,9 +358,66 @@ test('the same-name rule joins exact names across chats, except listed names and
   const ada = model.nodes.find(n => /ada/i.test(n.label));
   assert.deepEqual([ada.label, ada.chats.length, ada.kind], ['Ada Fixture', 2, 'direct']);
   assert.match(ada.identityNote, /same name is the same person/);
+  assert.equal(ada.confirmed, undefined, 'a rule join is not a person you confirmed, so the page can still combine it');
   const saved = JSON.parse(fs.readFileSync(rule, 'utf8'));
   fs.writeFileSync(rule, JSON.stringify({ ...saved, sameNamePeople: undefined }));
   assert.throws(() => readSelfLinks(rule, 'private'), /Invalid owner name rule/);
+});
+
+test('owner same-as names combine people across chats and Gmail, hidden names start hidden, and rule updates are new files', t => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'same-as-rule-synthetic-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const museFile = path.join(folder, 'muse.private.json'), base = path.join(folder, 'self.json'), gmailFile = path.join(folder, 'gmail.json');
+  const record = (id: string, chatType: string, participants: { name: string; id: string | null }[]) =>
+    ({ chatType, reportedChatId: id, participants, reportedLatestSentAt: now, nativeEvidenceVerified: false });
+  fs.writeFileSync(museFile, JSON.stringify({ schemaVersion: 1, dataClass: 'private', kind: 'muse-reported-chat-recency', source: 'messenger',
+    retrievedAt: now, requestedPeriod: 'last 14 days', coverage: 'partial', gaps: ['Synthetic gap'], records: [
+      record('g1', 'group', [{ name: 'Owner Fixture', id: null }, { name: 'MikeyMike Fixture', id: null }, { name: 'Ada Fixture', id: null }]),
+      record('d1', 'one_to_one', [{ name: 'Mike Fixture', id: null }]),
+      record('g2', 'group', [{ name: 'Zed Alias', id: null }, { name: 'Zed Person', id: null }]),
+      record('g3', 'group', [{ name: 'Ada Fixture', id: null }])] }));
+  fs.writeFileSync(gmailFile, JSON.stringify({ dataClass: 'private', source: 'email', account: 'owner@example.com', connector: 'synthetic',
+    fields: [], excluded: [], providerIds: false, rawRows: 1, uniqueRows: 1,
+    coverage: { start: '2026-11-12T08:00:00.000Z', end: now, completeness: 'partial', basis: 'synthetic' }, observations: [
+      { timestamp: '2026-11-20T12:00:00.000Z', direction: 'sent', from: 'owner@example.com', to: ['mike@example.com'], cc: [], batch: 1 }] }));
+  saveOwnerNameRule('owner fixture', base, 'private', now);
+  const original = fs.readFileSync(base);
+  const rule = path.join(folder, 'self-2.json');
+  assert.deepEqual(Object.values(updateNameRule(base, rule, { sameAs: ['MikeyMike  Fixture=Mike Fixture', 'Mike@Example.com=Mike Fixture',
+    'Zed Alias=Zed Person'], hide: ['ada fixture'] }, 'private', now)).slice(0, 2), [1, 3]);
+  assert.deepEqual(fs.readFileSync(base), original, 'the earlier rule file is never rewritten');
+  const muse = readMuseRecency(museFile, 'private'), gmail = readGmailMetadata(gmailFile, 'private');
+  const model = connectionModel(null, [muse], null, 'UTC', null, readSelfLinks(rule, 'private'), gmail);
+  const mike = model.nodes.filter(n => /mike/i.test(n.label));
+  assert.equal(mike.length, 1, 'only the names you listed join, with the rule for every other same name off');
+  assert.deepEqual([mike[0].label, mike[0].platforms, mike[0].chats.length, mike[0].kind], ['Mike Fixture', ['messenger', 'gmail'], 3, 'direct']);
+  assert.match(mike[0].identityNote, /you said these names are the same person/);
+  assert.equal(mike[0].confirmed, undefined);
+  assert.equal(model.nodes.filter(n => /zed/i.test(n.label)).length, 2, 'two people in one chat stay separate');
+  assert.equal(model.sameAsUnjoined, 1);
+  assert.match(connectionsPanel(model), /1 of your "same person" names could not be combined/);
+  const ada = model.nodes.filter(n => /ada/i.test(n.label));
+  assert.deepEqual(ada.map(n => n.hidden), [true, true], 'hidden people stay in the data, marked hidden');
+  const unchanged = path.join(folder, 'self-3.json');
+  updateNameRule(rule, unchanged, { show: ['Ada Fixture'], notSame: ['zed alias'] }, 'private', now);
+  const saved = JSON.parse(fs.readFileSync(unchanged, 'utf8'));
+  assert.deepEqual([saved.hiddenNames, saved.sameAs.length, saved.ownerName], [undefined, 2, 'owner fixture']);
+  const fail = (changes: Parameters<typeof updateNameRule>[2], pattern: RegExp) => {
+    const target = path.join(folder, `fail-${Math.random()}.json`);
+    assert.throws(() => updateNameRule(rule, target, changes, 'private', now), pattern);
+    assert.equal(fs.existsSync(target), false, 'a rejected update leaves no file');
+  };
+  fail({ sameAs: ['Mike Fixture=Michael Fixture'] }, /without chains/);
+  fail({ sameAs: ['Owner Fixture=Ada Fixture'] }, /your own name/);
+  fail({ sameAs: ['Mike Fixture'] }, /Other name=Person name/);
+  fail({ hide: ['Ada'], show: ['ada'] }, /both hidden and shown/);
+  assert.throws(() => updateNameRule(rule, unchanged, { hide: ['Bo'] }, 'private', now), /new self links file/);
+  const separate = path.join(folder, 'separate.json'), conflict = path.join(folder, 'conflict.json');
+  saveOwnerNameRule('owner fixture', separate, 'private', now, [], { separateNames: ['Mike Fixture'] });
+  assert.throws(() => updateNameRule(separate, conflict, { sameAs: ['MikeyMike Fixture=Mike Fixture'] }, 'private', now), /names kept separate/);
+  const ruled = connectionModel(null, [muse], null, 'UTC', null, Object.assign(readSelfLinks(rule, 'private'), { sameNamePeople: true, separateNames: [] }));
+  assert.deepEqual([ruled.nodes.filter(n => /mike/i.test(n.label)).length, ruled.nodes.filter(n => /ada/i.test(n.label)).length], [1, 1],
+    'with the same-name rule on, same-as names and same names both join');
 });
 
 test('a confirmed person never carries two different photos', () => {

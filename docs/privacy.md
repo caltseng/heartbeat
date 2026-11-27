@@ -153,7 +153,11 @@ different people and never join. The owner later set a standing rule, "Just
 assume that same name = same person. Unless explicitly stated otherwise", saved as
 `sameNamePeople` with the owner's `separateNames` exceptions in the private owner
 name rule file; it never joins namesakes in one chat, different reported profiles
-or different photos. Gmail correspondents are only the recipients of
+or different photos. The owner also asked to "exclude people easily" and to
+"combine entries": the chart's hide and combine choices stay in the browser's local
+storage as hashed name tags, never names, and `contacts:self-links --update`
+saves `hiddenNames` and `sameAs` decisions to a new private rule file under the
+same guards. Gmail correspondents are only the recipients of
 messages the owner sent, minus the owner's own addresses; addresses that only
 wrote to the owner are counted, not shown, and a message is one-to-one only when
 it has exactly one non-owner address. The candidates, review page, links file and Gmail copy in the

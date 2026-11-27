@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { manualOutputLocation } from './manual-retrieval.ts';
 import { readMuseRecency } from './contact-dashboard.ts';
-import { comparableName, emailKey } from './connection-graph.ts';
+import { comparableName, emailKey, readSelfLinks } from './connection-graph.ts';
 import { array, object, text, requireValue, publish, publishText, runCLI, errorCode, hash } from './lib.ts';
 
 // The owner's name only proposes slots for review, unless the owner saves a standing exact-name rule with --owner-name.
@@ -77,16 +77,62 @@ function saveOwnerNameRule(ownerName: string, output: string, dataClass = 'priva
   return { digest: hash(fs.readFileSync(target)) };
 }
 
+// Owner edits to people in the chart: hide names, show them again, or say one name is another person ("same as").
+// Each update writes a new rule file from an existing owner name rule, keeping every earlier decision.
+function updateNameRule(from: string, output: string, changes: { hide?: string[]; show?: string[]; sameAs?: string[]; notSame?: string[] },
+  dataClass = 'private', now = new Date().toISOString()) {
+  const source = path.resolve(from), target = path.resolve(output);
+  const rule = readSelfLinks(source, dataClass);
+  requireValue(rule.ownerName !== undefined, 'Update an owner name rule saved with --owner-name.');
+  manualOutputLocation(path.dirname(target), dataClass);
+  requireValue(!fs.existsSync(target), 'Choose a new self links file.', 'existing_output');
+  const value = JSON.parse(fs.readFileSync(source, 'utf8'));
+  const clean = (name: string) => name.normalize('NFKC').trim().replace(/\s+/g, ' ');
+  const names = (list: string[] | undefined) => (list ?? []).map(clean).filter(Boolean);
+  let hidden: string[] = value.hiddenNames ?? [];
+  const hide = names(changes.hide), show = new Set(names(changes.show).map(comparable));
+  requireValue(hide.every(name => !show.has(comparable(name))), 'A name cannot be both hidden and shown.');
+  hidden = [...hidden.filter(name => !show.has(comparable(name))), ...hide.filter(name =>
+    !hidden.some(old => comparable(old) === comparable(name)))];
+  const notSame = new Set(names(changes.notSame).map(comparable));
+  let sameAs: { name: string; as: string }[] = (value.sameAs ?? []).filter((row: { name: string }) => !notSame.has(comparable(row.name)));
+  for (const pair of names(changes.sameAs)) {
+    const at = pair.indexOf('=');
+    requireValue(at > 0 && at < pair.length - 1, 'Write each same-as pair as "Other name=Person name".');
+    const row = { name: clean(pair.slice(0, at)), as: clean(pair.slice(at + 1)) };
+    sameAs = [...sameAs.filter(old => comparable(old.name) !== comparable(row.name)), row];
+  }
+  const next = { ...value, confirmedAt: now };
+  delete next.hiddenNames; delete next.sameAs;
+  if (hidden.length) next.hiddenNames = hidden;
+  if (sameAs.length) next.sameAs = sameAs;
+  const counts = { hidden: hidden.length, sameAs: sameAs.length };
+  publish(target, next);
+  try { readSelfLinks(target, dataClass); } catch (error) { fs.rmSync(target); throw error; }
+  return { ...counts, digest: hash(fs.readFileSync(target)) };
+}
+
 if (require.main === module) {
   runCLI(() => {
     const args = process.argv.slice(2), flags = new Map<string, string>();
     requireValue(args.length % 2 === 0, 'Expected flag/value pairs.');
     for (let i = 0; i < args.length; i += 2) {
       requireValue(['--muse', '--name', '--output', '--candidates', '--approve', '--owner-name', '--owner-emails', '--same-name-people',
-        '--separate-names'].includes(args[i]) && !flags.has(args[i]), 'Invalid self link arguments.');
+        '--separate-names', '--update', '--hide', '--show', '--same-as', '--not-same'].includes(args[i]) && !flags.has(args[i]),
+      'Invalid self link arguments.');
       flags.set(args[i], args[i + 1]);
     }
-    if (flags.has('--owner-name')) {
+    const edits = ['--hide', '--show', '--same-as', '--not-same'];
+    requireValue(flags.has('--update') || edits.every(flag => !flags.has(flag)), 'Use --hide, --show, --same-as or --not-same with --update.');
+    if (flags.has('--update')) {
+      const used = edits.filter(flag => flags.has(flag));
+      requireValue(flags.has('--output') && used.length > 0 && flags.size === 2 + used.length,
+        'Usage: contacts:self-links --update <owner name rule.json> [--hide <Name A;Name B>] [--show <Name>] [--same-as <Other name=Person name;…>] [--not-same <Other name>] --output <new self.json>');
+      const list = (flag: string) => flags.get(flag)?.split(';');
+      const result = updateNameRule(flags.get('--update'), flags.get('--output'),
+        { hide: list('--hide'), show: list('--show'), sameAs: list('--same-as'), notSame: list('--not-same') });
+      process.stdout.write(`Saved name rule: ${result.hidden} name(s) hidden from the chart, ${result.sameAs} same-person name(s).\n`);
+    } else if (flags.has('--owner-name')) {
       const sameName = flags.get('--same-name-people');
       requireValue(flags.has('--output') && (sameName === undefined || sameName === 'on') &&
         (!flags.has('--separate-names') || sameName === 'on') &&
@@ -115,4 +161,4 @@ if (require.main === module) {
   });
 }
 
-export { selfLinkCandidates, confirmSelfLinks, saveOwnerNameRule };
+export { selfLinkCandidates, confirmSelfLinks, saveOwnerNameRule, updateNameRule };

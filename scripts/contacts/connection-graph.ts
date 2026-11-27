@@ -20,7 +20,8 @@ interface MuseSource {
 type PhotoLinks = Map<string, { name: string; key: string }> & { originalBytes?: Buffer; inputDigest?: string; confirmedAt?: string };
 // Owner-confirmed chat participant slots that are the owner, keyed `source|chatId|position`; they are never drawn as people.
 type SelfLinks = Map<string, string> & { originalBytes?: Buffer; inputDigest?: string; confirmedAt?: string; museInputDigest?: string;
-  ownerName?: string; ownerAddresses?: string[]; sameNamePeople?: boolean; separateNames?: string[] };
+  ownerName?: string; ownerAddresses?: string[]; sameNamePeople?: boolean; separateNames?: string[];
+  sameAs?: { name: string; as: string; label: string }[]; hiddenNames?: string[] };
 // Owner-confirmed people: each groups entries from any source that the owner said are the same person.
 type PersonMember = { source: 'messenger' | 'instagram'; reportedChatId: string; participantIndex: number; participantName: string } |
   { source: 'gmail'; address: string };
@@ -35,10 +36,11 @@ interface TextObservations { period?: { end: string; timeZone: string }; message
 interface GraphNode {
   id: string; label: string; initials: string; ring: Ring; ringLabel: string; kind: Kind; lastActivity: string | null;
   lastNote: string; platforms: Platform[]; platformLabels: string[]; chats: string[]; photo: string | null; identityNote: string;
+  hidden?: boolean; reportedOn?: Platform[]; confirmed?: boolean;
 }
 interface GraphChat { id: string; platform: Platform; kind: 'one-to-one' | 'group' | 'unknown' | 'text'; label: string; latest: string | null; asOf: string | null; members: string[] }
 interface ConnectionModel { nodes: GraphNode[]; chats: GraphChat[]; linkedPhotos: Photo[]; selfIdentified: boolean; selfHidden: number;
-  asOf: string | null; gmailHidden?: number | null }
+  asOf: string | null; gmailHidden?: number | null; sameAsUnjoined?: number }
 
 const PLATFORMS: Record<Platform, string> = { messenger: 'Messenger', instagram: 'Instagram', messages: 'Google Messages', gmail: 'Gmail' };
 // Rings are calendar-day age of the latest shared-chat activity, relative to that chat's own source snapshot day.
@@ -138,6 +140,23 @@ function readPhotoLinks(file: string, dataClass: string, photos: PhotoSet): Phot
   return Object.assign(links, { originalBytes, inputDigest: hash(originalBytes), confirmedAt: value.confirmedAt as string });
 }
 
+// The owner's explicit "this name is that person" decisions. A name may be a chat display name or an email address you wrote to.
+// Aliases never chain, never name the owner and never override a name the owner listed as separate people.
+function nameEdits(value: Record<string, unknown>, ownerName: string, separateNames: string[]) {
+  if (value.sameAs === undefined) return [];
+  const rows = array(value.sameAs, 'same-as names').map(row => {
+    object(row, ['name', 'as'], 'same-as name');
+    return { name: comparableName(text(row.name, 'alias name')), as: comparableName(text(row.as, 'person name')),
+      label: (row.as as string).normalize('NFKC').trim().replace(/\s+/g, ' ') };
+  });
+  const names = rows.map(row => row.name), targets = new Set(rows.map(row => row.as));
+  requireValue(rows.length <= 500 && rows.every(row => row.name !== null && row.as !== null && row.name !== row.as) &&
+    new Set(names).size === names.length && names.every(name => !targets.has(name)) &&
+    rows.every(row => ![row.name, row.as].some(name => name === ownerName || separateNames.includes(name))),
+    'Each same-as name joins one distinct name to a different person, without chains, your own name or names kept separate.');
+  return rows;
+}
+
 function readSelfLinks(file: string, dataClass: string): SelfLinks {
   const resolved = path.resolve(file);
   if (dataClass === 'private') manualOutputLocation(path.dirname(resolved), 'private');
@@ -146,8 +165,8 @@ function readSelfLinks(file: string, dataClass: string): SelfLinks {
   const originalBytes = fs.readFileSync(resolved), value = JSON.parse(originalBytes.toString('utf8'));
   if (value?.kind === 'owner-name-rule') {
     // The owner's standing rule: every participant with exactly the owner's normalized name is the owner, in any snapshot.
-    object(value, ['schemaVersion', 'dataClass', 'kind', 'ownerName', 'confirmedAt', 'ownerAddresses', 'sameNamePeople', 'separateNames'],
-      'owner name rule');
+    object(value, ['schemaVersion', 'dataClass', 'kind', 'ownerName', 'confirmedAt', 'ownerAddresses', 'sameNamePeople', 'separateNames',
+      'sameAs', 'hiddenNames'], 'owner name rule');
     const ownerName = comparableName(text(value.ownerName, 'owner name'));
     const ownerAddresses = value.ownerAddresses === undefined ? [] :
       array(value.ownerAddresses, 'owner addresses').map(address => emailKey(text(address, 'owner address')));
@@ -158,8 +177,14 @@ function readSelfLinks(file: string, dataClass: string): SelfLinks {
       (value.sameNamePeople === undefined ? value.separateNames === undefined : value.sameNamePeople === true && value.separateNames !== undefined) &&
       separateNames.every(name => name !== null) && new Set(separateNames).size === separateNames.length &&
       !Number.isNaN(Date.parse(text(value.confirmedAt, 'confirmation time'))), 'Invalid owner name rule.');
+    const sameAs = nameEdits(value, ownerName, separateNames);
+    const hiddenNames = value.hiddenNames === undefined ? [] :
+      array(value.hiddenNames, 'hidden names').map(name => comparableName(text(name, 'hidden name')));
+    requireValue(hiddenNames.every(name => name !== null) && new Set(hiddenNames).size === hiddenNames.length,
+      'Hidden names must be distinct names.');
     return Object.assign(new Map<string, string>(), { originalBytes, inputDigest: hash(originalBytes),
-      confirmedAt: value.confirmedAt as string, ownerName, ownerAddresses, sameNamePeople: value.sameNamePeople === true, separateNames });
+      confirmedAt: value.confirmedAt as string, ownerName, ownerAddresses, sameNamePeople: value.sameNamePeople === true, separateNames,
+      sameAs, hiddenNames });
   }
   object(value, ['schemaVersion', 'dataClass', 'kind', 'museInputDigest', 'confirmedAt', 'slots'], 'self links');
   requireValue(value.schemaVersion === 1 && value.dataClass === dataClass && value.kind === 'owner-confirmed-self-slots' &&
@@ -256,8 +281,8 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     const parts = Object.fromEntries(formatter.formatToParts(new Date(value)).map(p => [p.type, p.value]));
     return `${parts.year}-${parts.month}-${parts.day}`;
   };
-  type Profile = 'reported' | 'confirmed' | 'address' | 'joined' | 'sameName' | null;
-  const nodes = new Map<string, GraphNode & { kinds: Set<GraphChat['kind']>; profile: Profile }>();
+  type Profile = 'reported' | 'confirmed' | 'address' | 'joined' | 'sameName' | 'sameAs' | null;
+  const nodes = new Map<string, GraphNode & { kinds: Set<GraphChat['kind']>; profile: Profile; reported: Set<string> }>();
   const usedLinks = new Set<string>(), usedSelf = new Set<string>();
   const chats: GraphChat[] = [];
   const photoByKey = new Map((photos?.photos ?? []).map(photo => [photo.key, photo]));
@@ -349,11 +374,18 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     roots.slice(1).forEach(root => parent.set(root, roots[0]));
     personOf.set(roots[0], person.displayName);
   }
+  // Only people links are owner-confirmed people; rule joins below must not mark their nodes as confirmed.
+  const linkedPeople = new Set(personOf.keys());
   // The owner's standing rule: chat entries with exactly the same normalized name are one person unless the owner listed the
-  // name as separate. Namesakes in one chat, different reported IDs on one platform, two confirmed people or two different
-  // photos are evidence of different people, so that name stays separate.
-  const sameNameJoined = new Set<string>();
-  if (selfLinks?.sameNamePeople) {
+  // name as separate. Names the owner said are another person's ("same as") join that person's name group, in chats or Gmail.
+  // Namesakes in one chat, different reported IDs on one platform, two confirmed people or two different photos are evidence
+  // of different people, so that name stays separate; an explicit same-as that cannot join is counted, not forced.
+  const sameNameJoined = new Set<string>(), sameAsJoined = new Set<string>();
+  let sameAsUnjoined = 0;
+  const aliases = new Map((selfLinks?.sameAs ?? []).map(row => [row.name, row]));
+  const aliasTargets = new Set(aliases.size ? [...aliases.values()].map(row => row.as) : []);
+  const hiddenNames = new Set(selfLinks?.hiddenNames ?? []);
+  if (selfLinks?.sameNamePeople || aliases.size) {
     // Guards check everything a merged root already holds, so chained joins through one entry cannot combine conflicts.
     const facts = new Map<string, { photos: Set<string>; reported: Set<string>; chats: Map<string, Set<string>> }>();
     for (const entry of entries) {
@@ -366,10 +398,17 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     }
     const groups = new Map<string, typeof entries>();
     for (const entry of entries) {
-      const name = entry.platform === 'messenger' || entry.platform === 'instagram' ? comparableName(entry.name) : null;
-      if (name !== null && !selfLinks.separateNames.includes(name)) groups.set(name, [...groups.get(name) ?? [], entry]);
+      const raw = entry.platform === 'messages' ? null : comparableName(entry.name);
+      if (raw === null) continue;
+      const explicit = aliases.has(raw) || aliasTargets.has(raw);
+      const byRule = selfLinks.sameNamePeople && entry.platform !== 'gmail' && !selfLinks.separateNames.includes(raw);
+      if (!explicit && !byRule) continue;
+      const name = aliases.get(raw)?.as ?? raw;
+      groups.set(name, [...groups.get(name) ?? [], entry]);
     }
-    for (const group of groups.values()) {
+    for (const [name, group] of groups) {
+      const explicit = group.some(entry => aliases.has(comparableName(entry.name)));
+      if (!explicit && !selfLinks.sameNamePeople) continue;
       const roots = [...new Set(group.map(entry => find(entry.key)))];
       if (roots.length < 2) continue;
       const held = roots.map(root => facts.get(root));
@@ -380,11 +419,17 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       held.forEach(fact => fact.chats.forEach((keys, chat) => chats.set(chat, new Set([...chats.get(chat) ?? [], ...keys]))));
       const named = new Set(roots.map(root => personOf.get(root)).filter(Boolean));
       if (photos.size > 1 || new Set(platforms).size !== platforms.length || [...chats.values()].some(keys => keys.size > 1) ||
-        named.size > 1) continue;
+        named.size > 1) {
+        if (explicit) sameAsUnjoined++;
+        continue;
+      }
       roots.slice(1).forEach(root => { parent.set(root, roots[0]); personOf.delete(root); facts.delete(root); });
+      if (roots.some(root => linkedPeople.has(root))) linkedPeople.add(roots[0]);
       facts.set(roots[0], { photos, reported: new Set(reported), chats });
-      personOf.set(roots[0], [...named][0] ?? group[0].label);
-      sameNameJoined.add(roots[0]);
+      const target = group.find(entry => comparableName(entry.name) === name)?.label ??
+        [...aliases.values()].find(row => row.as === name)?.label ?? group[0].label;
+      personOf.set(roots[0], [...named][0] ?? (explicit ? target : group[0].label));
+      (explicit ? sameAsJoined : sameNameJoined).add(roots[0]);
     }
   }
   for (const entry of entries) {
@@ -394,7 +439,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       const label = person ?? entry.label;
       node = { id: `n${nodes.size + 1}`, label, initials: initials(label), ring: 'unknown', ringLabel: '', kind: 'unknown',
         lastActivity: null, lastNote: '', platforms: [], platformLabels: [], chats: [], photo: null, identityNote: '',
-        kinds: new Set(), profile: sameNameJoined.has(key) ? 'sameName' : person ? 'joined' : entry.profile };
+        kinds: new Set(), reported: new Set(), ...(linkedPeople.has(key) ? { confirmed: true } : {}), profile: sameAsJoined.has(key) ? 'sameAs' : sameNameJoined.has(key) ? 'sameName' : person ? 'joined' : entry.profile };
       nodes.set(key, node);
     }
     if (entry.photo) {
@@ -402,6 +447,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       node.photo = entry.photo.file; linked.set(entry.photo.file, entry.photo);
     }
     if (!node.platforms.includes(entry.platform)) node.platforms.push(entry.platform);
+    if (entry.profile === 'reported') node.reported.add(entry.key);
     if (node.chats.includes(entry.chat.id)) continue;
     node.chats.push(entry.chat.id); node.kinds.add(entry.chat.kind); entry.chat.members.push(node.id);
   }
@@ -409,7 +455,9 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
   const sourceDays = [...new Set(chats.map(c => c.asOf).filter((d): d is string => d !== null))].sort();
   const asOf = sourceDays.length === 0 ? null : sourceDays.length === 1 ? sourceDays[0] : `${sourceDays[0]} to ${sourceDays.at(-1)}`;
   const direct = (chat: GraphChat) => chat.kind === 'one-to-one' || chat.kind === 'text';
-  const result = [...nodes.values()].map(({ kinds, profile, ...node }) => {
+  const result = [...nodes.values()].map(({ kinds, profile, reported, ...node }) => {
+    // Platforms where this person has a reported profile ID, so the page can refuse combining two different profiles.
+    const reportedOn = [...reported].map(key => key.slice(0, key.indexOf('|')) as Platform).sort();
     const kind: Kind = kinds.has('one-to-one') ? 'direct' : kinds.has('text') ? 'text' : kinds.has('group') ? 'group' : 'unknown';
     let last: { day: string; age: number; chat: GraphChat } | null = null;
     for (const id of node.chats) {
@@ -429,16 +477,19 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
               last.chat.kind === 'text' ? 'latest observed message (inferred day)' :
                 last.chat.platform === 'gmail' ? 'latest email with only them' : 'latest one-to-one activity'}`,
       platformLabels: node.platforms.map(p => PLATFORMS[p]),
-      identityNote: profile === 'sameName' ? 'Joined by your rule that the same name is the same person; names you listed as separate, and namesakes in one chat, stay apart.' :
+      identityNote: profile === 'sameAs' ? 'Combined because you said these names are the same person.' :
+        profile === 'sameName' ? 'Joined by your rule that the same name is the same person; names you listed as separate, and namesakes in one chat, stay apart.' :
         profile === 'joined' ? 'You confirmed these entries are one person; they are joined only where you confirmed it.' :
         kind === 'text' ? 'Participants were not captured; not linked to any contact.' :
         profile === 'address' ? 'An email address you wrote to; joined with other sources only where you confirmed it.' :
         profile === 'confirmed' ? 'You confirmed this person matches a saved friend photo; joined only where you confirmed it.' :
         profile ? `Muse-reported profile ID; unverified.${node.photo ? ' Photo attached by exact profile ID match.' : ''}` :
           selfLinks?.sameNamePeople ? 'No profile ID; not joined with any other entry.' :
-          'No profile ID; this entry is local to one chat and never merged by name.' };
+          'No profile ID; this entry is local to one chat and never merged by name.',
+      ...(reportedOn.length ? { reportedOn } : {}), ...(hiddenNames.has(comparableName(node.label)) ? { hidden: true } : {}) };
   });
-  return { nodes: result, chats, linkedPhotos: [...linked.values()], selfIdentified, selfHidden, asOf, gmailHidden };
+  return { nodes: result, chats, linkedPhotos: [...linked.values()], selfIdentified, selfHidden, asOf, gmailHidden,
+    ...(aliases.size ? { sameAsUnjoined } : {}) };
 }
 
 const BADGES = `<g id="badge-messenger"><circle r="8" fill="#0a7cff" stroke="#fffdf9" stroke-width="2"/><path d="M-4.6 2.3L-1.2-1.9L1 .4L4.6-2.3L1.2 1.9L-1-.4Z" fill="#fff"/></g>
@@ -483,10 +534,61 @@ const CONNECTIONS_SCRIPT = `(()=>{
 const svg=document.getElementById('connections-svg');if(!svg)return;
 const model=JSON.parse(document.getElementById('connections-data').textContent);
 const byId=new Map(model.nodes.map(n=>[n.id,n])),chats=new Map(model.chats.map(c=>[c.id,c]));
-const nodes=[...svg.querySelectorAll('[data-node]')];
+const nodes=[...svg.querySelectorAll('[data-node]')],els=new Map(nodes.map(el=>[el.dataset.node,el])),NS='http://www.w3.org/2000/svg';
 const detail=document.getElementById('connection-detail'),empty=document.getElementById('connection-empty');
 let selected=null,moved=false;
+// Hide/combine choices persist in this browser as one-way name tags, never names.
+const KEY='heartbeat.chartEdits.v1';
+const canon=s=>String(s).normalize('NFKC').trim().replace(/\\s+/g,' ').toLocaleLowerCase('en-US');
+function tag(s){let a=0xdeadbeef,b=0x41c6ce57;for(const ch of canon(s)){const c=ch.codePointAt(0);a=Math.imul(a^c,2654435761);b=Math.imul(b^c,1597334677);}
+a=Math.imul(a^(a>>>16),2246822507)^Math.imul(b^(b>>>13),3266489909);b=Math.imul(b^(b>>>16),2246822507)^Math.imul(a^(a>>>13),3266489909);
+return (b>>>0).toString(36)+'-'+(a>>>0).toString(36);}
+let edits={hide:[],show:[],combine:[]};
+try{const v=JSON.parse(localStorage.getItem(KEY)||'null');if(v&&[v.hide,v.show,v.combine].every(Array.isArray))edits=v;}catch(e){}
+const note=document.getElementById('edits-note');
+function save(){try{localStorage.setItem(KEY,JSON.stringify(edits));}catch(e){note.textContent='This browser could not save your changes; they last until you close this page.';}}
+const without=(list,t)=>list.filter(x=>x!==t);
+const labelOf=new Map(model.nodes.map(n=>[tag(n.label),n.label]));
+const platformLabel=new Map(model.nodes.flatMap(n=>n.platforms.map((p,i)=>[p,n.platformLabels[i]])));
+const order=['today','week','fortnight','month','older','unknown'];
+const newer=(a,b)=>{const x=order.indexOf(a.ring),y=order.indexOf(b.ring);return x<y||(x===y&&(a.lastActivity||'')>(b.lastActivity||''));};
+const absorbed=new Map();
+const live=()=>[...byId.values()].filter(x=>!absorbed.has(x.id)),named=t=>live().filter(x=>tag(x.label)===t);
+// Mirrors the model's guards: evidence of two different people is never overridden by a browser combine.
+function differ(n,T){if(n.photo&&T.photo&&n.photo!==T.photo)return 'they have different photos';
+if(n.chats.some(c=>T.chats.includes(c)))return 'they are both in one chat';
+const r=new Set(n.reportedOn||[]);if((T.reportedOn||[]).some(p=>r.has(p)))return 'they have different profiles on one platform';
+if(n.confirmed&&T.confirmed)return 'each is a different person you confirmed';return '';}
+let blocked=0;
+function redraw(id,n,from){const el=els.get(id);el.querySelector('title').textContent=n.label;
+el.querySelector('.node-label').textContent=Array.from(n.label.split(/\\s+/)[0]||'').slice(0,12).join('');
+el.setAttribute('aria-label',n.label+': '+n.ringLabel+'; '+n.platformLabels.join(', '));
+const img=from.querySelector('image');
+if(n.photo&&!el.querySelector('image')&&img){for(const x of el.querySelectorAll('.disc,.initials'))x.remove();el.insertBefore(img.cloneNode(),el.querySelector('.rim'));}
+const initials=el.querySelector('.initials');if(initials)initials.textContent=n.initials;
+for(const u of el.querySelectorAll('use'))u.remove();
+n.platforms.forEach((p,i)=>{const u=document.createElementNS(NS,'use');u.setAttribute('href','#badge-'+p);u.setAttribute('x',String(16-i*15));u.setAttribute('y','16');el.insertBefore(u,el.querySelector('.node-label'));});
+el.setAttribute('class',el.getAttribute('class').replace(/kind-\\w+/,'kind-'+n.kind));
+if((n.kind==='direct'||n.kind==='text')&&![...svg.querySelectorAll('[data-spoke]')].some(s=>s.dataset.spoke===id)){const m=/translate\\(([-\\d.]+) ([-\\d.]+)\\)/.exec(el.getAttribute('transform'));
+const line=document.createElementNS(NS,'line');line.setAttribute('class','spoke '+n.kind);line.dataset.spoke=id;
+for(const [k,v] of [['x1',0],['y1',0],['x2',m[1]],['y2',m[2]]])line.setAttribute(k,String(v));svg.insertBefore(line,svg.querySelector('.self'));}}
+// A combined person takes the slot of whichever entry was active more recently. Combines are keyed by name, so a
+// name shared by more than one current person never combines.
+for(const [a,t] of edits.combine){const ns=named(a),ts=named(t);
+if(ns.length!==1||ts.length!==1){if(ns.length&&ts.length)blocked++;continue;}
+const n=ns[0],T=ts[0];if(T.id===n.id)continue;if(differ(n,T)){blocked++;continue;}
+{const keep=newer(n,T)?n:T,other=keep===n?T:n,platforms=[...new Set([...T.platforms,...n.platforms])];
+const kind=[keep.kind,other.kind].includes('direct')?'direct':[keep.kind,other.kind].includes('text')?'text':keep.kind;
+const merged={...keep,label:T.label,initials:T.initials,photo:T.photo||n.photo,kind,chats:[...new Set([...keep.chats,...other.chats])],
+reportedOn:[...new Set([...(n.reportedOn||[]),...(T.reportedOn||[])])],confirmed:!!(n.confirmed||T.confirmed),
+platforms,platformLabels:platforms.map(p=>platformLabel.get(p)),combined:[...(T.combined||[]),...(n.combined||[]),[a,t]],
+identityNote:'You combined '+n.label+' into '+T.label+' in this browser. '+T.identityNote};
+byId.set(keep.id,merged);absorbed.set(other.id,keep.id);
+for(const c of chats.values())c.members=[...new Set(c.members.map(m=>m===other.id?keep.id:m))];
+redraw(keep.id,merged,els.get(other.id));}}
+const hiddenNow=n=>{const t=tag(n.label);return edits.hide.includes(t)||(!!n.hidden&&!edits.show.includes(t));};
 function related(id){const set=new Set();for(const c of byId.get(id).chats)for(const m of chats.get(c).members)set.add(m);return set;}
+const same=document.getElementById('connection-same'),combine=document.getElementById('connection-combine'),combineNote=document.getElementById('combine-note');
 function paint(){const rel=selected?related(selected):null;
 for(const el of nodes){const id=el.dataset.node;el.classList.toggle('selected',id===selected);
 el.classList.toggle('related',!!rel&&id!==selected&&rel.has(id));el.classList.toggle('dimmed',!!rel&&!rel.has(id));
@@ -500,17 +602,50 @@ document.getElementById('connection-identity').textContent=n.identityNote;
 const list=document.getElementById('connection-chats');list.replaceChildren();
 for(const id of n.chats){const c=chats.get(id);const item=document.createElement('li');
 item.textContent=c.label+' · latest sent as returned: '+(c.latest||'unknown')+(c.kind==='group'?' · '+c.members.length+' other listed members':'');list.append(item);}
+const first=new Option('Choose someone…','');same.replaceChildren(first,...live().filter(x=>x.id!==selected&&!hiddenNow(x)&&named(tag(x.label)).length===1)
+.sort((x,y)=>x.label.localeCompare(y.label)).map(x=>new Option(x.label,x.id)));combine.disabled=true;
+const many=named(tag(n.label)).length;same.disabled=many>1;combineNote.hidden=many<2;
+combineNote.textContent=many>1?many+' people have this name, so combining by name is unavailable for them.':'';
+document.getElementById('connection-hide').textContent=many>1?'Hide everyone with this name ('+many+')':'Hide from chart';
+document.getElementById('connection-separate').hidden=!n.combined;
 detail.hidden=false;empty.hidden=true;}
 function select(id){selected=selected===id?null:id;paint();}
 for(const el of nodes){el.addEventListener('click',e=>{e.stopPropagation();select(el.dataset.node);});
 el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(el.dataset.node);}});}
 const checks=[...document.querySelectorAll('[data-platform-filter]')],search=document.getElementById('connection-search');
-function filter(){const on=new Set(checks.filter(c=>c.checked).map(c=>c.value));const term=search.value.trim().toLocaleLowerCase();let shown=0;
-for(const el of nodes){const n=byId.get(el.dataset.node);const ok=n.platforms.some(p=>on.has(p))&&(!term||n.label.toLocaleLowerCase().includes(term));
-el.classList.toggle('filtered',!ok);if(ok)shown++;}
+function lists(){const hidden=[...byId.values()].filter(n=>!absorbed.has(n.id)&&hiddenNow(n)).sort((x,y)=>x.label.localeCompare(y.label));
+document.getElementById('hidden-count').textContent=String(hidden.length);
+document.getElementById('hidden-list').replaceChildren(...hidden.map(n=>{const item=document.createElement('li'),b=document.createElement('button');
+b.type='button';b.className='chip';b.textContent='Show';b.addEventListener('click',()=>{const t=tag(n.label);edits.hide=without(edits.hide,t);
+if(n.hidden&&!edits.show.includes(t))edits.show.push(t);save();filter();});item.append(n.label+' ',b);return item;}));
+const combos=edits.combine.filter(([a,t])=>labelOf.has(a)&&labelOf.has(t));
+document.getElementById('combined-heading').hidden=!combos.length;
+document.getElementById('combined-list').replaceChildren(...combos.map(([a,t])=>{const item=document.createElement('li'),b=document.createElement('button');
+b.type='button';b.className='chip';b.textContent='Separate again';b.addEventListener('click',()=>{edits.combine=edits.combine.filter(x=>x[0]!==a);save();location.reload();});
+item.append(labelOf.get(a)+' → '+labelOf.get(t)+' ',b);return item;}));
+const stuck=document.getElementById('combine-blocked');stuck.hidden=!blocked;
+stuck.textContent=blocked+' saved combine(s) were not applied because more than one person now has that name or the entries show different people.';}
+function filter(){const on=new Set(checks.filter(c=>c.checked).map(c=>c.value));const term=search.value.trim().toLocaleLowerCase();let shown=0,total=0,hid=0;
+for(const el of nodes){const id=el.dataset.node,n=byId.get(id),gone=absorbed.has(id),off=!gone&&hiddenNow(n);
+const ok=!gone&&!off&&n.platforms.some(p=>on.has(p))&&(!term||n.label.toLocaleLowerCase().includes(term));
+el.classList.toggle('filtered',!ok);if(ok)shown++;if(!gone)total++;if(off)hid++;}
 for(const s of svg.querySelectorAll('[data-spoke]'))s.classList.toggle('filtered',svg.querySelector('[data-node="'+s.dataset.spoke+'"]').classList.contains('filtered'));
-document.getElementById('connection-count').textContent=shown+' of '+nodes.length+' shown';}
+document.getElementById('connection-count').textContent=shown+' of '+total+' shown'+(hid?' · '+hid+' hidden':'');
+if(selected&&(absorbed.has(selected)||hiddenNow(byId.get(selected)))){selected=null;paint();}lists();}
 for(const c of checks)c.addEventListener('change',filter);search.addEventListener('input',filter);
+document.getElementById('connection-hide').addEventListener('click',()=>{const t=tag(byId.get(selected).label);
+if(!edits.hide.includes(t))edits.hide.push(t);edits.show=without(edits.show,t);save();filter();});
+same.addEventListener('change',()=>{combine.disabled=!same.value;});
+combine.addEventListener('click',()=>{const n=byId.get(selected),T=byId.get(same.value),a=tag(n.label),pick=tag(T.label);
+const why=named(a).length>1||named(pick).length>1?'more than one person has that name':differ(n,T);
+if(why){combineNote.textContent='Not combined: '+why+'.';combineNote.hidden=false;return;}
+const t=(edits.combine.find(x=>x[0]===pick)||[pick,pick])[1];if(a===t)return;
+edits.combine=[...edits.combine.filter(x=>x[0]!==a).map(x=>x[1]===a?[x[0],t]:x),[a,t]];save();location.reload();});
+document.getElementById('connection-separate').addEventListener('click',()=>{const mine=new Set(byId.get(selected).combined.map(x=>x[0]));
+edits.combine=edits.combine.filter(x=>!mine.has(x[0]));save();location.reload();});
+// Lets the owner's agent copy these browser choices into the saved name rule.
+window.heartbeatChartEdits=()=>({hide:edits.hide.map(t=>labelOf.get(t)).filter(Boolean),show:edits.show.map(t=>labelOf.get(t)).filter(Boolean),
+combine:edits.combine.filter(([a,t])=>labelOf.has(a)&&labelOf.has(t)).map(([a,t])=>({name:labelOf.get(a),as:labelOf.get(t)}))});
 const base=svg.getAttribute('viewBox').split(' ').map(Number);let box=base.slice(),drag=null;
 function view(){svg.setAttribute('viewBox',box.join(' '));}
 function zoom(f,cx,cy){const size=Math.max(base[2]*0.2,Math.min(base[2]*1.6,box[2]*f));
@@ -544,6 +679,8 @@ const CONNECTIONS_STYLE = `.graph-panel{margin-bottom:22px}.graph-layout{display
 .node.dimmed,.spoke.dimmed{opacity:.22}.node.filtered,.spoke.filtered{display:none}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#6c7570;margin-top:10px}.legend svg{width:18px;height:18px;vertical-align:-4px}
 #connection-chats{padding-left:18px;font-size:13px}
+[hidden]{display:none!important}.edit-tools{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.edit-tools select{max-width:170px}
+#hidden-people summary{cursor:pointer;font-weight:600}#hidden-list,#combined-list{padding-left:18px;font-size:13px}#hidden-list li,#combined-list li{margin:4px 0}
 @media(max-width:900px){.graph-layout{grid-template-columns:1fr}}`;
 
 function connectionsPanel(model: ConnectionModel): string {
@@ -561,7 +698,16 @@ ${platforms.map(p => `<label class="chip"><input type="checkbox" data-platform-f
 <aside><div id="connection-empty" class="notice">Select someone in the graph to inspect their chats.</div>
 <div id="connection-detail" hidden><div class="label">Selected</div><h2 id="connection-name"></h2><p id="connection-ring" class="muted"></p>
 <p id="connection-platforms"></p><ul id="connection-chats"></ul><p id="connection-identity" class="notice"></p>
+<div class="edit-tools"><button type="button" id="connection-hide" class="chip">Hide from chart</button>
+<label class="chip">Same person as <select id="connection-same" aria-label="Same person as"></select></label>
+<button type="button" id="connection-combine" class="chip" disabled>Combine</button>
+<button type="button" id="connection-separate" class="chip" hidden>Separate again</button></div>
+<p id="combine-note" class="muted" hidden></p>
 <button type="button" id="connection-clear" class="chip">Clear selection</button></div>
+<details id="hidden-people" class="notice"><summary>Hidden from chart (<span id="hidden-count">0</span>)</summary><ul id="hidden-list"></ul>
+<p id="combined-heading" hidden>Combined in this browser</p><ul id="combined-list"></ul><p id="combine-blocked" class="muted" hidden></p>
+<p id="edits-note" class="muted">Hide, show and combine are saved in this browser and apply to every rebuilt dashboard opened here. To keep them everywhere, save them to your name rule.</p></details>
+${model.sameAsUnjoined ? `<div class="notice">${model.sameAsUnjoined} of your "same person" names could not be combined because the entries show different people (different profiles, photos, or both in one chat).</div>` : ''}
 <div class="notice">Muse-reported, unverified and partial. Photos attach only by exact Facebook profile ID or a pairing you confirmed, never by automatic name or face matching. Entries from different chats or sources become one person only where you confirmed it.
 ${typeof model.gmailHidden === 'number' ? `Gmail shows only addresses you wrote to; ${model.gmailHidden} address(es) that only wrote to you are not shown.` : ''}
 ${model.selfIdentified ? '' : model.selfHidden
