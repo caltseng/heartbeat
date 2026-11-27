@@ -353,6 +353,82 @@ test('private preview copies only exactly linked photos beside the dashboard', t
   assert.deepEqual([record.saved, record.linked, record.directory], [2, 1, 'photos']);
 });
 
+test('CSV CLI combines photo rounds with per-round links and newest retrieval wins regardless of argument order', t => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'photo-rounds-synthetic-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const input = path.join(folder, 'contacts.csv'), museFile = path.join(folder, 'muse.json');
+  fs.writeFileSync(input, 'Name\nFixture\n');
+  const names = ['Ada Fixture', 'Bo Fixture', 'Cy Fixture', 'Ada Fixture'];
+  fs.writeFileSync(museFile, JSON.stringify({ schemaVersion: 1, dataClass: 'private', kind: 'muse-reported-chat-recency',
+    source: 'messenger', retrievedAt: now, requestedPeriod: 'last 14 days', coverage: 'partial', gaps: ['Synthetic fixture'],
+    records: names.map((name, index) => ({ chatType: 'one_to_one', reportedChatId: `chat-${index}`,
+      reportedLatestSentAt: now, nativeEvidenceVerified: false, participants: [{ name, id: null }] })) }));
+  const round = (name: string, retrievedAt: string, participants: number[], tag: string) => {
+    const directory = path.join(folder, name), links = path.join(directory, 'links.json'), file = path.join(directory, 'profile-photos.json');
+    fs.mkdirSync(directory);
+    const saved = { ...manifest('private'), retrievedAt, profiles: participants.map(index => {
+      const bytes = Buffer.concat([png, Buffer.from(`${tag}-${index}`)]);
+      const filename = `profile-photo-${hash(bytes)}.png`;
+      fs.writeFileSync(path.join(directory, filename), bytes);
+      return { ...manifest('private').profiles[0], profileReference: `https://www.facebook.com/person${index}.fixture`,
+        displayName: names[index], file: filename, digest: hash(bytes) };
+    }) };
+    fs.writeFileSync(file, JSON.stringify(saved));
+    const linksValue = { schemaVersion: 1, dataClass: 'private', kind: 'owner-confirmed-photo-links',
+      photosInputDigest: hash(fs.readFileSync(file)), confirmedAt: now, links: participants.map(index => ({
+        source: 'messenger', reportedChatId: `chat-${index}`, participantIndex: 0, participantName: names[index],
+        profileReference: `https://www.facebook.com/person${index}.fixture`
+      })) };
+    fs.writeFileSync(links, JSON.stringify(linksValue));
+    return { file, links, saved, linksValue };
+  };
+  const oldest = round('oldest', '2026-11-24T12:00:00Z', [0, 1], 'oldest');
+  const newest = round('newest', '2026-11-26T04:00:00-08:00', [0, 2], 'newest');
+  const middle = round('middle', '2026-11-26T11:00:00Z', [0], 'middle');
+  const rounds = [oldest, newest, middle];
+  const invoke = (output: string, files = rounds.map(round => round.links)) => {
+    fs.mkdirSync(output);
+    return spawnSync(process.execPath, ['--import', 'tsx', path.join(__dirname, 'contact-csv.ts'),
+      '--input', input, '--output', output, '--muse', museFile, '--time-zone', 'UTC',
+      ...rounds.flatMap((round, index) => ['--photos', round.file, ...(files[index] ? ['--photo-links', files[index]] : [])])],
+    { encoding: 'utf8' });
+  };
+  const output = path.join(folder, 'output'), result = invoke(output);
+  assert.equal(result.status, 2, result.stderr);
+  const preview = path.join(output, 'preview');
+  const expected = [newest.saved.profiles[0], oldest.saved.profiles[1], newest.saved.profiles[1]];
+  assert.deepEqual(fs.readdirSync(path.join(preview, 'photos')).sort(), expected.map(photo => photo.file).sort());
+  for (const photo of expected) assert.equal(hash(fs.readFileSync(path.join(preview, 'photos', photo.file))), photo.digest);
+  const html = fs.readFileSync(path.join(preview, 'dashboard.html'), 'utf8');
+  assert.equal(html.match(/<image href="photos\//g)?.length, 3, 'unapproved same-name slots never get a photo');
+  assert.ok(!html.includes(oldest.saved.profiles[0].file), 'superseded photo is not rendered');
+  assert.ok(!html.includes(middle.saved.profiles[0].file), 'last flag cannot override a newer retrieval');
+  const provenance = JSON.parse(fs.readFileSync(path.join(preview, 'contact-import.json'), 'utf8')).profilePhotos;
+  assert.deepEqual([provenance.saved, provenance.linked, provenance.ownerConfirmedLinks.links], [3, 3, 3]);
+  assert.deepEqual(provenance.rounds.map(round => round.inputDigest), rounds.map(round => hash(fs.readFileSync(round.file))));
+  for (const [index, round] of rounds.entries()) {
+    const record = provenance.rounds[index].ownerConfirmedLinks;
+    assert.equal(record.inputDigest, hash(fs.readFileSync(round.links)));
+    assert.deepEqual(fs.readFileSync(path.join(preview, record.file)), fs.readFileSync(round.links));
+  }
+  const mismatch = path.join(folder, 'mismatch');
+  assert.equal(invoke(mismatch, [newest.links, oldest.links, middle.links]).status, 1, 'cross-round digests still fail');
+  assert.deepEqual(fs.readdirSync(mismatch), [], 'invalid pair publishes nothing');
+  const missing = path.join(folder, 'missing');
+  assert.equal(invoke(missing, [oldest.links]).status, 1, 'partial positional link lists are rejected');
+  assert.deepEqual(fs.readdirSync(missing), []);
+  fs.writeFileSync(middle.links, JSON.stringify({ ...middle.linksValue, links: [{
+    ...middle.linksValue.links[0], participantName: 'Different Fixture'
+  }] }));
+  const conflict = path.join(folder, 'conflict');
+  assert.equal(invoke(conflict).status, 1, 'conflicting decisions cannot silently overwrite one another');
+  assert.deepEqual(fs.readdirSync(conflict), []);
+  const bare = path.join(folder, 'without-links');
+  const bareResult = invoke(bare, []);
+  assert.equal(bareResult.status, 2, bareResult.stderr);
+  assert.ok(!fs.existsSync(path.join(bare, 'preview', 'photos')), 'rounds alone cannot match ID-less participants');
+});
+
 test('photo-link review proposes unique exact-name pairs, and only approved numbers become links', t => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'photo-link-review-synthetic-'));
   t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
