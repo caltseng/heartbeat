@@ -374,6 +374,8 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     roots.slice(1).forEach(root => parent.set(root, roots[0]));
     personOf.set(roots[0], person.displayName);
   }
+  // Only people links are owner-confirmed people; rule joins below must not mark their nodes as confirmed.
+  const linkedPeople = new Set(personOf.keys());
   // The owner's standing rule: chat entries with exactly the same normalized name are one person unless the owner listed the
   // name as separate. Names the owner said are another person's ("same as") join that person's name group, in chats or Gmail.
   // Namesakes in one chat, different reported IDs on one platform, two confirmed people or two different photos are evidence
@@ -422,6 +424,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
         continue;
       }
       roots.slice(1).forEach(root => { parent.set(root, roots[0]); personOf.delete(root); facts.delete(root); });
+      if (roots.some(root => linkedPeople.has(root))) linkedPeople.add(roots[0]);
       facts.set(roots[0], { photos, reported: new Set(reported), chats });
       const target = group.find(entry => comparableName(entry.name) === name)?.label ??
         [...aliases.values()].find(row => row.as === name)?.label ?? group[0].label;
@@ -436,7 +439,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       const label = person ?? entry.label;
       node = { id: `n${nodes.size + 1}`, label, initials: initials(label), ring: 'unknown', ringLabel: '', kind: 'unknown',
         lastActivity: null, lastNote: '', platforms: [], platformLabels: [], chats: [], photo: null, identityNote: '',
-        kinds: new Set(), reported: new Set(), ...(person ? { confirmed: true } : {}), profile: sameAsJoined.has(key) ? 'sameAs' : sameNameJoined.has(key) ? 'sameName' : person ? 'joined' : entry.profile };
+        kinds: new Set(), reported: new Set(), ...(linkedPeople.has(key) ? { confirmed: true } : {}), profile: sameAsJoined.has(key) ? 'sameAs' : sameNameJoined.has(key) ? 'sameName' : person ? 'joined' : entry.profile };
       nodes.set(key, node);
     }
     if (entry.photo) {

@@ -314,6 +314,7 @@ test('Gmail shows only addresses you wrote to, and approved people join entries 
   assert.deepEqual([ada[0].label, ada[0].platforms, ada[0].chats.length, ada[0].kind], ['Ada Fixture', ['messenger', 'gmail'], 5, 'direct']);
   assert.equal(ada[0].lastActivity, '2026-11-26');
   assert.match(ada[0].identityNote, /You confirmed these entries are one person/);
+  assert.equal(ada[0].confirmed, true);
   assert.match(connectionsPanel(model), /1 address\(es\) that only wrote to you are not shown/);
   const output = path.join(folder, 'preview-out'); fs.mkdirSync(output);
   importContactCSV(csv, output, undefined, [museFile], undefined, 'UTC', undefined, rule, gmailFile, links);
@@ -357,6 +358,7 @@ test('the same-name rule joins exact names across chats, except listed names and
   const ada = model.nodes.find(n => /ada/i.test(n.label));
   assert.deepEqual([ada.label, ada.chats.length, ada.kind], ['Ada Fixture', 2, 'direct']);
   assert.match(ada.identityNote, /same name is the same person/);
+  assert.equal(ada.confirmed, undefined, 'a rule join is not a person you confirmed, so the page can still combine it');
   const saved = JSON.parse(fs.readFileSync(rule, 'utf8'));
   fs.writeFileSync(rule, JSON.stringify({ ...saved, sameNamePeople: undefined }));
   assert.throws(() => readSelfLinks(rule, 'private'), /Invalid owner name rule/);
@@ -390,6 +392,7 @@ test('owner same-as names combine people across chats and Gmail, hidden names st
   assert.equal(mike.length, 1, 'only the names you listed join, with the rule for every other same name off');
   assert.deepEqual([mike[0].label, mike[0].platforms, mike[0].chats.length, mike[0].kind], ['Mike Fixture', ['messenger', 'gmail'], 3, 'direct']);
   assert.match(mike[0].identityNote, /you said these names are the same person/);
+  assert.equal(mike[0].confirmed, undefined);
   assert.equal(model.nodes.filter(n => /zed/i.test(n.label)).length, 2, 'two people in one chat stay separate');
   assert.equal(model.sameAsUnjoined, 1);
   assert.match(connectionsPanel(model), /1 of your "same person" names could not be combined/);
