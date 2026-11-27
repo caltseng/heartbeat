@@ -354,21 +354,35 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
   // photos are evidence of different people, so that name stays separate.
   const sameNameJoined = new Set<string>();
   if (selfLinks?.sameNamePeople) {
-    const photosOf = new Map<string, Set<string>>();
-    for (const entry of entries) if (entry.photo) photosOf.set(find(entry.key), new Set([...photosOf.get(find(entry.key)) ?? [], entry.photo.file]));
+    // Guards check everything a merged root already holds, so chained joins through one entry cannot combine conflicts.
+    const facts = new Map<string, { photos: Set<string>; reported: Set<string>; chats: Map<string, Set<string>> }>();
+    for (const entry of entries) {
+      const root = find(entry.key);
+      const fact = facts.get(root) ?? { photos: new Set(), reported: new Set(), chats: new Map() };
+      if (entry.photo) fact.photos.add(entry.photo.file);
+      if (entry.profile === 'reported') fact.reported.add(entry.key);
+      fact.chats.set(entry.chat.id, new Set([...fact.chats.get(entry.chat.id) ?? [], entry.key]));
+      facts.set(root, fact);
+    }
     const groups = new Map<string, typeof entries>();
     for (const entry of entries) {
       const name = entry.platform === 'messenger' || entry.platform === 'instagram' ? comparableName(entry.name) : null;
       if (name !== null && !selfLinks.separateNames.includes(name)) groups.set(name, [...groups.get(name) ?? [], entry]);
     }
     for (const group of groups.values()) {
-      const chatIds = group.map(entry => entry.chat.id);
-      const reported = (platform: Platform) => new Set(group.filter(e => e.platform === platform && e.profile === 'reported').map(e => e.key));
       const roots = [...new Set(group.map(entry => find(entry.key)))];
+      if (roots.length < 2) continue;
+      const held = roots.map(root => facts.get(root));
+      const photos = new Set(held.flatMap(fact => [...fact.photos]));
+      const reported = held.flatMap(fact => [...fact.reported]);
+      const platforms = reported.map(key => key.slice(0, key.indexOf('|')));
+      const chats = new Map<string, Set<string>>();
+      held.forEach(fact => fact.chats.forEach((keys, chat) => chats.set(chat, new Set([...chats.get(chat) ?? [], ...keys]))));
       const named = new Set(roots.map(root => personOf.get(root)).filter(Boolean));
-      if (roots.length < 2 || new Set(chatIds).size !== chatIds.length || reported('messenger').size > 1 || reported('instagram').size > 1 ||
-        named.size > 1 || new Set(roots.flatMap(root => [...photosOf.get(root) ?? []])).size > 1) continue;
-      roots.slice(1).forEach(root => { parent.set(root, roots[0]); personOf.delete(root); });
+      if (photos.size > 1 || new Set(platforms).size !== platforms.length || [...chats.values()].some(keys => keys.size > 1) ||
+        named.size > 1) continue;
+      roots.slice(1).forEach(root => { parent.set(root, roots[0]); personOf.delete(root); facts.delete(root); });
+      facts.set(roots[0], { photos, reported: new Set(reported), chats });
       personOf.set(roots[0], [...named][0] ?? group[0].label);
       sameNameJoined.add(roots[0]);
     }

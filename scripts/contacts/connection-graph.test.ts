@@ -370,4 +370,18 @@ test('a confirmed person never carries two different photos', () => {
   const sameName = Object.assign(new Map<string, string>(), { sameNamePeople: true, separateNames: [] });
   assert.equal(connectionModel(null, [muse()], twoPhotos, 'UTC', null, sameName).nodes.filter(n => /Ada/.test(n.label)).length, 2,
     'the same-name rule keeps different reported profiles and photos apart instead of failing');
+  const chain = (rows: [string, string, string | null][]) => ({ source: 'messenger' as const, retrievedAt: now, gaps: ['Synthetic gap'],
+    records: rows.map(([chat, name, id]) => ({ chatType: 'group' as const, reportedChatId: chat, reportedLatestSentAt: now,
+      nativeEvidenceVerified: false as const, participants: [{ name, id }] })) });
+  const two = { inputDigest: 'x', photos: [{ key: 'user:one.fixture', file: photoName, bytes: png, digest: hash(png) },
+    { key: 'user:two.fixture', file: other, bytes: png, digest: hash(png) }] };
+  const viaPhoto = chain([['c1', 'Ada', null], ['c2', 'Ada', 'https://www.facebook.com/one.fixture'],
+    ['c3', 'Ada L', 'https://www.facebook.com/one.fixture'], ['c4', 'Ada L', null]]);
+  const photoLink = new Map([['messenger|c4|0', { name: 'Ada L', key: 'user:two.fixture' }]]);
+  assert.deepEqual(connectionModel(null, [viaPhoto], two, 'UTC', photoLink, sameName).nodes.map(n => n.chats.length).sort(), [1, 3],
+    'a join through an entry under two names never combines two photos');
+  const viaLink = chain([['d1', 'Ada', null], ['d2', 'Ada', '33333'], ['d3', 'Ada L', null], ['d4', 'Ada L', '44444']]);
+  const shared = new Map([['messenger|d1|0', { name: 'Ada', key: 'user:pp.fixture' }], ['messenger|d3|0', { name: 'Ada L', key: 'user:pp.fixture' }]]);
+  assert.deepEqual(connectionModel(null, [viaLink], null, 'UTC', shared, sameName).nodes.map(n => n.chats.length).sort(), [1, 3],
+    'a join through an entry under two names never combines two reported profiles');
 });
