@@ -393,6 +393,9 @@ test('owner same-as names combine people across chats and Gmail, hidden names st
   assert.deepEqual([mike[0].label, mike[0].platforms, mike[0].chats.length, mike[0].kind], ['Mike Fixture', ['messenger', 'gmail'], 3, 'direct']);
   assert.match(mike[0].identityNote, /you said these names are the same person/);
   assert.equal(mike[0].confirmed, undefined);
+  const alone = connectionModel(null, [], null, 'UTC', null, readSelfLinks(rule, 'private'), gmail).nodes;
+  assert.deepEqual(alone.map(n => [n.label, n.platforms]), [['Mike Fixture', ['gmail']]],
+    'a same-as name with no other entry still shows under the name you gave it');
   assert.equal(model.nodes.filter(n => /zed/i.test(n.label)).length, 2, 'two people in one chat stay separate');
   assert.equal(model.sameAsUnjoined, 1);
   assert.match(connectionsPanel(model), /1 of your "same person" names could not be combined/);

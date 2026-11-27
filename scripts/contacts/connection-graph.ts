@@ -410,7 +410,13 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       const explicit = group.some(entry => aliases.has(comparableName(entry.name)));
       if (!explicit && !selfLinks.sameNamePeople) continue;
       const roots = [...new Set(group.map(entry => find(entry.key)))];
-      if (roots.length < 2) continue;
+      const target = group.find(entry => comparableName(entry.name) === name)?.label ??
+        [...aliases.values()].find(row => row.as === name)?.label ?? group[0].label;
+      if (roots.length < 2) {
+        // An explicit same-as still gives a lone entry the name the owner said it belongs to.
+        if (explicit && !personOf.has(roots[0])) { personOf.set(roots[0], target); sameAsJoined.add(roots[0]); }
+        continue;
+      }
       const held = roots.map(root => facts.get(root));
       const photos = new Set(held.flatMap(fact => [...fact.photos]));
       const reported = held.flatMap(fact => [...fact.reported]);
@@ -426,8 +432,6 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       roots.slice(1).forEach(root => { parent.set(root, roots[0]); personOf.delete(root); facts.delete(root); });
       if (roots.some(root => linkedPeople.has(root))) linkedPeople.add(roots[0]);
       facts.set(roots[0], { photos, reported: new Set(reported), chats });
-      const target = group.find(entry => comparableName(entry.name) === name)?.label ??
-        [...aliases.values()].find(row => row.as === name)?.label ?? group[0].label;
       personOf.set(roots[0], [...named][0] ?? (explicit ? target : group[0].label));
       (explicit ? sameAsJoined : sameNameJoined).add(roots[0]);
     }
