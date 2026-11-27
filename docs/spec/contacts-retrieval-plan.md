@@ -222,7 +222,8 @@ to be groups or direct interactions. Group membership and group activity never
 imply a direct interaction with any member. A missing date stays in the unknown ring
 rather than being treated as old.
 Each node carries a platform badge (Messenger, Instagram,
-Google Messages). Selecting a node lists its chats and highlights people who share
+Google Messages, Gmail). The platform filter chips and legend use the same source
+icons at a fixed size alongside their text labels. Selecting a node lists its chats and highlights people who share
 those chats; search, platform filters, zoom and pan are local. Searching a listed
 member finds their group node; hidden people and excluded businesses do not make a
 group match and are omitted from its inspector. A group disappears when no eligible

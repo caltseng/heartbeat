@@ -870,7 +870,8 @@ const CONNECTIONS_STYLE = `.graph-panel{margin-bottom:22px}.graph-layout{display
 .bubble-hit{fill:transparent;pointer-events:all}.bubble-count{font-size:10px;fill:#6c7570}
 .bubble-members{display:none}.bubble:hover>.bubble-members,.bubble.open>.bubble-members,.bubble:focus-within>.bubble-members{display:inline}
 .member-preview{cursor:pointer}.member-preview:focus{outline:none}.member-preview:focus .halo{stroke:#cc624f}
-.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#6c7570;margin-top:10px}.legend svg{width:18px;height:18px;vertical-align:-4px}
+.source-icon{flex:none;vertical-align:-4px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#6c7570;margin-top:10px}
 #connection-chats{padding-left:18px;font-size:13px}
 [hidden]{display:none!important}.edit-tools{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.edit-tools select{max-width:170px}
 #hidden-people summary,#business-people summary{cursor:pointer;font-weight:600}#hidden-list,#combined-list,#business-list{padding-left:18px;font-size:13px}#hidden-list li,#combined-list li,#business-list li{margin:4px 0}
@@ -879,7 +880,7 @@ const CONNECTIONS_STYLE = `.graph-panel{margin-bottom:22px}.graph-layout{display
 function connectionsPanel(model: ConnectionModel): string {
   if (!model.nodes.length) return '';
   const platforms = (['messenger', 'instagram', 'messages', 'gmail'] as Platform[]).filter(p => model.nodes.some(n => n.platforms.includes(p)));
-  const badge = (p: Platform) => `<svg viewBox="-10 -10 20 20" aria-hidden="true"><use href="#badge-${p}"/></svg>`;
+  const badge = (p: Platform) => `<svg class="source-icon" width="18" height="18" viewBox="-10 -10 20 20" aria-hidden="true"><use href="#badge-${p}"/></svg>`;
   return `<section class="panel graph-panel" aria-labelledby="graph-heading"><h2 id="graph-heading">Your connections</h2>
 <p class="muted">Rings show how recently a chat you share was active, measured from each source's snapshot day${model.asOf ? ` (${escape(model.asOf)})` : ' (unknown: no time zone or dates)'}: most recent at the center, older further out. Group-only contacts appear in group-chat nodes: hover or click a group to reveal its members, then select a member to inspect or edit them. Group activity is not a direct interaction. Drag to pan, scroll to zoom.</p>
 <div class="graph-tools"><input id="connection-search" type="search" placeholder="Find in graph…" autocomplete="off" aria-label="Find in graph">

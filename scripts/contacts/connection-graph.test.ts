@@ -124,6 +124,27 @@ test('group plus unknown chat does not claim that a person has only group chats'
   assert.ok(!svg.includes(`data-spoke="${person.id}"`), 'unknown chat type is not direct interaction evidence');
 });
 
+test('every platform chip and legend entry has a bounded icon referencing its source badge', () => {
+  const platforms = ['messenger', 'instagram', 'messages', 'gmail'] as const;
+  const labels = ['Messenger', 'Instagram', 'Google Messages', 'Gmail'];
+  const model = connectionModel(null, [muse(['100001'])], null, 'UTC');
+  model.nodes = platforms.map((platform, index) => ({ ...model.nodes[0], id: `synthetic-${platform}`,
+    platforms: [platform], platformLabels: [labels[index]] }));
+  model.groups = [];
+  const html = connectionsPanel(model);
+  const chips = [...html.matchAll(/<label class="chip">(<input[^>]*data-platform-filter[^>]*>)(.*?)<\/label>/g)];
+  const legend = html.match(/<div class="legend">(.*?)<\/div>/)[1];
+  assert.equal(chips.length, platforms.length);
+  platforms.forEach((platform, index) => {
+    const icon = `<svg class="source-icon" width="18" height="18" viewBox="-10 -10 20 20" aria-hidden="true"><use href="#badge-${platform}"/></svg>`;
+    assert.ok(chips[index][1].includes(`value="${platform}" checked`));
+    assert.equal(chips[index][2], `${icon}${labels[index]}`);
+    assert.ok(legend.includes(`<span>${icon} ${labels[index]}</span>`));
+    assert.equal(html.split(`id="badge-${platform}"`).length - 1, 1, 'one shared source definition per badge');
+  });
+  assert.equal(connectionsPanel({ ...model, nodes: [] }), '');
+});
+
 test('owner-confirmed photo links attach faces to ID-less participants only where confirmed', t => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'photo-links-synthetic-'));
   t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
