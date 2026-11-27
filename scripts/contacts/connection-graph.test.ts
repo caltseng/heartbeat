@@ -4,9 +4,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { hash } from './lib.ts';
-import { profileKey, readProfilePhotos, readPhotoLinks, readSelfLinks, connectionModel, connectionsPanel } from './connection-graph.ts';
+import { profileKey, readProfilePhotos, readPhotoLinks, readSelfLinks, readPeopleLinks, connectionModel, connectionsPanel } from './connection-graph.ts';
 import { projectGoogleCSV, importContactCSV } from './contact-csv.ts';
 import { renderDashboard, readMuseRecency } from './contact-dashboard.ts';
+import { readGmailMetadata } from './gmail-metadata.ts';
+import { peopleLinkCandidates, confirmPeopleLinks } from './people-links.ts';
 import { photoLinkCandidates, confirmPhotoLinks } from './photo-links.ts';
 import { selfLinkCandidates, confirmSelfLinks, saveOwnerNameRule } from './self-links.ts';
 
@@ -261,4 +263,81 @@ test('owner name rule hides every exact-name participant in any snapshot', t => 
   const imported = JSON.parse(fs.readFileSync(path.join(output, 'preview', 'contact-import.json'), 'utf8')).ownerConfirmedSelf;
   assert.deepEqual([imported.slots, imported.museInputDigest], [null, null]);
   assert.match(imported.rule, /exactly the owner/);
+});
+
+test('Gmail shows only addresses you wrote to, and approved people join entries across chats and sources', t => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'people-links-synthetic-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const museFile = path.join(folder, 'muse.private.json'), rule = path.join(folder, 'self.json'), gmailFile = path.join(folder, 'gmail.json');
+  const csv = path.join(folder, 'contacts.csv'), review = path.join(folder, 'review'), links = path.join(folder, 'people.json');
+  fs.mkdirSync(review);
+  const record = (id: string, chatType: string, participants: { name: string; id: string | null }[]) =>
+    ({ chatType, reportedChatId: id, participants, reportedLatestSentAt: now, nativeEvidenceVerified: false });
+  fs.writeFileSync(museFile, JSON.stringify({ schemaVersion: 1, dataClass: 'private', kind: 'muse-reported-chat-recency', source: 'messenger',
+    retrievedAt: now, requestedPeriod: 'last 14 days', coverage: 'partial', gaps: ['Synthetic gap'], records: [
+      record('g1', 'group', [{ name: 'Owner Fixture', id: null }, { name: 'Ada Fixture', id: null }, { name: 'Bo Fixture', id: null }]),
+      record('g2', 'group', [{ name: 'ada  fixture', id: null }]),
+      record('d1', 'one_to_one', [{ name: 'Cy Fixture', id: null }]),
+      record('g3', 'group', [{ name: 'Dee Fixture', id: null }, { name: 'Dee Fixture', id: null }]),
+      record('g4', 'group', [{ name: 'Dee Fixture', id: null }])] }));
+  saveOwnerNameRule('owner fixture', rule, 'private', now, ['Me@Example.com']);
+  const row = (direction: string, from: string, to: string[], cc: string[], timestamp: string) => ({ timestamp, direction, from, to, cc, batch: 1 });
+  fs.writeFileSync(gmailFile, JSON.stringify({ dataClass: 'private', source: 'email', account: 'Owner@Example.com', connector: 'synthetic',
+    fields: [], excluded: [], providerIds: false, rawRows: 4, uniqueRows: 4,
+    coverage: { start: '2026-11-12T08:00:00.000Z', end: now, completeness: 'partial', basis: 'synthetic' }, observations: [
+      row('sent', 'owner@example.com', ['ada@example.com', 'me@example.com'], [], '2026-11-20T12:00:00.000Z'),
+      row('sent', 'alias@example.com', ['cy@example.com', 'owner@example.com'], ['ADA@example.com'], '2026-11-21T12:00:00.000Z'),
+      row('received', 'news@example.com', ['owner@example.com', 'ada@example.com'], [], '2026-11-25T12:00:00.000Z'),
+      row('received', 'ada@example.com', ['alias@example.com'], [], '2026-11-24T12:00:00.000Z')] }));
+  fs.writeFileSync(csv, 'Name,E-mail 1 - Value\nAda Fixture,ada@example.com\nCy Fixture,cy@example.com\nCy Fixture,\n');
+  assert.deepEqual(peopleLinkCandidates({ muse: [museFile], gmail: gmailFile, contacts: csv, selfLinks: rule, output: review }),
+    { candidates: 1, entries: 3, bridged: 1 }, 'ambiguous contact names, same-chat namesakes and single entries are never proposed');
+  assert.ok(!fs.readFileSync(path.join(review, 'review.html'), 'utf8').includes('<script'));
+  const candidates = path.join(review, 'people-link-candidates.json');
+  assert.throws(() => confirmPeopleLinks(candidates, '2', links), /candidate numbers/);
+  assert.equal(confirmPeopleLinks(candidates, 'all', links, 'private', now).entries, 3);
+  const muse = readMuseRecency(museFile, 'private'), gmail = readGmailMetadata(gmailFile, 'private'), self = readSelfLinks(rule, 'private');
+  const unjoined = connectionModel(null, [muse], null, 'UTC', null, self, gmail);
+  assert.deepEqual(unjoined.nodes.filter(n => n.platforms.includes('gmail')).map(n => n.label).sort(), ['ada@example.com', 'cy@example.com'],
+    'owner addresses, listed owner addresses and received-only senders are not people');
+  assert.equal(unjoined.gmailHidden, 1);
+  const newsletter = unjoined.chats.find(c => c.platform === 'gmail' && c.latest === '2026-11-25T12:00:00.000Z');
+  assert.equal(newsletter.kind, 'group', 'mail that also went to a hidden address is never one-to-one');
+  assert.deepEqual(unjoined.chats.filter(c => c.platform === 'gmail' && c.kind === 'one-to-one').map(c => c.latest),
+    ['2026-11-24T12:00:00.000Z'], 'one-to-one keeps the latest message with only them');
+  assert.equal(unjoined.nodes.filter(n => /ada/i.test(n.label)).length, 3, 'without approval nothing joins by name or address');
+  const model = connectionModel(null, [muse], null, 'UTC', null, self, gmail, readPeopleLinks(links, 'private'));
+  const ada = model.nodes.filter(n => /ada/i.test(n.label));
+  assert.equal(ada.length, 1);
+  assert.deepEqual([ada[0].label, ada[0].platforms, ada[0].chats.length, ada[0].kind], ['Ada Fixture', ['messenger', 'gmail'], 5, 'direct']);
+  assert.equal(ada[0].lastActivity, '2026-11-26');
+  assert.match(ada[0].identityNote, /You confirmed these entries are one person/);
+  assert.match(connectionsPanel(model), /1 address\(es\) that only wrote to you are not shown/);
+  const output = path.join(folder, 'preview-out'); fs.mkdirSync(output);
+  importContactCSV(csv, output, undefined, [museFile], undefined, 'UTC', undefined, rule, gmailFile, links);
+  const preview = path.join(output, 'preview'), imported = JSON.parse(fs.readFileSync(path.join(preview, 'contact-import.json'), 'utf8'));
+  assert.deepEqual([imported.gmail.records, imported.ownerConfirmedPeople.people], [4, 1]);
+  assert.deepEqual(fs.readFileSync(path.join(preview, 'people-links.original.json')), fs.readFileSync(links));
+  assert.deepEqual(fs.readFileSync(path.join(preview, 'gmail.original.json')), fs.readFileSync(gmailFile));
+  const saved = JSON.parse(fs.readFileSync(links, 'utf8'));
+  saved.people[0].members[0].participantName = 'Someone Else';
+  fs.writeFileSync(links, JSON.stringify(saved));
+  assert.throws(() => connectionModel(null, [muse], null, 'UTC', null, self, gmail, readPeopleLinks(links, 'private')), /no longer matches/);
+  const ownSlot = { ...saved, people: [{ displayName: 'Owner', members: [
+    { source: 'messenger', reportedChatId: 'g1', participantIndex: 0, participantName: 'Owner Fixture' },
+    { source: 'messenger', reportedChatId: 'g2', participantIndex: 0, participantName: 'ada  fixture' }] }] };
+  fs.writeFileSync(links, JSON.stringify(ownSlot));
+  assert.throws(() => connectionModel(null, [muse], null, 'UTC', null, self, gmail, readPeopleLinks(links, 'private')), /your own entries/);
+  const dee = (index: number) => ({ source: 'messenger', reportedChatId: 'g3', participantIndex: index, participantName: 'Dee Fixture' });
+  fs.writeFileSync(links, JSON.stringify({ ...saved, people: [{ displayName: 'Dee', members: [dee(0), dee(1)] }] }));
+  assert.throws(() => readPeopleLinks(links, 'private'), /one chat are different people/);
+});
+
+test('a confirmed person never carries two different photos', () => {
+  const other = `profile-photo-${'b'.repeat(64)}.png`;
+  const twoPhotos = { inputDigest: 'x', photos: [...photos.photos, { key: 'user:other.fixture', file: other, bytes: png, digest: hash(png) }] };
+  const member = (chat: string) => ({ source: 'messenger' as const, reportedChatId: chat, participantIndex: 1, participantName: '<b>Ada</b> Fixture' });
+  const people = { people: [{ displayName: 'Ada Fixture', members: [member('direct'), member('group')] }] };
+  assert.equal(connectionModel(null, [muse()], photos, 'UTC', null, null, null, people).nodes.filter(n => /Ada/.test(n.label)).length, 1);
+  assert.throws(() => connectionModel(null, [muse()], twoPhotos, 'UTC', null, null, null, people), /different photos/);
 });

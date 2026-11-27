@@ -145,6 +145,16 @@ directed "just assume that anyone with my exact name is me"; a saved
 `contacts:self-links --owner-name` rule therefore omits every exact normalized
 name match in any snapshot. The rule file stays private like the review files.
 
+The owner directed that the view be people-centric, without duplicate nodes for
+one person reached in several places. `contacts:people-links` only proposes
+same-name chat slots and contact-bridged Gmail addresses on a private review page;
+nothing joins until the owner approves numbers. Two entries in one chat are
+different people and never join. Gmail correspondents are only the recipients of
+messages the owner sent, minus the owner's own addresses; addresses that only
+wrote to the owner are counted, not shown, and a message is one-to-one only when
+it has exactly one non-owner address. The candidates, review page, links file and Gmail copy in the
+preview stay private, outside Git, PRs, CI and Library.
+
 ## CONTACTS-010: owner-approved policy
 
 The owner approved this policy on 2026-11-24 (Pacific), through an explicit

@@ -210,8 +210,9 @@ filter.addEventListener('change',update);update();
 function renderDashboard(snapshot: ContactSnapshot, observations: Observations | null,
   suggestions: { evidence: string; people: string[] }[], muse: MuseRecency[] = [], photos: PhotoSet | null = null,
   timeZone: string | null = null, photoLinks: Parameters<typeof connectionModel>[4] = null,
-  selfLinks: Parameters<typeof connectionModel>[5] = null): string {
-  const graph = connectionModel(observations, muse, photos, timeZone, photoLinks, selfLinks);
+  selfLinks: Parameters<typeof connectionModel>[5] = null, gmail: Parameters<typeof connectionModel>[6] = null,
+  peopleLinks: Parameters<typeof connectionModel>[7] = null): string {
+  const graph = connectionModel(observations, muse, photos, timeZone, photoLinks, selfLinks, gmail, peopleLinks);
   const graphHash = crypto.createHash('sha256').update(CONNECTIONS_SCRIPT).digest('base64');
   const threads = [...new Set(observations?.messages.map(m => m.threadUiId) ?? [])];
   const days: string[] = [];
@@ -293,5 +294,5 @@ ${muse.flatMap(source => source.records.map((row, index) => `<div class="source-
 ${graph.nodes.length ? `<script id="connections-data" type="application/json">${json({ nodes: graph.nodes, chats: graph.chats })}</script><script>${CONNECTIONS_SCRIPT}</script>` : ''}</body></html>`;
 }
 
-export { validateObservations, readObservations, readMuseRecency, renderDashboard, DASHBOARD_SCRIPT };
+export { validateObservations, readMetadata, readObservations, readMuseRecency, renderDashboard, DASHBOARD_SCRIPT };
 export type { Observations, Observation, MuseRecency };

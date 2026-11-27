@@ -18,6 +18,7 @@
     "contacts:photos": "node --import tsx scripts/contacts/profile-photos.ts",
     "contacts:photo-links": "node --import tsx scripts/contacts/photo-links.ts",
     "contacts:self-links": "node --import tsx scripts/contacts/self-links.ts",
+    "contacts:people-links": "node --import tsx scripts/contacts/people-links.ts",
     "contacts:collect": "node --import tsx scripts/contacts/collect.ts",
     "contacts:email": "node --import tsx scripts/contacts/email.ts",
     "contacts:google": "node --import tsx scripts/contacts/google.ts",
