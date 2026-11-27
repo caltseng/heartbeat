@@ -12,8 +12,10 @@ interface MuseSource {
   source: 'messenger' | 'instagram';
   retrievedAt?: string;
   selfIds?: string[];
-  records: { chatType: string; participants: { name: string | null; id: string | null }[]; reportedLatestSentAt: string | null }[];
+  records: { chatType: string; reportedChatId?: string | null; participants: { name: string | null; id: string | null }[]; reportedLatestSentAt: string | null }[];
 }
+// Owner-confirmed pairings of one ID-less chat participant with one saved friend photo, keyed `source|chatId|position`.
+type PhotoLinks = Map<string, { name: string; key: string }>;
 interface TextObservations { period?: { end: string; timeZone: string }; messages: { threadUiId: string; inferredLocalDate: string | null; requestedWindowMembership: string }[] }
 interface GraphNode {
   id: string; label: string; initials: string; ring: Ring; ringLabel: string; kind: Kind; lastActivity: string | null;
@@ -96,13 +98,37 @@ function readProfilePhotos(file: string, dataClass: string): PhotoSet {
   return { inputDigest: hash(bytes), photos };
 }
 
+// The owner's explicit per-participant decision is the identity evidence; nothing here matches names automatically.
+function readPhotoLinks(file: string, dataClass: string, photos: PhotoSet): PhotoLinks {
+  const resolved = path.resolve(file);
+  if (dataClass === 'private') manualOutputLocation(path.dirname(resolved), 'private');
+  requireValue(fs.realpathSync(resolved) === resolved && fs.statSync(resolved).isFile() && fs.statSync(resolved).size <= 1024 * 1024,
+    'Choose a bounded, non-redirected photo links file.');
+  const value = JSON.parse(fs.readFileSync(resolved, 'utf8'));
+  object(value, ['schemaVersion', 'dataClass', 'kind', 'photosInputDigest', 'confirmedAt', 'links'], 'photo links');
+  requireValue(value.schemaVersion === 1 && value.dataClass === dataClass && value.kind === 'owner-confirmed-photo-links' &&
+    !Number.isNaN(Date.parse(text(value.confirmedAt, 'confirmation time'))), 'Invalid owner-confirmed photo links.');
+  requireValue(value.photosInputDigest === photos.inputDigest, 'Photo links were confirmed against a different photo manifest.');
+  const rows = array(value.links, 'photo links'), keys = new Set(photos.photos.map(photo => photo.key)), links: PhotoLinks = new Map();
+  requireValue(rows.length <= 200, 'Photo links exceed their bounded review.');
+  for (const row of rows) {
+    object(row, ['source', 'reportedChatId', 'participantIndex', 'participantName', 'profileReference'], 'photo link');
+    const at = `${row.source}|${text(row.reportedChatId, 'reported chat ID')}|${row.participantIndex}`;
+    const key = profileKey(text(row.profileReference, 'profile reference'));
+    requireValue(row.source === 'messenger' && Number.isInteger(row.participantIndex) && row.participantIndex >= 0 &&
+      key !== null && keys.has(key) && !links.has(at), 'Each photo link needs one distinct participant and a saved photo.');
+    links.set(at, { name: text(row.participantName, 'participant name'), key });
+  }
+  return links;
+}
+
 function initials(label: string): string {
   const letters = label.split(/\s+/).filter(Boolean).slice(0, 2).map(word => Array.from(word)[0] ?? '');
   return letters.join('').toLocaleUpperCase() || '?';
 }
 
 function connectionModel(observations: TextObservations | null, muse: MuseSource[], photos: PhotoSet | null = null,
-  zone: string | null = null): ConnectionModel {
+  zone: string | null = null, photoLinks: PhotoLinks | null = null): ConnectionModel {
   // Calendar days need the owner's zone; without one, recency stays unknown rather than defaulting to UTC.
   const timeZone = observations?.period?.timeZone ?? zone;
   const formatter = timeZone ? new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }) : null;
@@ -113,12 +139,13 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     const parts = Object.fromEntries(formatter.formatToParts(new Date(value)).map(p => [p.type, p.value]));
     return `${parts.year}-${parts.month}-${parts.day}`;
   };
-  const nodes = new Map<string, GraphNode & { kinds: Set<GraphChat['kind']>; profile: boolean }>();
+  const nodes = new Map<string, GraphNode & { kinds: Set<GraphChat['kind']>; profile: 'reported' | 'confirmed' | null }>();
+  const usedLinks = new Set<string>();
   const chats: GraphChat[] = [];
   const photoByKey = new Map((photos?.photos ?? []).map(photo => [photo.key, photo]));
   const linked = new Map<string, Photo>();
   let selfIdentified = false;
-  const add = (key: string, label: string, platform: Platform, chat: GraphChat, profile: boolean, photo: Photo | null) => {
+  const add = (key: string, label: string, platform: Platform, chat: GraphChat, profile: 'reported' | 'confirmed' | null, photo: Photo | null) => {
     let node = nodes.get(key);
     if (!node) {
       node = { id: `n${nodes.size + 1}`, label, initials: initials(label), ring: 'unknown', ringLabel: '', kind: 'unknown',
@@ -128,6 +155,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       if (photo) linked.set(photo.file, photo);
     }
     if (!node.platforms.includes(platform)) node.platforms.push(platform);
+    if (node.chats.includes(chat.id)) return;
     node.chats.push(chat.id); node.kinds.add(chat.kind); chat.members.push(node.id);
   };
   for (const source of muse) {
@@ -141,14 +169,21 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
         label: `${PLATFORMS[platform]} ${kind === 'group' ? 'group chat' : kind === 'unknown' ? 'chat' : 'one-to-one chat'} ${index + 1}` };
       chats.push(chat);
       row.participants.forEach((participant, position) => {
-        const key = participantKey(platform, participant.id);
-        if (key && self.has(key)) return;
+        const reported = participantKey(platform, participant.id);
+        if (reported && self.has(reported)) return;
+        const at = `${platform}|${row.reportedChatId}|${position}`, link = reported === null ? photoLinks?.get(at) : undefined;
+        if (link) {
+          requireValue(link.name === participant.name, 'A confirmed photo link no longer matches its chat participant.');
+          usedLinks.add(at);
+        }
+        const key = reported ?? link?.key ?? null;
         const photo = platform === 'messenger' && key ? photoByKey.get(key) ?? null : null;
         add(key ? `${platform}|${key}` : `${platform}|${chat.id}|${position}`,
-          participant.name ?? 'Participant (ID only)', platform, chat, key !== null, photo);
+          participant.name ?? 'Participant (ID only)', platform, chat, reported ? 'reported' : link ? 'confirmed' : null, photo);
       });
     });
   }
+  requireValue(photoLinks === null || usedLinks.size === photoLinks.size, 'A confirmed photo link has no matching chat participant.');
   [...new Set(observations?.messages.map(m => m.threadUiId) ?? [])].forEach((thread, index) => {
     const inside = observations.messages.filter(m => m.threadUiId === thread && m.requestedWindowMembership === 'inferred-inside')
       .map(m => m.inferredLocalDate).sort();
@@ -156,7 +191,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       label: `Text conversation ${index + 1}`, latest: inside.at(-1) ?? null,
       asOf: observations.period ? dayOf(new Date(Date.parse(observations.period.end) - 1).toISOString()) : null };
     chats.push(chat);
-    add(`messages|${thread}`, `Conversation ${index + 1}`, 'messages', chat, false, null);
+    add(`messages|${thread}`, `Conversation ${index + 1}`, 'messages', chat, null, null);
   });
   // Each chat ages against its own source snapshot day, never the render clock or another source's later snapshot.
   const sourceDays = [...new Set(chats.map(c => c.asOf).filter((d): d is string => d !== null))].sort();
@@ -182,6 +217,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
               last.chat.kind === 'text' ? 'latest observed message (inferred day)' : 'latest one-to-one activity'}`,
       platformLabels: node.platforms.map(p => PLATFORMS[p]),
       identityNote: kind === 'text' ? 'Participants were not captured; not linked to any contact.' :
+        profile === 'confirmed' ? 'You confirmed this person matches a saved friend photo; joined only where you confirmed it.' :
         profile ? `Muse-reported profile ID; unverified.${node.photo ? ' Photo attached by exact profile ID match.' : ''}` :
           'No profile ID; this entry is local to one chat and never merged by name.' };
   });
@@ -308,9 +344,9 @@ ${platforms.map(p => `<label class="chip"><input type="checkbox" data-platform-f
 <div id="connection-detail" hidden><div class="label">Selected</div><h2 id="connection-name"></h2><p id="connection-ring" class="muted"></p>
 <p id="connection-platforms"></p><ul id="connection-chats"></ul><p id="connection-identity" class="notice"></p>
 <button type="button" id="connection-clear" class="chip">Clear selection</button></div>
-<div class="notice">Muse-reported, unverified and partial. Photos attach only by exact Facebook profile ID, never by name or face.
+<div class="notice">Muse-reported, unverified and partial. Photos attach only by exact Facebook profile ID or a pairing you confirmed, never by automatic name or face matching.
 ${model.selfIdentified ? '' : 'Your own account was not identified in this snapshot, so you may appear as a participant.'}</div></aside></div></section>`;
 }
 
-export { profileKey, readProfilePhotos, connectionModel, connectionSVG, connectionsPanel, CONNECTIONS_SCRIPT, CONNECTIONS_STYLE };
+export { profileKey, readProfilePhotos, readPhotoLinks, connectionModel, connectionSVG, connectionsPanel, CONNECTIONS_SCRIPT, CONNECTIONS_STYLE };
 export type { PhotoSet, ConnectionModel };

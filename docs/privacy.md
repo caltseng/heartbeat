@@ -125,6 +125,17 @@ are never used to match. The attachment is display-only: it does not establish
 interaction, contact identity or a canonical-person merge, and photos stay in the
 private external preview bundle, never Git, PRs, CI or Library.
 
+Muse returns Messenger participant names without profile IDs. The owner then
+directed "Names should be sufficient" and chose to confirm each pairing once.
+`contacts:photo-links` may therefore propose a saved friend photo for ID-less
+participants with exactly the same normalized name, on a private local review
+page. Only candidate numbers the owner approves become links; ambiguous names
+are excluded. Approved links join those exact chat slots into one graph person
+and show the photo. They do not create contact identities, canonical merges or
+interaction claims elsewhere. Unapproved names are never joined. The candidates,
+review page and links file are private and stay outside Git, PRs, CI and Library;
+approve by number so names never enter chat.
+
 ## CONTACTS-010: owner-approved policy
 
 The owner approved this policy on 2026-11-24 (Pacific), through an explicit
