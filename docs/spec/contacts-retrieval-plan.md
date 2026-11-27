@@ -286,6 +286,39 @@ in any snapshot, including reported profiles. Near matches stay, and an exact
 match that is also photo-linked fails the preview. `ownerConfirmedSelf` records
 the rule with `slots` and `museInputDigest` as null.
 
+### People across chats and sources
+
+The owner directed that nodes be people, not chats: "We shouoldn't have duplicaed
+nodes even though we contact in different places." Without native IDs, the graph
+still never joins by name on its own. `contacts:people-links` proposes candidates
+on a private review page:
+
+- ID-less, non-owner Muse slots with the same normalized name in different chats.
+- A Gmail correspondent whose address is saved on exactly one CSV contact whose
+  name is unique in the CSV and equals that slot name. Shared contact names are
+  never used as a bridge.
+
+```powershell
+npm run contacts:people-links -- --muse "<muse.private.json>" --gmail "<gmail-observations.json>" --contacts "<contacts.csv>" --self-links "<self-links.private.json>" --output "<fresh-existing-external-directory>"
+npm run contacts:people-links -- --candidates "<dir>\people-link-candidates.json" --approve all --output "<new people-links.private.json>"
+npm run contacts:csv -- ... --gmail "<gmail-observations.json>" --people-links "<people-links.private.json>"
+```
+
+Only approved numbers (`all` and `none` allowed) join. Each person
+(`kind: owner-confirmed-people-links`) lists exact members: a Messenger/Instagram
+chat slot with its name, or a Gmail address. A member that no longer matches, is
+one of the owner's own entries, appears in two people, or a person with two
+different photos fails the preview. Joined nodes take the confirmed name and every
+member's chats, so recency is the latest across sources.
+
+`contacts:csv --gmail` reads the saved Gmail observations. People are the to/cc
+addresses of messages the owner sent, minus the account and the owner's sending
+addresses. Addresses that only wrote to the owner are counted but not shown, so
+newsletters do not become people. Threads are grouped by the exact correspondent
+set; the as-of is the end of coverage. The preview copies `gmail.original.json`
+and `people-links.original.json` and records `gmail` and `ownerConfirmedPeople`
+in `contact-import.json`.
+
 ## V0 collection runbook
 
 Repeat a collection with this sequence. Every run is owner-invoked and bounded:
@@ -308,8 +341,11 @@ counts; never paste names, IDs or records into chats, PRs or Library.
 Then build the private preview into a fresh folder:
 
 ```powershell
-npm run contacts:csv -- --input "<contacts.csv>" --observations "<messages.private.json>" --muse "<muse.private.json>" --photos "<profile-photos.json>" --photo-links "<photo-links.private.json>" --self-links "<self-links.private.json>" --time-zone America/Los_Angeles --output "<fresh-existing-external-directory>"
+npm run contacts:csv -- --input "<contacts.csv>" --observations "<messages.private.json>" --muse "<muse.private.json>" --photos "<profile-photos.json>" --photo-links "<photo-links.private.json>" --self-links "<self-links.private.json>" --gmail "<gmail-observations.json>" --people-links "<people-links.private.json>" --time-zone America/Los_Angeles --output "<fresh-existing-external-directory>"
 ```
+
+Before that, generate and approve [people links](#people-across-chats-and-sources)
+so one person appears once across chats and Gmail.
 
 Exit 2 is the expected partial result. Check it by counts in
 `preview\dashboard.html` (nodes per ring and kind, attached photos), then open it

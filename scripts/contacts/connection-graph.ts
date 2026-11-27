@@ -2,8 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { array, object, text, requireValue, hash } from './lib.ts';
 import { manualOutputLocation } from './manual-retrieval.ts';
+import { normalized } from './identity-review.ts';
+import type { GmailSource } from './gmail-metadata.ts';
 
-type Platform = 'messenger' | 'instagram' | 'messages';
+type Platform = 'messenger' | 'instagram' | 'messages' | 'gmail';
 type Ring = 'today' | 'week' | 'fortnight' | 'month' | 'older' | 'unknown';
 type Kind = 'direct' | 'text' | 'group' | 'unknown';
 interface Photo { key: string; file: string; bytes: Buffer; digest: string }
@@ -19,6 +21,14 @@ type PhotoLinks = Map<string, { name: string; key: string }> & { originalBytes?:
 // Owner-confirmed chat participant slots that are the owner, keyed `source|chatId|position`; they are never drawn as people.
 type SelfLinks = Map<string, string> & { originalBytes?: Buffer; inputDigest?: string; confirmedAt?: string; museInputDigest?: string;
   ownerName?: string };
+// Owner-confirmed people: each groups entries from any source that the owner said are the same person.
+type PersonMember = { source: 'messenger' | 'instagram'; reportedChatId: string; participantIndex: number; participantName: string } |
+  { source: 'gmail'; address: string };
+interface PeopleLinks { people: { displayName: string; members: PersonMember[] }[]; originalBytes?: Buffer; inputDigest?: string;
+  confirmedAt?: string }
+const memberRef = (member: PersonMember) => member.source === 'gmail' ? `gmail|${member.address}` :
+  `${member.source}|${member.reportedChatId}|${member.participantIndex}`;
+const emailKey = (value: string) => normalized('email', value)?.toLowerCase() ?? null;
 const comparableName = (name: string | null | undefined) =>
   typeof name !== 'string' ? null : name.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US') || null;
 interface TextObservations { period?: { end: string; timeZone: string }; messages: { threadUiId: string; inferredLocalDate: string | null; requestedWindowMembership: string }[] }
@@ -28,9 +38,9 @@ interface GraphNode {
 }
 interface GraphChat { id: string; platform: Platform; kind: 'one-to-one' | 'group' | 'unknown' | 'text'; label: string; latest: string | null; asOf: string | null; members: string[] }
 interface ConnectionModel { nodes: GraphNode[]; chats: GraphChat[]; linkedPhotos: Photo[]; selfIdentified: boolean; selfHidden: number;
-  asOf: string | null }
+  asOf: string | null; gmailHidden?: number | null }
 
-const PLATFORMS: Record<Platform, string> = { messenger: 'Messenger', instagram: 'Instagram', messages: 'Google Messages' };
+const PLATFORMS: Record<Platform, string> = { messenger: 'Messenger', instagram: 'Instagram', messages: 'Google Messages', gmail: 'Gmail' };
 // Rings are calendar-day age of the latest shared-chat activity, relative to that chat's own source snapshot day.
 const RINGS: { id: Ring; label: string; base: number; maxAge: number }[] = [
   { id: 'today', label: 'Today', base: 140, maxAge: 0 },
@@ -160,13 +170,70 @@ function readSelfLinks(file: string, dataClass: string): SelfLinks {
     museInputDigest: value.museInputDigest as string });
 }
 
+// Each person is one explicit owner decision; nothing here joins entries by name, address or contact match.
+function readPeopleLinks(file: string, dataClass: string): PeopleLinks {
+  const resolved = path.resolve(file);
+  if (dataClass === 'private') manualOutputLocation(path.dirname(resolved), 'private');
+  requireValue(fs.realpathSync(resolved) === resolved && fs.statSync(resolved).isFile() && fs.statSync(resolved).size <= 1024 * 1024,
+    'Choose a bounded, non-redirected people links file.');
+  const originalBytes = fs.readFileSync(resolved), value = JSON.parse(originalBytes.toString('utf8'));
+  object(value, ['schemaVersion', 'dataClass', 'kind', 'confirmedAt', 'inputs', 'people'], 'people links');
+  requireValue(value.schemaVersion === 1 && value.dataClass === dataClass && value.kind === 'owner-confirmed-people-links' &&
+    !Number.isNaN(Date.parse(text(value.confirmedAt, 'confirmation time'))), 'Invalid owner-confirmed people links.');
+  const rows = array(value.people, 'confirmed people'), seen = new Set<string>();
+  requireValue(rows.length <= 500, 'People links exceed their bounded review.');
+  const people = rows.map(row => {
+    object(row, ['displayName', 'members'], 'confirmed person');
+    const members = array(row.members, 'person members').map(member => {
+      object(member, ['source', 'reportedChatId', 'participantIndex', 'participantName', 'address'], 'person member');
+      let parsed: PersonMember;
+      if (member.source === 'gmail') {
+        requireValue(Object.keys(member).length === 2, 'Gmail members hold only an address.');
+        const address = emailKey(text(member.address, 'member address'));
+        requireValue(address !== null, 'Gmail members need an email address.');
+        parsed = { source: 'gmail', address };
+      } else {
+        requireValue(['messenger', 'instagram'].includes(member.source as string) && member.address === undefined &&
+          Number.isInteger(member.participantIndex) && (member.participantIndex as number) >= 0, 'Invalid chat participant member.');
+        parsed = { source: member.source as 'messenger', reportedChatId: text(member.reportedChatId, 'reported chat ID'),
+          participantIndex: member.participantIndex as number, participantName: text(member.participantName, 'participant name') };
+      }
+      requireValue(!seen.has(memberRef(parsed)), 'Each entry belongs to at most one confirmed person.');
+      seen.add(memberRef(parsed));
+      return parsed;
+    });
+    requireValue(members.length >= 2, 'A confirmed person joins at least two entries.');
+    return { displayName: text(row.displayName, 'person display name'), members };
+  });
+  return { people, originalBytes, inputDigest: hash(originalBytes), confirmedAt: value.confirmedAt as string };
+}
+
 function initials(label: string): string {
   const letters = label.split(/\s+/).filter(Boolean).slice(0, 2).map(word => Array.from(word)[0] ?? '');
   return letters.join('').toLocaleUpperCase() || '?';
 }
 
+// Every sent row's sender is one of the owner's addresses. Only addresses the owner wrote to count as correspondents;
+// received-only senders (often automated) stay hidden until the owner writes to them.
+function gmailPeople(gmail: GmailSource) {
+  const sent = gmail.observations.filter(row => row.direction === 'sent');
+  const owner = new Set([gmail.account, ...sent.map(row => row.from)]);
+  const correspondents = new Set(sent.flatMap(row => [...row.to, ...row.cc]).filter(a => !owner.has(a)));
+  const hidden = new Set(gmail.observations.flatMap(row => [row.from, ...row.to, ...row.cc])
+    .filter(a => !owner.has(a) && !correspondents.has(a)));
+  const threads = new Map<string, { people: string[]; latest: string }>();
+  for (const row of gmail.observations) {
+    const people = [...new Set([row.from, ...row.to, ...row.cc])].filter(a => correspondents.has(a)).sort();
+    if (!people.length) continue;
+    const key = JSON.stringify(people), found = threads.get(key);
+    if (!found || row.timestamp > found.latest) threads.set(key, { people, latest: row.timestamp });
+  }
+  return { owner, correspondents, hiddenAddresses: hidden.size, threads: [...threads.values()] };
+}
+
 function connectionModel(observations: TextObservations | null, muse: MuseSource[], photos: PhotoSet | null = null,
-  zone: string | null = null, photoLinks: PhotoLinks | null = null, selfLinks: SelfLinks | null = null): ConnectionModel {
+  zone: string | null = null, photoLinks: PhotoLinks | null = null, selfLinks: SelfLinks | null = null,
+  gmail: GmailSource | null = null, peopleLinks: PeopleLinks | null = null): ConnectionModel {
   // Calendar days need the owner's zone; without one, recency stays unknown rather than defaulting to UTC.
   const timeZone = observations?.period?.timeZone ?? zone;
   const formatter = timeZone ? new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }) : null;
@@ -177,7 +244,8 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     const parts = Object.fromEntries(formatter.formatToParts(new Date(value)).map(p => [p.type, p.value]));
     return `${parts.year}-${parts.month}-${parts.day}`;
   };
-  const nodes = new Map<string, GraphNode & { kinds: Set<GraphChat['kind']>; profile: 'reported' | 'confirmed' | null }>();
+  type Profile = 'reported' | 'confirmed' | 'address' | 'joined' | null;
+  const nodes = new Map<string, GraphNode & { kinds: Set<GraphChat['kind']>; profile: Profile }>();
   const usedLinks = new Set<string>(), usedSelf = new Set<string>();
   const chats: GraphChat[] = [];
   const photoByKey = new Map((photos?.photos ?? []).map(photo => [photo.key, photo]));
@@ -186,19 +254,11 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
   // name-based hiding can miss differently named slots.
   let selfIdentified = muse.length > 0;
   let selfHidden = 0;
-  const add = (key: string, label: string, platform: Platform, chat: GraphChat, profile: 'reported' | 'confirmed' | null, photo: Photo | null) => {
-    let node = nodes.get(key);
-    if (!node) {
-      node = { id: `n${nodes.size + 1}`, label, initials: initials(label), ring: 'unknown', ringLabel: '', kind: 'unknown',
-        lastActivity: null, lastNote: '', platforms: [],
-        platformLabels: [], chats: [], photo: photo?.file ?? null, identityNote: '', kinds: new Set(), profile };
-      nodes.set(key, node);
-      if (photo) linked.set(photo.file, photo);
-    }
-    if (!node.platforms.includes(platform)) node.platforms.push(platform);
-    if (node.chats.includes(chat.id)) return;
-    node.chats.push(chat.id); node.kinds.add(chat.kind); chat.members.push(node.id);
-  };
+  // Entries are collected first so owner-confirmed people can join them before nodes are numbered.
+  const entries: { key: string; label: string; platform: Platform; chat: GraphChat; profile: Profile; photo: Photo | null;
+    ref: string | null; name: string | null }[] = [];
+  const add = (key: string, label: string, platform: Platform, chat: GraphChat, profile: Profile, photo: Photo | null,
+    ref: string | null = null, name: string | null = null) => entries.push({ key, label, platform, chat, profile, photo, ref, name });
   for (const source of muse) {
     const platform: Platform = source.source;
     const self = new Set((source.selfIds ?? []).map(id => participantKey(platform, id)).filter(Boolean));
@@ -232,7 +292,8 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
         const key = reported ?? link?.key ?? null;
         const photo = platform === 'messenger' && key ? photoByKey.get(key) ?? null : null;
         add(key ? `${platform}|${key}` : `${platform}|${chat.id}|${position}`,
-          participant.name ?? 'Participant (ID only)', platform, chat, reported ? 'reported' : link ? 'confirmed' : null, photo);
+          participant.name ?? 'Participant (ID only)', platform, chat, reported ? 'reported' : link ? 'confirmed' : null, photo,
+          at, participant.name);
       });
     });
     if (!selfMatched) selfIdentified = false;
@@ -248,6 +309,52 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     chats.push(chat);
     add(`messages|${thread}`, `Conversation ${index + 1}`, 'messages', chat, null, null);
   });
+  let gmailHidden: number | null = null;
+  if (gmail) {
+    const people = gmailPeople(gmail), asOf = dayOf(new Date(Date.parse(gmail.coverage.end) - 1).toISOString());
+    gmailHidden = people.hiddenAddresses;
+    people.threads.forEach((thread, index) => {
+      const kind = thread.people.length === 1 ? 'one-to-one' : 'group';
+      const chat: GraphChat = { id: `c${chats.length + 1}`, platform: 'gmail', kind, latest: thread.latest, asOf, members: [],
+        label: `${kind === 'group' ? 'Group email' : 'Email'} ${index + 1}` };
+      chats.push(chat);
+      for (const address of thread.people) add(`gmail|${address}`, address, 'gmail', chat, 'address', null, `gmail|${address}`, address);
+    });
+  }
+  // Union only the entries the owner confirmed are one person; a person may never carry two different photos.
+  const parent = new Map<string, string>();
+  const find = (key: string) => { while (parent.has(key)) key = parent.get(key); return key; };
+  const byRef = new Map(entries.filter(e => e.ref !== null).map(e => [e.ref, e]));
+  const personOf = new Map<string, string>();
+  for (const person of peopleLinks?.people ?? []) {
+    const roots = [...new Set(person.members.map(member => {
+      const entry = byRef.get(memberRef(member));
+      requireValue(entry && (member.source === 'gmail' || entry.name === member.participantName),
+        'A confirmed person no longer matches its entries, or includes one of your own entries.');
+      return find(entry.key);
+    }))];
+    requireValue(roots.every(root => !personOf.has(root)), 'Two confirmed people share an entry.');
+    roots.slice(1).forEach(root => parent.set(root, roots[0]));
+    personOf.set(roots[0], person.displayName);
+  }
+  for (const entry of entries) {
+    const key = find(entry.key), person = personOf.get(key);
+    let node = nodes.get(key);
+    if (!node) {
+      const label = person ?? entry.label;
+      node = { id: `n${nodes.size + 1}`, label, initials: initials(label), ring: 'unknown', ringLabel: '', kind: 'unknown',
+        lastActivity: null, lastNote: '', platforms: [], platformLabels: [], chats: [], photo: null, identityNote: '',
+        kinds: new Set(), profile: person ? 'joined' : entry.profile };
+      nodes.set(key, node);
+    }
+    if (entry.photo) {
+      requireValue(node.photo === null || node.photo === entry.photo.file, 'A confirmed person joins entries with different photos.');
+      node.photo = entry.photo.file; linked.set(entry.photo.file, entry.photo);
+    }
+    if (!node.platforms.includes(entry.platform)) node.platforms.push(entry.platform);
+    if (node.chats.includes(entry.chat.id)) continue;
+    node.chats.push(entry.chat.id); node.kinds.add(entry.chat.kind); entry.chat.members.push(node.id);
+  }
   // Each chat ages against its own source snapshot day, never the render clock or another source's later snapshot.
   const sourceDays = [...new Set(chats.map(c => c.asOf).filter((d): d is string => d !== null))].sort();
   const asOf = sourceDays.length === 0 ? null : sourceDays.length === 1 ? sourceDays[0] : `${sourceDays[0]} to ${sourceDays.at(-1)}`;
@@ -267,21 +374,25 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       lastNote: last === null ? (formatter === null && node.chats.some(id => chats.find(c => c.id === id).latest !== null) ?
         'No time zone supplied, so the activity day is unknown.' : 'No activity date returned for any shared chat.') :
         `${last.day} · ${age === 0 ? 'same day as' : age === 1 ? '1 day before' : `${age} days before`} its ${last.chat.asOf} snapshot · ${
-          last.chat.kind === 'group' ? 'latest group-chat activity, not necessarily with them' :
+          last.chat.kind === 'group' ? `latest group-${last.chat.platform === 'gmail' ? 'email' : 'chat'} activity, not necessarily with them` :
             last.chat.kind === 'unknown' ? 'latest activity in a chat of unknown type, not necessarily with them' :
-              last.chat.kind === 'text' ? 'latest observed message (inferred day)' : 'latest one-to-one activity'}`,
+              last.chat.kind === 'text' ? 'latest observed message (inferred day)' :
+                last.chat.platform === 'gmail' ? 'latest email with only them' : 'latest one-to-one activity'}`,
       platformLabels: node.platforms.map(p => PLATFORMS[p]),
-      identityNote: kind === 'text' ? 'Participants were not captured; not linked to any contact.' :
+      identityNote: profile === 'joined' ? 'You confirmed these entries are one person; they are joined only where you confirmed it.' :
+        kind === 'text' ? 'Participants were not captured; not linked to any contact.' :
+        profile === 'address' ? 'An email address you wrote to; joined with other sources only where you confirmed it.' :
         profile === 'confirmed' ? 'You confirmed this person matches a saved friend photo; joined only where you confirmed it.' :
         profile ? `Muse-reported profile ID; unverified.${node.photo ? ' Photo attached by exact profile ID match.' : ''}` :
           'No profile ID; this entry is local to one chat and never merged by name.' };
   });
-  return { nodes: result, chats, linkedPhotos: [...linked.values()], selfIdentified, selfHidden, asOf };
+  return { nodes: result, chats, linkedPhotos: [...linked.values()], selfIdentified, selfHidden, asOf, gmailHidden };
 }
 
 const BADGES = `<g id="badge-messenger"><circle r="8" fill="#0a7cff" stroke="#fffdf9" stroke-width="2"/><path d="M-4.6 2.3L-1.2-1.9L1 .4L4.6-2.3L1.2 1.9L-1-.4Z" fill="#fff"/></g>
 <g id="badge-instagram"><circle r="8" fill="#d62976" stroke="#fffdf9" stroke-width="2"/><rect x="-3.8" y="-3.8" width="7.6" height="7.6" rx="2.2" fill="none" stroke="#fff" stroke-width="1.3"/><circle r="1.7" fill="none" stroke="#fff" stroke-width="1.3"/></g>
-<g id="badge-messages"><circle r="8" fill="#1e8e3e" stroke="#fffdf9" stroke-width="2"/><path d="M-4-3.4h8a1 1 0 0 1 1 1v4.1a1 1 0 0 1-1 1h-4.2l-2.6 2.1v-2.1h-1.2a1 1 0 0 1-1-1v-4.1a1 1 0 0 1 1-1z" fill="#fff"/></g>`;
+<g id="badge-messages"><circle r="8" fill="#1e8e3e" stroke="#fffdf9" stroke-width="2"/><path d="M-4-3.4h8a1 1 0 0 1 1 1v4.1a1 1 0 0 1-1 1h-4.2l-2.6 2.1v-2.1h-1.2a1 1 0 0 1-1-1v-4.1a1 1 0 0 1 1-1z" fill="#fff"/></g>
+<g id="badge-gmail"><circle r="8" fill="#c5221f" stroke="#fffdf9" stroke-width="2"/><rect x="-4.4" y="-3.2" width="8.8" height="6.4" rx="1" fill="#fff"/><path d="M-4.2-2.8L0 .6L4.2-2.8" fill="none" stroke="#c5221f" stroke-width="1.2"/></g>`;
 
 function connectionSVG(model: ConnectionModel): string {
   const used = RINGS.filter(ring => model.nodes.some(node => node.ring === ring.id));
@@ -385,7 +496,7 @@ const CONNECTIONS_STYLE = `.graph-panel{margin-bottom:22px}.graph-layout{display
 
 function connectionsPanel(model: ConnectionModel): string {
   if (!model.nodes.length) return '';
-  const platforms = (['messenger', 'instagram', 'messages'] as Platform[]).filter(p => model.nodes.some(n => n.platforms.includes(p)));
+  const platforms = (['messenger', 'instagram', 'messages', 'gmail'] as Platform[]).filter(p => model.nodes.some(n => n.platforms.includes(p)));
   const badge = (p: Platform) => `<svg viewBox="-10 -10 20 20" aria-hidden="true"><use href="#badge-${p}"/></svg>`;
   return `<section class="panel graph-panel" aria-labelledby="graph-heading"><h2 id="graph-heading">Your connections</h2>
 <p class="muted">Rings show how recently a chat you share was active, measured from each source's snapshot day${model.asOf ? ` (${escape(model.asOf)})` : ' (unknown: no time zone or dates)'}: most recent at the center, older further out. Click a person to see where you talked and who shares those chats. Drag to pan, scroll to zoom.</p>
@@ -399,11 +510,14 @@ ${platforms.map(p => `<label class="chip"><input type="checkbox" data-platform-f
 <div id="connection-detail" hidden><div class="label">Selected</div><h2 id="connection-name"></h2><p id="connection-ring" class="muted"></p>
 <p id="connection-platforms"></p><ul id="connection-chats"></ul><p id="connection-identity" class="notice"></p>
 <button type="button" id="connection-clear" class="chip">Clear selection</button></div>
-<div class="notice">Muse-reported, unverified and partial. Photos attach only by exact Facebook profile ID or a pairing you confirmed, never by automatic name or face matching.
+<div class="notice">Muse-reported, unverified and partial. Photos attach only by exact Facebook profile ID or a pairing you confirmed, never by automatic name or face matching. Entries from different chats or sources become one person only where you confirmed it.
+${typeof model.gmailHidden === 'number' ? `Gmail shows only addresses you wrote to; ${model.gmailHidden} address(es) that only wrote to you are not shown.` : ''}
 ${model.selfIdentified ? '' : model.selfHidden
     ? `${model.selfHidden} of your own participant entries were hidden by your confirmation; your account was not identified by ID, so other entries for you may still appear.`
     : 'Your own account was not identified in this snapshot, so you may appear as a participant.'}</div></aside></div></section>`;
 }
 
-export { profileKey, comparableName, readProfilePhotos, readPhotoLinks, readSelfLinks, connectionModel, connectionSVG, connectionsPanel, CONNECTIONS_SCRIPT, CONNECTIONS_STYLE };
-export type { PhotoSet, ConnectionModel };
+export { profileKey, participantKey, comparableName, memberRef, emailKey, gmailPeople, readProfilePhotos, readPhotoLinks, readSelfLinks, readPeopleLinks,
+  connectionModel,
+  connectionSVG, connectionsPanel, CONNECTIONS_SCRIPT, CONNECTIONS_STYLE };
+export type { PhotoSet, ConnectionModel, PeopleLinks, PersonMember };
