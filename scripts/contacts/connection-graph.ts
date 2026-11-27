@@ -82,13 +82,14 @@ function correspondenceHistory(chats: GraphChat[], timeZone: string | null = nul
     const note = chat.kind === 'group' ? 'Group activity, not necessarily correspondence with this person.' :
       chat.kind === 'unknown' ? 'Chat type unknown; not necessarily correspondence with this person.' :
         chat.kind === 'text' ? 'Observed conversation; participants unlinked, not attributed to a person.' : 'One-to-one correspondence.';
-    return { chat, day, date, relative: relative + (chat.asOf ? ` (${chat.asOf})` : ''), note };
+    return { chat, day, dayOnly, date, relative: relative + (chat.asOf ? ` (${chat.asOf})` : ''),
+      note: note + (dayOnly ? ' Within-day ordering unknown.' : '') };
   });
   return rows.sort((a, b) => {
     if (a.day === null || b.day === null) return a.day === b.day ? 0 : a.day === null ? 1 : -1;
-    // Same-day inferred observations cannot be ordered against precise instants within that day.
-    return b.day.localeCompare(a.day) || (a.chat.latest.length > 10 && b.chat.latest.length > 10 ?
-      Date.parse(b.chat.latest) - Date.parse(a.chat.latest) : 0);
+    // Keep exact instants together so an intervening day-only row cannot break their order.
+    return b.day.localeCompare(a.day) || Number(a.dayOnly) - Number(b.dayOnly) ||
+      (a.dayOnly ? 0 : Date.parse(b.chat.latest) - Date.parse(a.chat.latest));
   });
 }
 
@@ -779,7 +780,8 @@ icon.setAttribute('class','source-icon');icon.setAttribute('width','18');icon.se
 icon.setAttribute('viewBox','-10 -10 20 20');icon.setAttribute('aria-hidden','true');use.setAttribute('href','#badge-'+latest.chat.platform);
 icon.append(use);where.append(icon,' '+platformLabel.get(latest.chat.platform)+' · '+latest.chat.label);}
 document.getElementById('correspondence-note').textContent=(latest?latest.note+' ':'')+
-'Saved partial metadata only; not complete history.'+(history.some(row=>row.day===null)?' Undated chats may be newer.':'');
+'Saved partial metadata only; not complete history.'+(history.some(row=>row.day===null)?' Undated chats may be newer.':'')+
+(latest&&!latest.dayOnly&&history.some(row=>row.dayOnly&&row.day===latest.day)?' Day-only observations on this date may be newer.':'');
 document.getElementById('connection-ring').textContent=n.ringLabel+' · '+n.lastNote;
 document.getElementById('connection-platforms').textContent=n.platformLabels.join(' · ');
 document.getElementById('connection-identity').textContent=n.identityNote;

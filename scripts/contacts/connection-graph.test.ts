@@ -60,6 +60,13 @@ test('correspondence history orders exact instants, preserves inferred days and 
   assert.match(unknown.note, /Chat type unknown/);
   const future = correspondenceHistory([{ ...model.chats[0], latest: '2026-11-27T01:00:00Z' }], 'UTC')[0];
   assert.equal(future.relative, '1 day after snapshot (2026-11-26)');
+  const mixed = correspondenceHistory([
+    { ...model.chats[0], latest: '2026-11-26T08:00:00Z' },
+    { ...model.chats[3], latest: '2026-11-26' },
+    { ...model.chats[1], latest: '2026-11-26T20:00:00Z' }
+  ], 'UTC');
+  assert.deepEqual(mixed.map(row => row.chat.id), ['c2', 'c1', 'c4']);
+  assert.match(mixed[2].note, /Within-day ordering unknown/);
 });
 
 test('browser shows latest correspondence and other chats across combine, hide and business choices', t => {

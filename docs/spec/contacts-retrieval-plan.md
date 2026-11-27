@@ -232,8 +232,10 @@ to that member. Unlinked text observations remain unlinked and show **inferred d
 only**, never an invented time. Exact timestamps include the time zone (UTC when
 no local zone was supplied); without a local zone their calendar-day age remains
 unknown. Other chats follow newest dated first, with same-day precise timestamps
-ordered by instant, and undated chats last. Same-day inferred observations cannot
-be ordered within that day. Undated chats may be newer; all results remain partial
+ordered by instant, and undated chats last. Day-only observations follow precise
+timestamps on the same day as a display grouping, with within-day ordering explicitly
+unknown; they may be newer than that day's latest precise timestamp.
+Undated chats may be newer; all results remain partial
 saved metadata, not complete history. No message content is displayed. The summary
 is recomputed from all retained chats after a guarded browser combine and preserves
 the existing hide/show and business controls.
