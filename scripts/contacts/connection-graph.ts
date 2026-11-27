@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { array, object, text, requireValue, hash } from './lib.ts';
+import { array, object, text, instant, requireValue, hash } from './lib.ts';
 import { manualOutputLocation } from './manual-retrieval.ts';
 import { normalized } from './identity-review.ts';
 import type { GmailSource } from './gmail-metadata.ts';
@@ -95,7 +95,7 @@ function profileKey(value: string | null): string | null {
 const participantKey = (platform: Platform, id: string | null) =>
   id === null ? null : platform === 'messenger' ? profileKey(id) : `raw:${id}`;
 
-function readProfilePhotos(file: string, dataClass: string): PhotoSet {
+function readProfilePhotos(file: string, dataClass: string): PhotoSet & { retrievedAt: string } {
   const manifest = path.resolve(file), folder = path.dirname(manifest);
   if (dataClass === 'private') manualOutputLocation(folder, 'private');
   requireValue(fs.realpathSync(manifest) === manifest && fs.statSync(manifest).isFile() &&
@@ -133,7 +133,7 @@ function readProfilePhotos(file: string, dataClass: string): PhotoSet {
     'Saved photo signature does not match its type.', 'photo_image_invalid');
     photos.push({ key, file: row.file, bytes: image, digest: row.digest });
   }
-  return { inputDigest: hash(bytes), photos };
+  return { inputDigest: hash(bytes), photos, retrievedAt: instant(value.retrievedAt, 'photo retrieval time') };
 }
 
 // The owner's explicit per-participant decision is the identity evidence; nothing here matches names automatically.
