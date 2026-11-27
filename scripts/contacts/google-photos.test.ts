@@ -126,6 +126,11 @@ test('graph uses exact address evidence including unique saved-contact phone bri
     { type: 'phone', value: '+12025550100' }] }]).nodes[0].photo, null, 'unshown contact still makes shared phone ambiguous');
   const nameOnly = { ...bundle, connections: bundle.connections.map(row => ({ ...row, addresses: [] })) };
   assert.equal(build(nameOnly, contacts).nodes[0].photo, null);
+  const aliasOnly = { ...bundle, connections: bundle.connections.map(row => ({ ...row,
+    addresses: [{ type: 'email', value: 'absent@example.invalid' }] })) };
+  assert.equal(build(aliasOnly, [{ displayName: 'Ada', addresses: [
+    { type: 'email', value: 'ada@example.invalid' }, { type: 'email', value: 'absent@example.invalid' }] }]).nodes[0].photo, null,
+  'the phone bridge must not promote a secondary CSV email absent from the graph');
   const facebook = { inputDigest: 'fixture', photos: [{ key: 'id:123456', file: 'profile-photo-fixture.png', bytes: png, digest }] };
   const muse = [{ source: 'messenger' as const, records: [{ chatType: 'direct', reportedChatId: 'fixture',
     participants: [{ id: '123456', name: 'Ada' }], reportedLatestSentAt: now }] }];

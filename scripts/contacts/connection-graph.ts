@@ -542,7 +542,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       const emails = contact.addresses.filter(address => address.type === 'email').map(address => normalized('email', address.value)).filter(Boolean);
       const matches = evidence.filter(person => person.node && [...person.node.mail].some(mail => emails.includes(normalized('email', mail))));
       if (matches.length === 1 && emails.every(email => contactEmails.get(email).size === 1)) {
-        matches[0].addresses.push(...contact.addresses);
+        matches[0].addresses.push(...contact.addresses.filter(address => address.type === 'phone'));
       } else evidence.push({ node: null, addresses: [...contact.addresses] });
     }
     for (const [person, photo] of matchGooglePhotos(evidence, googlePhotos)) {
