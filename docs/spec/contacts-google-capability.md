@@ -120,6 +120,78 @@ interruption/replay/write rollback, quota/auth/expiry, profile/alias/deletion/
 absence persistence, self/field limits, private no-artifact denial and unchanged
 curated bytes; no live validation.
 
+## Separate saved Google photo display contract
+
+`contacts:csv --google-photos <google-photos.json>` validates an **already saved**
+projected People API connections photo round. It does not retrieve connections
+or images, enable CONTACTS-012 private acquisition, load credentials, or change
+its field mask. Building and testing this feature uses synthetic fixtures only.
+A separate owner-run retrieval needs its own exact account, fields, finite
+budget and external output approval. For that run only, request connection
+`resourceName,emailAddresses,phoneNumbers,photos` (photo URL, explicit `default`
+and source type); never notes or unrelated fields. Do not treat this documentation
+as approval to call People API or inspect an owner's saved export.
+
+The local UTF-8 manifest (at most 1 MB) is a strict projection:
+
+```json
+{
+  "schemaVersion": 1,
+  "dataClass": "private",
+  "kind": "google-connections-photo-assets",
+  "observedAt": "2026-11-27T12:00:00Z",
+  "coverage": "partial",
+  "connections": [{
+    "resourceName": "people/synthetic-example",
+    "emailAddresses": [{"value": "fixture@example.invalid"}],
+    "phoneNumbers": [{"value": "+12025550100"}],
+    "photos": [{
+      "url": "https://lh3.googleusercontent.com/synthetic-example",
+      "default": true,
+      "sourceType": "CONTACT",
+      "redirectUrls": [],
+      "file": null,
+      "sha256": null
+    }]
+  }]
+}
+```
+
+Each non-default photo instead names a sibling
+`google-photo-<sha256>.png`, `.jpg` or `.webp` and its exact-byte `sha256`.
+The validator checks containment/no filesystem redirects, digest, bounded size
+and raster signature; it is not a full image decoder or proof of provider
+authenticity. Defaults have null file/hash and never attach. At most 100 distinct
+connections, 100 photo records in total, 100 values per address field, 5 MB per
+image and 50 MB total are accepted. Missing/failed photos use an empty photo list;
+missing coverage is never complete. More than one non-default preferred-source
+photo is ambiguous: do not fall back to another source to guess.
+
+The separate saver must use only observed HTTPS `*.googleusercontent.com` URLs,
+omit cookies/credentials, bound retrieval time and stream size, and follow at
+most three redirects with the same allowlist at every hop. This offline validator
+performs **zero HTTP requests** and validates the declared original/redirect
+URLs (no credential parameters/userinfo) plus every saved file; it cannot attest
+to the historical fetch headers or undeclared hops. No saver/HTTP transport is
+provided by this change.
+
+Photos bind only to their containing connection resourceName. Display attachment
+requires unique exact normalized email/phone evidence from that **same**
+connection; no name, image, face, country-code or Gmail dot/+ alias inference.
+CONTACT beats PROFILE; existing Facebook attachment beats Google. Shared
+addresses, conflicting connections and ambiguous target people stay unattached,
+including conflicts involving connections with no usable photo. The graph's
+Gmail address evidence can bind a CSV contact's phone only through its unique
+exact email; anonymous text threads have no verified phone identity and cannot
+receive photos. These display links neither merge canonical identities nor
+establish activity.
+
+Only attached assets are copied under external `preview\photos`; the existing
+CSP is unchanged. `contact-import.json` records the manifest digest, observation
+time, connection/saved/default/eligible/linked counts and copied file hashes.
+All bundle manifests, matching metadata and images remain private, outside
+Git, PRs, CI and Library. No actual account data or images are used in tests.
+
 ## Public evidence
 
 Consulted 2026-11-24:

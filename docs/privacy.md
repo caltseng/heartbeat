@@ -167,6 +167,34 @@ wrote to the owner are counted, not shown, and a message is one-to-one only when
 it has exactly one non-owner address. The candidates, review page, links file and Gmail copy in the
 preview stay private, outside Git, PRs, CI and Library.
 
+### Separate saved Google photo display boundary
+
+The optional `contacts:csv --google-photos` path validates an already saved
+People API connections photo bundle for local display. This coding assignment
+uses synthetic fixtures only: no People API/account calls, owner exports,
+browser/device access or real image downloads. A separate owner-run retrieval
+must approve its exact account, fields, finite budget and external output.
+The photo exception is limited to URLs/default/source metadata, connection
+resourceName and email/phone matching evidence plus current raster assets;
+it does not broaden the generic Google adapter's metadata-only mask or lift
+private importer guards.
+
+The offline validator performs no network requests and accepts only declared
+HTTPS `*.googleusercontent.com` URLs/redirects, no credentials/cookies, bounded
+local raster assets and exact sha256-bound filenames. It cannot certify past
+fetch headers or unreported redirects. An independently authorized saver must
+omit credentials/cookies and enforce the documented redirect/size limits.
+Connection resourceName binds each photo; only unique exact normalized
+email/phone from that same connection can attach it to a graph person.
+A phone bridge through a CSV contact requires that contact's unique exact
+email on the graph person; names alone never supply evidence.
+Defaults and ambiguous matches stay unattached; CONTACT precedes PROFILE and
+existing Facebook photos win. No face recognition, biometric inference,
+identity merge, activity inference, sending or schedule is added.
+All inputs, matching evidence, manifests/counts and copied images stay in
+approved external private folders, never Git, PRs, CI, Library or ordinary
+replies. See the [saved-bundle contract](spec/contacts-google-capability.md#separate-saved-google-photo-display-contract).
+
 ## CONTACTS-010: owner-approved policy
 
 The owner approved this policy on 2026-11-24 (Pacific), through an explicit

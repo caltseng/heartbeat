@@ -211,8 +211,8 @@ function renderDashboard(snapshot: ContactSnapshot, observations: Observations |
   suggestions: { evidence: string; people: string[] }[], muse: MuseRecency[] = [], photos: PhotoSet | null = null,
   timeZone: string | null = null, photoLinks: Parameters<typeof connectionModel>[4] = null,
   selfLinks: Parameters<typeof connectionModel>[5] = null, gmail: Parameters<typeof connectionModel>[6] = null,
-  peopleLinks: Parameters<typeof connectionModel>[7] = null): string {
-  const graph = connectionModel(observations, muse, photos, timeZone, photoLinks, selfLinks, gmail, peopleLinks, snapshot.contacts);
+  peopleLinks: Parameters<typeof connectionModel>[7] = null, googlePhotos: Parameters<typeof connectionModel>[9] = null): string {
+  const graph = connectionModel(observations, muse, photos, timeZone, photoLinks, selfLinks, gmail, peopleLinks, snapshot.contacts, googlePhotos);
   const graphHash = crypto.createHash('sha256').update(CONNECTIONS_SCRIPT).digest('base64');
   const wordmark = fs.readFileSync(path.join(__dirname, '..', '..', 'docs', 'assets', 'heartbeat-wordmark.png')).toString('base64');
   const threads = [...new Set(observations?.messages.map(m => m.threadUiId) ?? [])];
