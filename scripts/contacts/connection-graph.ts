@@ -791,7 +791,8 @@ const CONNECTIONS_STYLE = `.graph-panel{margin-bottom:22px}.graph-layout{display
 .node .rim{fill:none;stroke:#fffdf9;stroke-width:2.5}.initials{font-size:13px;font-weight:700;fill:#735746}.node-label{font-size:11px;fill:#4d5752}
 .node:hover .halo,.node:focus-visible .halo{stroke:#cc624f}.node:focus{outline:none}.node.selected .halo{stroke:#df6958;fill:#fde7e1}.node.related .halo{stroke:#e9a08f;stroke-dasharray:3 3}
 .node.dimmed,.spoke.dimmed{opacity:.22}.node.filtered,.spoke.filtered{display:none}
-.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#6c7570;margin-top:10px}.legend svg{width:18px;height:18px;vertical-align:-4px}
+.source-icon{flex:none;vertical-align:-4px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#6c7570;margin-top:10px}
 #connection-chats{padding-left:18px;font-size:13px}
 [hidden]{display:none!important}.edit-tools{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.edit-tools select{max-width:170px}
 #hidden-people summary,#business-people summary{cursor:pointer;font-weight:600}#hidden-list,#combined-list,#business-list{padding-left:18px;font-size:13px}#hidden-list li,#combined-list li,#business-list li{margin:4px 0}
@@ -800,7 +801,7 @@ const CONNECTIONS_STYLE = `.graph-panel{margin-bottom:22px}.graph-layout{display
 function connectionsPanel(model: ConnectionModel): string {
   if (!model.nodes.length) return '';
   const platforms = (['messenger', 'instagram', 'messages', 'gmail'] as Platform[]).filter(p => model.nodes.some(n => n.platforms.includes(p)));
-  const badge = (p: Platform) => `<svg viewBox="-10 -10 20 20" aria-hidden="true"><use href="#badge-${p}"/></svg>`;
+  const badge = (p: Platform) => `<svg class="source-icon" width="18" height="18" viewBox="-10 -10 20 20" aria-hidden="true"><use href="#badge-${p}"/></svg>`;
   return `<section class="panel graph-panel" aria-labelledby="graph-heading"><h2 id="graph-heading">Your connections</h2>
 <p class="muted">Rings show how recently a chat you share was active, measured from each source's snapshot day${model.asOf ? ` (${escape(model.asOf)})` : ' (unknown: no time zone or dates)'}: most recent at the center, older further out. Click a person to see where you talked and who shares those chats. Drag to pan, scroll to zoom.</p>
 <div class="graph-tools"><input id="connection-search" type="search" placeholder="Find in graph…" autocomplete="off" aria-label="Find in graph">
