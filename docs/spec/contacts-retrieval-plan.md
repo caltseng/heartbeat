@@ -223,7 +223,23 @@ imply a direct interaction with any member. A missing date stays in the unknown 
 rather than being treated as old.
 Each node carries a platform badge (Messenger, Instagram,
 Google Messages, Gmail). The platform filter chips and legend use the same source
-icons at a fixed size alongside their text labels. Selecting a node lists its chats and highlights people who share
+icons at a fixed size alongside their text labels. Selecting a person puts the latest
+known correspondence at the top of the detail panel: a friendly date, calendar-day
+age relative to that source's saved snapshot, source icon/platform and chat label.
+If the newest dated chat is a group or has unknown type, the summary instead says
+**Latest shared-chat activity** and explicitly does not attribute correspondence
+to that member. Unlinked text observations remain unlinked and show **inferred day
+only**, never an invented time. Exact timestamps include the time zone (UTC when
+no local zone was supplied); without a local zone their calendar-day age remains
+unknown. Other chats follow newest dated first, with same-day precise timestamps
+ordered by instant, and undated chats last. Day-only observations follow precise
+timestamps on the same day as a display grouping, with within-day ordering explicitly
+unknown; they may be newer than that day's latest precise timestamp.
+Undated chats may be newer; all results remain partial
+saved metadata, not complete history. No message content is displayed. The summary
+is recomputed from all retained chats after a guarded browser combine and preserves
+the existing hide/show and business controls.
+Selecting a node also highlights people who share
 those chats; search, platform filters, zoom and pan are local. Searching a listed
 member finds their group node; hidden people and excluded businesses do not make a
 group match and are omitted from its inspector. A group disappears when no eligible
