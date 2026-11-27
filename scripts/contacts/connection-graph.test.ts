@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { hash } from './lib.ts';
-import { profileKey, readProfilePhotos, readPhotoLinks, readSelfLinks, readPeopleLinks, connectionModel, connectionSVG, connectionsPanel } from './connection-graph.ts';
+import { profileKey, readProfilePhotos, readPhotoLinks, readSelfLinks, readPeopleLinks, connectionModel, correspondenceHistory, connectionSVG, connectionsPanel } from './connection-graph.ts';
 import { projectGoogleCSV, importContactCSV } from './contact-csv.ts';
 import { renderDashboard, readMuseRecency } from './contact-dashboard.ts';
 import { readGmailMetadata } from './gmail-metadata.ts';
@@ -30,6 +32,114 @@ const manifest = (dataClass: string, extra: Record<string, unknown> = {}) => ({ 
   limitations: [], profiles: [{ profileReference: 'https://www.facebook.com/ada.fixture', displayName: 'Ada Fixture',
     friendshipEvidence: 'friends-list', pictureReference: null, status: 'saved', file: photoName, digest: hash(png), ...extra }] });
 const photos = { inputDigest: 'x', photos: [{ key: 'user:ada.fixture', file: photoName, bytes: png, digest: hash(png) }] };
+
+test('correspondence history orders exact instants, preserves inferred days and keeps missing dates/ages unknown', () => {
+  const source = muse(['100001']);
+  source.records[1].reportedLatestSentAt = '2026-11-26T14:00:00+02:00';
+  source.records[0].reportedLatestSentAt = '2026-11-26T11:00:00.000Z';
+  source.records[2].reportedLatestSentAt = null;
+  const text = { period: { end: '2026-11-27T00:00:00Z', timeZone: 'UTC' },
+    messages: [{ threadUiId: 'text', inferredLocalDate: '2026-11-25', requestedWindowMembership: 'inferred-inside' }] };
+  const model = connectionModel(text, [source], null);
+  const rows = correspondenceHistory(model.chats, model.timeZone);
+  assert.deepEqual(rows.map(row => row.chat.id), ['c2', 'c1', 'c4', 'c3']);
+  assert.match(rows[0].date, /Nov 26, 2026.*12:00:00.*UTC/);
+  assert.match(rows[0].note, /Group activity, not necessarily correspondence/);
+  assert.match(rows[0].relative, /same day as snapshot \(2026-11-26\)/);
+  assert.match(rows[1].note, /One-to-one correspondence/);
+  assert.equal(rows[2].date, 'Nov 25, 2026 (inferred day only)');
+  assert.equal(rows[2].relative, '1 day before snapshot (2026-11-26)');
+  assert.match(rows[2].note, /participants unlinked/);
+  assert.equal(rows[3].date, 'Date unknown');
+  assert.equal(rows[3].relative, 'Age unknown (2026-11-26)');
+  const noZone = correspondenceHistory(model.chats);
+  assert.match(noZone[0].date, /UTC/);
+  assert.match(noZone[0].relative, /Age unknown/);
+  const unknown = correspondenceHistory([{ ...model.chats[0], kind: 'unknown', asOf: null }], 'UTC')[0];
+  assert.equal(unknown.relative, 'Age unknown');
+  assert.match(unknown.note, /Chat type unknown/);
+  const future = correspondenceHistory([{ ...model.chats[0], latest: '2026-11-27T01:00:00Z' }], 'UTC')[0];
+  assert.equal(future.relative, '1 day after snapshot (2026-11-26)');
+});
+
+test('browser shows latest correspondence and other chats across combine, hide and business choices', t => {
+  const browser = process.env.HEARTBEAT_BROWSER || [
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+  ].find(file => fs.existsSync(file));
+  if (!browser) {
+    t.skip('No Chromium browser found; set HEARTBEAT_BROWSER to run the correspondence regression.');
+    return;
+  }
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'correspondence-synthetic-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const source = muse(['100001']);
+  source.records[0].reportedLatestSentAt = '2026-11-25T13:00:00Z';
+  source.records[1].reportedLatestSentAt = now;
+  source.records[1].participants[1].name = 'Other Fixture';
+  source.records.push({ ...source.records[0], reportedChatId: 'undated', reportedLatestSentAt: null });
+  const instagram = { source: 'instagram' as const, retrievedAt: '2026-11-27T14:00:00Z', gaps: ['Synthetic gap'],
+    records: [{ chatType: 'direct' as const, reportedChatId: 'ig', reportedLatestSentAt: '2026-11-27T13:00:00Z',
+      nativeEvidenceVerified: false as const, participants: [{ name: 'IG Fixture', id: 'ig-fixture' }] }] };
+  const dashboard = path.join(folder, 'dashboard.html'), harness = path.join(folder, 'browser.html');
+  fs.writeFileSync(dashboard, renderDashboard(projectGoogleCSV(Buffer.from('Name\nFixture\n'), 'synthetic', now),
+    null, [], [source, instagram], null, 'UTC'));
+  fs.writeFileSync(harness, `<!doctype html><meta charset="utf-8"><body><pre id="result">pending</pre><script>
+const frame=document.createElement('iframe');frame.style.cssText='width:1280px;height:1000px';
+let phase=0;const checks={};
+frame.onload=()=>{try{
+const doc=frame.contentDocument,win=frame.contentWindow;
+win.addEventListener('error',event=>{document.getElementById('result').textContent=JSON.stringify({error:event.message,checks});});
+const model=JSON.parse(doc.getElementById('connections-data').textContent);
+const person=model.nodes.find(n=>n.kind==='direct'&&n.platforms.includes('messenger'));
+const ig=model.nodes.find(n=>n.label==='IG Fixture');
+const click=id=>doc.querySelector('[data-node="'+id+'"]').dispatchEvent(new win.MouseEvent('click',{bubbles:true}));
+const text=id=>doc.getElementById(id).textContent;
+if(phase===0){
+click(person.id);
+checks.groupHonesty=text('correspondence-heading')==='Latest shared-chat activity'&&text('correspondence-note').includes('not necessarily correspondence');
+checks.friendly=text('correspondence-date').includes('Nov 26, 2026')&&text('correspondence-date').includes('same day as snapshot');
+checks.where=text('correspondence-where').includes('Messenger group chat 2')&&!!doc.querySelector('#correspondence-where use[href="#badge-messenger"]');
+checks.unknown=text('correspondence-note').includes('Undated chats may be newer.');
+checks.order=[...doc.querySelectorAll('#connection-chats li')].map(n=>n.textContent).join('|').includes('Nov 25, 2026')&&
+doc.querySelector('#connection-chats li:last-child').textContent.includes('Date unknown');
+const same=doc.getElementById('connection-same');same.value=ig.id;same.dispatchEvent(new win.Event('change'));
+phase=1;document.getElementById('result').textContent=JSON.stringify({phase,checks});
+setTimeout(()=>doc.getElementById('connection-combine').click(),0);return;
+}
+const live=[...doc.querySelectorAll('[data-node]')].find(el=>!el.classList.contains('filtered')&&el.getAttribute('aria-label').startsWith('IG Fixture:'));
+live.dispatchEvent(new win.MouseEvent('click',{bubbles:true}));
+checks.combined=text('correspondence-heading')==='Last corresponded (latest known)'&&text('correspondence-date').includes('Nov 27, 2026')&&
+text('correspondence-where').includes('Instagram')&&doc.querySelectorAll('#connection-chats li').length===3;
+checks.safeText=doc.getElementById('connection-name').textContent==='IG Fixture'&&!doc.querySelector('#connection-detail b');
+doc.getElementById('connection-hide').click();
+checks.hidden=doc.getElementById('connection-detail').hidden;
+doc.querySelector('#hidden-list button').click();
+live.dispatchEvent(new win.MouseEvent('click',{bubbles:true}));
+checks.restored=text('correspondence-where').includes('Instagram')&&!doc.getElementById('connection-detail').hidden;
+doc.getElementById('connection-business').click();
+checks.businessHidden=doc.getElementById('connection-detail').hidden;
+const biz=doc.getElementById('business-filter');biz.checked=true;biz.dispatchEvent(new win.Event('change'));
+live.dispatchEvent(new win.MouseEvent('click',{bubbles:true}));
+checks.businessRestored=text('correspondence-date').includes('Nov 27, 2026')&&!doc.getElementById('connection-detail').hidden;
+document.getElementById('result').textContent=JSON.stringify(checks);
+}catch(error){document.getElementById('result').textContent=JSON.stringify({error:String(error),checks});}};
+frame.src=${JSON.stringify(pathToFileURL(dashboard).href)};document.body.append(frame);
+</script></body>`);
+  const result = spawnSync(browser, ['--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+    '--allow-file-access-from-files', `--user-data-dir=${path.join(folder, 'browser-profile')}`, '--dump-dom',
+    '--virtual-time-budget=10000', pathToFileURL(harness).href],
+  { encoding: 'utf8', timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
+  assert.equal(result.status, 0, result.error?.message || result.stderr);
+  const output = result.stdout.match(/<pre id="result">([^<]+)<\/pre>/)?.[1];
+  assert.ok(output && output !== 'pending', result.stdout);
+  const checks = JSON.parse(output);
+  assert.equal(checks.error, undefined, output);
+  assert.equal(Object.keys(checks).length, 11, output);
+  for (const [name, passed] of Object.entries(checks)) assert.equal(passed, true, `${name}: ${output}`);
+});
 
 test('profile keys use exact native Facebook references and never derive identity from names', () => {
   assert.equal(profileKey('https://www.facebook.com/Ada.Fixture/'), 'user:ada.fixture');
