@@ -268,6 +268,28 @@ participants stay separate. The preview copies the links file as
 `photo-links.original.json`, and `contact-import.json` records its digest, link
 count and the owner-confirmed link rule.
 
+To combine saved Facebook rounds, repeat `--photos` and `--photo-links`:
+
+```powershell
+npm run contacts:csv -- ... --photos "<round-a>\profile-photos.json" --photo-links "<round-a-links.json>" --photos "<round-b>\profile-photos.json" --photo-links "<round-b-links.json>"
+```
+
+The first links file is checked only against the first photo manifest, the
+second against the second, and so on. Supply one links file for every round
+(an approved empty links file is valid), or omit all links files for exact-ID-only
+attachment. Each original digest binding must still match; a combined digest
+never substitutes for these checks. Repeated decisions for a chat slot must
+agree on its name and profile. Photos are combined by exact Facebook profile
+reference; the saved photo from the newest `retrievedAt` round wins, regardless
+of argument order (the later argument wins a timestamp tie). Missing or failed
+photos in a newer round do not erase an older saved photo. No new name matching
+or URL fetching happens. `contact-import.json` retains each round's manifest
+digest, retrieval time, saved count and link-file provenance; multiple rounds
+copy their links as `photo-links-1.original.json`, `photo-links-2.original.json`,
+etc. Only attached, winning images are copied beside the offline dashboard.
+Existing single-round invocations and `photo-links.original.json` stay supported.
+Combining already saved files grants no authorization to acquire another round.
+
 Without profile IDs, the owner's own Messenger participant slots also appear in
 chats. `contacts:self-links` proposes every ID-less slot whose normalized name
 equals the owner's supplied name on a private review page (chat label plus the
