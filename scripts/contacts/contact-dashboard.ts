@@ -214,6 +214,7 @@ function renderDashboard(snapshot: ContactSnapshot, observations: Observations |
   peopleLinks: Parameters<typeof connectionModel>[7] = null): string {
   const graph = connectionModel(observations, muse, photos, timeZone, photoLinks, selfLinks, gmail, peopleLinks, snapshot.contacts);
   const graphHash = crypto.createHash('sha256').update(CONNECTIONS_SCRIPT).digest('base64');
+  const wordmark = fs.readFileSync(path.join(__dirname, '..', '..', 'docs', 'assets', 'heartbeat-wordmark.png')).toString('base64');
   const threads = [...new Set(observations?.messages.map(m => m.threadUiId) ?? [])];
   const days: string[] = [];
   if (observations) {
@@ -235,11 +236,11 @@ function renderDashboard(snapshot: ContactSnapshot, observations: Observations |
 <button class="contact-select" data-index="${index}"><span class="avatar">${escape((c.displayName ?? '?').slice(0, 1))}</span>
 <span><strong>${escape(c.displayName ?? 'Unnamed contact')}</strong><small>${escape(c.addresses.map(a => a.value).join(' · ') || 'No phone/email in export')}</small></span><span class="chevron" aria-hidden="true">›</span></button></li>`).join('');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-${scriptHash}' 'sha256-${graphHash}'; style-src 'unsafe-inline'; img-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-${scriptHash}' 'sha256-${graphHash}'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Heartbeat — local contacts preview</title><style>
 *{box-sizing:border-box}body{margin:0;background:#faf7f2;color:#263332;font:15px/1.5 system-ui,sans-serif}
-header,main{max-width:1300px;margin:auto;padding:24px 32px}header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e3ddd4}
-.wordmark{font-size:25px;font-weight:750;letter-spacing:-1px}.dot{color:#df6958}.badge{padding:7px 12px;border-radius:20px;background:#e9eee7;color:#3c614a;font-size:12px;font-weight:650}
+header,main{max-width:1300px;margin:auto;padding:24px 32px}header{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center;border-bottom:1px solid #e3ddd4}
+.wordmark{display:block;width:243px;max-width:100%;height:auto}.badge{padding:7px 12px;border-radius:20px;background:#e9eee7;color:#3c614a;font-size:12px;font-weight:650}
 h1{font-size:32px;letter-spacing:-1px;margin:0}h2{font-size:18px;margin:0 0 6px}h3{font-size:15px;margin:0}p{margin:6px 0 18px}.muted,small{color:#6c7570}.intro{margin-bottom:24px}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px}
 .card,.panel{background:#fffdf9;border:1px solid #e5dfd6;border-radius:16px}.card{padding:20px}.metric{font-size:34px;font-weight:750;letter-spacing:-1px}.label{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#737970}.workspace{display:grid;grid-template-columns:360px minmax(0,1fr);gap:22px}.panel{padding:22px;min-width:0}.panel+.panel{margin-top:20px}
 input,select,button{font:inherit}input,select{width:100%;min-height:44px;border:1px solid #ded8ce;border-radius:9px;padding:10px;background:#fffdf9;color:#263332}
@@ -249,7 +250,7 @@ button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visi
 details{margin:14px 0;font-size:12px}summary{cursor:pointer;font-weight:600}.source-id{font-size:11px;overflow-wrap:anywhere}small{display:block}[hidden]{display:none!important}
 ${CONNECTIONS_STYLE}
 @media(max-width:900px){.workspace{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}header,main{padding:18px}.contact-list{max-height:330px}.toolbar{flex-wrap:wrap}}
-</style></head><body><header><div class="wordmark"><span class="dot">●</span> Heartbeat</div><span class="badge">Private · offline · read-only</span></header>
+</style></head><body><header><img class="wordmark" src="data:image/png;base64,${wordmark}" width="972" height="180" alt="Heartbeat — ping-and-reply H logo and wordmark"><span class="badge">Private · offline · read-only</span></header>
 <main><section class="intro"><div class="label">Your local relationship workspace</div><h1>A first look at your connections</h1>
 <p class="muted">Contacts alongside observed message activity. Frequency is not relationship quality.</p></section>
 <section class="cards" aria-label="Capture overview">
