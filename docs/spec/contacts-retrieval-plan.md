@@ -365,8 +365,10 @@ addresses, hidden ones included; only a message with exactly one is one-to-one, 
 newsletters or lists that include a person stay group email. The as-of is the end
 of coverage. An address saved in the contacts CSV under exactly one contact name
 takes that name, matched exactly or, for gmail.com, ignoring dots and `+tags` as
-Gmail does. With the same-name rule on, that joins all of a contact's addresses
-and their same-name chat entries, under the usual guards. An address saved under
+Gmail does. Named addresses listed on one saved contact always show as one person,
+so one email to several of them is not mistaken for namesakes. With the same-name
+rule on, a contact name also joins same-name chat entries, under the usual guards.
+A same-as row may name an address, which then joins that address. An address saved under
 two different names stays unnamed, and one saved under the owner's name is the
 owner's and is hidden. The preview copies `gmail.original.json`
 and `people-links.original.json` and records `gmail` and `ownerConfirmedPeople`

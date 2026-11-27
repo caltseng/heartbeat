@@ -356,6 +356,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     add(`messages|${thread}`, `Conversation ${index + 1}`, 'messages', chat, null, null);
   });
   let gmailHidden: number | null = null;
+  const contactCards: string[][] = [];
   if (gmail) {
     // A saved contact names an address only when every contact listing that mailbox has the same name; addresses saved under
     // the owner's own name are the owner's.
@@ -387,6 +388,13 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
         add(`gmail|${address}`, contact ?? address, 'gmail', chat, contact ? 'contact' : 'address', null, `gmail|${address}`, address, contact);
       }
     });
+    // Named addresses listed on one saved contact are that one person, so one email to several of them is not namesakes.
+    const shown = [...new Set(people.threads.flatMap(thread => thread.people))].filter(address => contactOf(address));
+    for (const contact of contacts ?? []) {
+      const keys = new Set(contact.addresses.filter(a => a.type === 'email').map(a => mailboxKey(a.value)).filter(Boolean));
+      const card = shown.filter(address => keys.has(mailboxKey(address))).map(address => `gmail|${address}`);
+      if (card.length > 1) contactCards.push(card);
+    }
   }
   // Union only the entries the owner confirmed are one person; a person may never carry two different photos.
   const parent = new Map<string, string>();
@@ -404,6 +412,12 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     roots.slice(1).forEach(root => parent.set(root, roots[0]));
     personOf.set(roots[0], person.displayName);
   }
+  for (const card of contactCards) {
+    const roots = [...new Set(card.map(find))], named = roots.filter(root => personOf.has(root)).map(root => personOf.get(root));
+    if (roots.length < 2 || named.length > 1) continue;
+    roots.slice(1).forEach(root => { parent.set(root, roots[0]); personOf.delete(root); });
+    if (named.length) personOf.set(roots[0], named[0]);
+  }
   // Only people links are owner-confirmed people; rule joins below must not mark their nodes as confirmed.
   const linkedPeople = new Set(personOf.keys());
   // The owner's standing rule: chat entries with exactly the same normalized name are one person unless the owner listed the
@@ -417,13 +431,13 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
   const hiddenNames = new Set(selfLinks?.hiddenNames ?? []);
   if (selfLinks?.sameNamePeople || aliases.size) {
     // Guards check everything a merged root already holds, so chained joins through one entry cannot combine conflicts.
-    const facts = new Map<string, { photos: Set<string>; reported: Set<string>; chats: Map<string, Set<string>> }>();
+    const facts = new Map<string, { photos: Set<string>; reported: Set<string>; chats: Set<string> }>();
     for (const entry of entries) {
       const root = find(entry.key);
-      const fact = facts.get(root) ?? { photos: new Set(), reported: new Set(), chats: new Map() };
+      const fact = facts.get(root) ?? { photos: new Set(), reported: new Set(), chats: new Set() };
       if (entry.photo) fact.photos.add(entry.photo.file);
       if (entry.profile === 'reported') fact.reported.add(entry.key);
-      fact.chats.set(entry.chat.id, new Set([...fact.chats.get(entry.chat.id) ?? [], entry.key]));
+      fact.chats.add(entry.chat.id);
       facts.set(root, fact);
     }
     // A Gmail entry's own name is the contact name its address is saved under, if any; chat entries use their chat name.
@@ -433,17 +447,19 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       const raw = entry.platform === 'messages' ? null : comparableName(entry.name);
       if (raw === null) continue;
       const own = nameOf(entry), alias = aliases.has(raw) ? raw : own !== null && aliases.has(own) ? own : null;
-      const explicit = alias !== null || (own !== null && aliasTargets.has(own));
+      // A same-as row may name a Gmail address itself; that address groups under the address, not its contact name.
+      const asTarget = aliasTargets.has(raw) ? raw : own !== null && aliasTargets.has(own) ? own : null;
+      const explicit = alias !== null || asTarget !== null;
       const byRule = selfLinks.sameNamePeople && own !== null && !selfLinks.separateNames.includes(own);
       if (!explicit && !byRule) continue;
-      const name = alias !== null ? aliases.get(alias).as : own ?? raw;
+      const name = alias !== null ? aliases.get(alias).as : asTarget ?? own ?? raw;
       groups.set(name, [...groups.get(name) ?? [], entry]);
     }
     for (const [name, group] of groups) {
       const explicit = group.some(entry => aliases.has(comparableName(entry.name)) || aliases.has(nameOf(entry)));
       if (!explicit && !selfLinks.sameNamePeople) continue;
       const roots = [...new Set(group.map(entry => find(entry.key)))];
-      const target = group.find(entry => nameOf(entry) === name)?.label ??
+      const target = (group.find(entry => nameOf(entry) === name) ?? group.find(entry => comparableName(entry.name) === name))?.label ??
         [...aliases.values()].find(row => row.as === name)?.label ?? group[0].label;
       if (roots.length < 2) {
         // An explicit same-as still gives a lone entry the name the owner said it belongs to.
@@ -454,17 +470,17 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       const photos = new Set(held.flatMap(fact => [...fact.photos]));
       const reported = held.flatMap(fact => [...fact.reported]);
       const platforms = reported.map(key => key.slice(0, key.indexOf('|')));
-      const chats = new Map<string, Set<string>>();
-      held.forEach(fact => fact.chats.forEach((keys, chat) => chats.set(chat, new Set([...chats.get(chat) ?? [], ...keys]))));
+      const chatsSeen = new Set<string>();
+      let clash = false;
+      held.forEach(fact => fact.chats.forEach(chat => { if (chatsSeen.has(chat)) clash = true; chatsSeen.add(chat); }));
       const named = new Set(roots.map(root => personOf.get(root)).filter(Boolean));
-      if (photos.size > 1 || new Set(platforms).size !== platforms.length || [...chats.values()].some(keys => keys.size > 1) ||
-        named.size > 1) {
+      if (photos.size > 1 || new Set(platforms).size !== platforms.length || clash || named.size > 1) {
         if (explicit) sameAsUnjoined++;
         continue;
       }
       roots.slice(1).forEach(root => { parent.set(root, roots[0]); personOf.delete(root); facts.delete(root); });
       if (roots.some(root => linkedPeople.has(root))) linkedPeople.add(roots[0]);
-      facts.set(roots[0], { photos, reported: new Set(reported), chats });
+      facts.set(roots[0], { photos, reported: new Set(reported), chats: chatsSeen });
       personOf.set(roots[0], [...named][0] ?? (explicit ? target : group[0].label));
       (explicit ? sameAsJoined : sameNameJoined).add(roots[0]);
     }
@@ -519,7 +535,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
         profile === 'joined' ? 'You confirmed these entries are one person; they are joined only where you confirmed it.' :
         kind === 'text' ? 'Participants were not captured; not linked to any contact.' :
         profile === 'address' ? 'An email address you wrote to; joined with other sources only where you confirmed it.' :
-        profile === 'contact' ? 'An email address you wrote to, named by the one contact it is saved under; joined with other entries only by your same-name rule.' :
+        profile === 'contact' ? 'An email address you wrote to, named by the one contact it is saved under; addresses on that one contact show together, and other entries join only by your same-name rule.' :
         profile === 'confirmed' ? 'You confirmed this person matches a saved friend photo; joined only where you confirmed it.' :
         profile ? `Muse-reported profile ID; unverified.${node.photo ? ' Photo attached by exact profile ID match.' : ''}` :
           selfLinks?.sameNamePeople ? 'No profile ID; not joined with any other entry.' :

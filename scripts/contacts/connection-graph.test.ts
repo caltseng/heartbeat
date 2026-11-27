@@ -375,9 +375,10 @@ test('Gmail addresses take the one contact name they are saved under, and the sa
         nativeEvidenceVerified: false }] }));
   const sent = (to: string[]) => ({ timestamp: '2026-11-20T12:00:00.000Z', direction: 'sent', from: 'owner@example.com', to, cc: [], batch: 1 });
   fs.writeFileSync(gmailFile, JSON.stringify({ dataClass: 'private', source: 'email', account: 'owner@example.com', connector: 'synthetic',
-    fields: [], excluded: [], providerIds: false, rawRows: 4, uniqueRows: 4,
+    fields: [], excluded: [], providerIds: false, rawRows: 5, uniqueRows: 5,
     coverage: { start: '2026-11-12T08:00:00.000Z', end: now, completeness: 'partial', basis: 'synthetic' }, observations: [
-      sent(['ada@example.com']), sent(['adafix+news@gmail.com']), sent(['bo@example.com']), sent(['me2@example.com'])] }));
+      sent(['ada@example.com']), sent(['adafix+news@gmail.com']), sent(['bo@example.com']), sent(['me2@example.com']),
+      { ...sent(['ada@example.com']), timestamp: '2026-11-21T12:00:00.000Z', cc: ['adafix@gmail.com'] }] }));
   const contacts = [
     { displayName: 'Ada Fixture', addresses: [{ type: 'email', value: 'Ada@Example.com' }, { type: 'email', value: 'ada.fix@gmail.com' }] },
     { displayName: 'Bo One', addresses: [{ type: 'email', value: 'bo@example.com' }] },
@@ -389,11 +390,18 @@ test('Gmail addresses take the one contact name they are saved under, and the sa
     readGmailMetadata(gmailFile, 'private'), null, contacts).nodes;
   const joined = model(on);
   assert.deepEqual(joined.map(n => [n.label, n.platforms, n.chats.length]).sort(),
-    [['Ada Fixture', ['messenger', 'gmail'], 3], ['bo@example.com', ['gmail'], 1]],
-    'both saved addresses join the chat entry by name; an address saved under two names stays unnamed; your own contact is hidden');
+    [['Ada Fixture', ['messenger', 'gmail'], 4], ['bo@example.com', ['gmail'], 1]],
+    'saved addresses join the chat entry by name, even when one email went to two of them; an address saved under two names stays unnamed; your own contact is hidden');
   const apart = model(off);
-  assert.deepEqual(apart.map(n => n.label).sort(), ['Ada Fixture', 'Ada Fixture', 'Ada Fixture', 'bo@example.com']);
+  assert.deepEqual(apart.map(n => [n.label, n.chats.length]).sort(), [['Ada Fixture', 1], ['Ada Fixture', 3], ['bo@example.com', 1]],
+    'without the rule, only the addresses saved on one contact show together');
   assert.match(apart.find(n => n.platforms[0] === 'gmail' && n.label === 'Ada Fixture').identityNote, /named by the one contact/);
+  const zed = path.join(folder, 'zed.json');
+  updateNameRule(off, zed, { sameAs: ['Ada Fixture=ada@example.com'] }, 'private', now);
+  const aliased = connectionModel(null, [readMuseRecency(museFile, 'private')], null, 'UTC', null, readSelfLinks(zed, 'private'),
+    readGmailMetadata(gmailFile, 'private'), null, contacts).nodes;
+  assert.deepEqual(aliased.map(n => [n.label, n.platforms, n.chats.length]).sort(),
+    [['Ada Fixture', ['messenger', 'gmail'], 4], ['bo@example.com', ['gmail'], 1]], 'a same-as row naming an address joins that address');
 });
 
 test('owner same-as names combine people across chats and Gmail, hidden names start hidden, and rule updates are new files', t => {
