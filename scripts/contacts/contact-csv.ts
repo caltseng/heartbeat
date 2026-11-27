@@ -15,6 +15,8 @@ interface PreviewContact {
   idKind: 'local';
   displayName: string | null;
   addresses: Address[];
+  // Set when the owner filed the contact under a "Business" label, or saved it with a company and no person's name.
+  business?: 'label' | 'company';
 }
 interface ContactSnapshot {
   schemaVersion: 1;
@@ -27,7 +29,9 @@ interface ContactSnapshot {
   contacts: PreviewContact[];
   ignoredRows: number;
 }
-const allowedColumn = (name: string) => /^(Name|Given Name|Additional Name|Family Name|First Name|Middle Name|Last Name|E-mail \d+ - Value|Email \d+ - Value|Phone \d+ - Value)$/.test(name);
+const allowedColumn = (name: string) => /^(Name|Given Name|Additional Name|Family Name|First Name|Middle Name|Last Name|E-mail \d+ - Value|Email \d+ - Value|Phone \d+ - Value|Labels|Group Membership|Organization Name|Organization 1 - Name)$/.test(name);
+// Label and company text is read only to decide whether a contact is a business; neither is kept.
+const BUSINESS_LABEL = /^(\*\s*)?business(es)?$/i;
 
 function projectGoogleCSV(bytes: Buffer, dataClass: ContactSnapshot['dataClass'],
   importedAt = new Date().toISOString()): ContactSnapshot {
@@ -53,11 +57,16 @@ function projectGoogleCSV(bytes: Buffer, dataClass: ContactSnapshot['dataClass']
         'CSV needs distinct supported Google Contacts headers.');
     } else if (rowStarted) {
       requireValue(column === headers.length, 'Contact CSV has an inconsistent row width.');
-      const displayName = selected.get('Name') || [
+      const personName = selected.get('Name') || [
         selected.get('Given Name') || selected.get('First Name'),
         selected.get('Additional Name') || selected.get('Middle Name'),
         selected.get('Family Name') || selected.get('Last Name')
       ].filter(Boolean).join(' ') || null;
+      const company = selected.get('Organization Name') || selected.get('Organization 1 - Name') || null;
+      const labelled = (selected.get('Labels') || selected.get('Group Membership') || '').split(/\s+:::\s+/)
+        .some(label => BUSINESS_LABEL.test(label.trim()));
+      const business = labelled ? 'label' : !personName && company ? 'company' : null;
+      const displayName = personName ?? (business ? company : null);
       const addresses: Address[] = [];
       for (const [header, value] of selected) {
         if (!value || !/^(E-mail|Email|Phone) \d+ - Value$/.test(header)) continue;
@@ -68,7 +77,7 @@ function projectGoogleCSV(bytes: Buffer, dataClass: ContactSnapshot['dataClass']
       if (displayName || addresses.length) {
         const id = `csv-row:${row}`, sourceKey = JSON.stringify(['google-contacts', namespace, 'identity', id]);
         contacts.push({ id, idKind: 'local', sourceKey, personId: `person-${hash(sourceKey)}`, displayName,
-          addresses: [...new Map(addresses.map(a => [JSON.stringify(a), a])).values()] });
+          addresses: [...new Map(addresses.map(a => [JSON.stringify(a), a])).values()], ...(business ? { business } : {}) });
       } else ignoredRows++;
     }
     row++; column = 0; selected = new Map(); rowStarted = false;
@@ -187,7 +196,13 @@ function importContactCSV(input: string, output: string, observationsFile?: stri
         sameAs: selfLinks.sameAs?.length ? { names: selfLinks.sameAs.length,
           rule: 'each listed name is the named person, joined only where entries show no different profiles, photos or shared chat' } : null,
         hiddenNames: selfLinks.hiddenNames?.length ? { names: selfLinks.hiddenNames.length,
-          rule: 'people with these names stay in the data but start hidden from the chart' } : null } : null,
+          rule: 'people with these names stay in the data but start hidden from the chart' } : null,
+        categories: selfLinks.businessNames?.length || selfLinks.personNames?.length ? { businessNames: selfLinks.businessNames?.length ?? 0,
+          personNames: selfLinks.personNames?.length ?? 0,
+          rule: 'listed names or addresses are businesses or people; a Google Contacts business label still decides first' } : null } : null,
+      businessContacts: { label: snapshot.contacts.filter(c => c.business === 'label').length,
+        companyOnly: snapshot.contacts.filter(c => c.business === 'company').length,
+        rule: 'a contact under a "Business" label, or saved with a company and no person\'s name, is a business; label and company text are not kept, except a company-only contact is named by its company' },
       gmail: gmail ? { file: 'gmail.original.json', inputDigest: gmail.inputDigest, records: gmail.observations.length,
         coverage: 'partial', rule: 'only addresses the owner wrote to are shown; received-only addresses are counted, not shown; an address saved under exactly one contact name takes that name, and one saved under the owner\'s name is the owner' } : null,
       ownerConfirmedPeople: peopleLinks ? { file: 'people-links.original.json', inputDigest: peopleLinks.inputDigest,

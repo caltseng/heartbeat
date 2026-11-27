@@ -463,6 +463,50 @@ test('owner same-as names combine people across chats and Gmail, hidden names st
     'with the same-name rule on, same-as names and same names both join');
 });
 
+test('businesses come from Google Contacts first, then the name rule, and automatic guesses only for unnamed automated addresses', t => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'business-synthetic-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const museFile = path.join(folder, 'muse.private.json'), gmailFile = path.join(folder, 'gmail.json'), base = path.join(folder, 'self.json');
+  fs.writeFileSync(museFile, JSON.stringify({ schemaVersion: 1, dataClass: 'private', kind: 'muse-reported-chat-recency', source: 'messenger',
+    retrievedAt: now, requestedPeriod: 'last 14 days', coverage: 'partial', gaps: ['Synthetic gap'], records: [
+      { chatType: 'one_to_one', reportedChatId: 'd1', participants: [{ name: 'Cafe Fixture', id: null }], reportedLatestSentAt: now,
+        nativeEvidenceVerified: false }] }));
+  const to = ['shop@acme.example', 'orders@ink.example', 'deals@news.brand.example', 'bo@example.com', 'help@friend.example',
+    'info@rule.example', 'noreply@kept.example', 'alex@mail.com', 'sam@mail.school.edu', 'deals@mail.shop.example'];
+  fs.writeFileSync(gmailFile, JSON.stringify({ dataClass: 'private', source: 'email', account: 'owner@example.com', connector: 'synthetic',
+    fields: [], excluded: [], providerIds: false, rawRows: 1, uniqueRows: 1,
+    coverage: { start: '2026-11-12T08:00:00.000Z', end: now, completeness: 'partial', basis: 'synthetic' }, observations: [
+      { timestamp: '2026-11-20T12:00:00.000Z', direction: 'sent', from: 'owner@example.com', to, cc: [], batch: 1 }] }));
+  const contacts = [
+    { displayName: 'Acme Store', addresses: [{ type: 'email', value: 'Shop@Acme.example' }], business: 'label' as const },
+    { displayName: 'Bo Person', addresses: [{ type: 'email', value: 'bo@example.com' }] },
+    { displayName: 'Helpful Friend', addresses: [{ type: 'email', value: 'help@friend.example' }] }];
+  saveOwnerNameRule('owner fixture', base, 'private', now);
+  const rule = path.join(folder, 'self-2.json');
+  assert.deepEqual(Object.values(updateNameRule(base, rule, { business: ['Cafe Fixture', 'info@rule.example', 'cafe fixture'],
+    person: ['noreply@kept.example', 'Acme Store'] }, 'private', now)).slice(0, 4), [0, 0, 2, 2]);
+  const model = (file: string) => Object.fromEntries(connectionModel(null, [readMuseRecency(museFile, 'private')], null, 'UTC', null,
+    readSelfLinks(file, 'private'), readGmailMetadata(gmailFile, 'private'), null, contacts).nodes.map(n => [n.label, n.business ?? null]));
+  assert.deepEqual(model(rule), { 'Cafe Fixture': 'rule', 'Acme Store': 'contacts', 'orders@ink.example': 'guess',
+    'deals@news.brand.example': 'guess', 'Bo Person': null, 'Helpful Friend': null, 'info@rule.example': 'rule',
+    'noreply@kept.example': null, 'alex@mail.com': null, 'sam@mail.school.edu': null, 'deals@mail.shop.example': 'guess' },
+  'the Contacts label wins over a person mark; marks beat guesses; a saved contact name, a consumer provider or a school is never guessed');
+  const moved = path.join(folder, 'self-3.json');
+  updateNameRule(rule, moved, { person: ['CAFE  fixture'] }, 'private', now);
+  const saved = JSON.parse(fs.readFileSync(moved, 'utf8'));
+  assert.deepEqual([saved.businessNames, saved.personNames], [['info@rule.example'], ['noreply@kept.example', 'Acme Store', 'CAFE fixture']]);
+  assert.equal(model(moved)['Cafe Fixture'], null, 'marking a name as a person takes it off the business list');
+  const target = path.join(folder, 'conflict.json');
+  assert.throws(() => updateNameRule(rule, target, { business: ['Bo'], person: ['bo'] }, 'private', now), /both a business and a person/);
+  assert.equal(fs.existsSync(target), false);
+  const overlap = path.join(folder, 'overlap.json');
+  fs.writeFileSync(overlap, JSON.stringify({ ...saved, businessNames: ['Bo'], personNames: ['bo'] }));
+  assert.throws(() => readSelfLinks(overlap, 'private'), /no name can be both/);
+  const page = connectionsPanel(connectionModel(null, [], null, 'UTC', null, null, readGmailMetadata(gmailFile, 'private'), null, contacts));
+  assert.match(page, /id="business-filter">Show businesses/);
+  assert.doesNotMatch(page, /id="business-filter" checked/, 'businesses start filtered out');
+});
+
 test('a confirmed person never carries two different photos', () => {
   const other = `profile-photo-${'b'.repeat(64)}.png`;
   const twoPhotos = { inputDigest: 'x', photos: [...photos.photos, { key: 'user:other.fixture', file: other, bytes: png, digest: hash(png) }] };
