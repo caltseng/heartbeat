@@ -149,7 +149,11 @@ The owner directed that the view be people-centric, without duplicate nodes for
 one person reached in several places. `contacts:people-links` only proposes
 same-name chat slots and contact-bridged Gmail addresses on a private review page;
 nothing joins until the owner approves numbers. Two entries in one chat are
-different people and never join. Gmail correspondents are only the recipients of
+different people and never join. The owner later set a standing rule, "Just
+assume that same name = same person. Unless explicitly stated otherwise", saved as
+`sameNamePeople` with the owner's `separateNames` exceptions in the private owner
+name rule file; it never joins namesakes in one chat, different reported profiles
+or different photos. Gmail correspondents are only the recipients of
 messages the owner sent, minus the owner's own addresses; addresses that only
 wrote to the owner are counted, not shown, and a message is one-to-one only when
 it has exactly one non-owner address. The candidates, review page, links file and Gmail copy in the

@@ -20,7 +20,7 @@ interface MuseSource {
 type PhotoLinks = Map<string, { name: string; key: string }> & { originalBytes?: Buffer; inputDigest?: string; confirmedAt?: string };
 // Owner-confirmed chat participant slots that are the owner, keyed `source|chatId|position`; they are never drawn as people.
 type SelfLinks = Map<string, string> & { originalBytes?: Buffer; inputDigest?: string; confirmedAt?: string; museInputDigest?: string;
-  ownerName?: string; ownerAddresses?: string[] };
+  ownerName?: string; ownerAddresses?: string[]; sameNamePeople?: boolean; separateNames?: string[] };
 // Owner-confirmed people: each groups entries from any source that the owner said are the same person.
 type PersonMember = { source: 'messenger' | 'instagram'; reportedChatId: string; participantIndex: number; participantName: string } |
   { source: 'gmail'; address: string };
@@ -146,15 +146,20 @@ function readSelfLinks(file: string, dataClass: string): SelfLinks {
   const originalBytes = fs.readFileSync(resolved), value = JSON.parse(originalBytes.toString('utf8'));
   if (value?.kind === 'owner-name-rule') {
     // The owner's standing rule: every participant with exactly the owner's normalized name is the owner, in any snapshot.
-    object(value, ['schemaVersion', 'dataClass', 'kind', 'ownerName', 'confirmedAt', 'ownerAddresses'], 'owner name rule');
+    object(value, ['schemaVersion', 'dataClass', 'kind', 'ownerName', 'confirmedAt', 'ownerAddresses', 'sameNamePeople', 'separateNames'],
+      'owner name rule');
     const ownerName = comparableName(text(value.ownerName, 'owner name'));
     const ownerAddresses = value.ownerAddresses === undefined ? [] :
       array(value.ownerAddresses, 'owner addresses').map(address => emailKey(text(address, 'owner address')));
+    const separateNames = value.separateNames === undefined ? [] :
+      array(value.separateNames, 'separate names').map(name => comparableName(text(name, 'separate name')));
     requireValue(value.schemaVersion === 1 && value.dataClass === dataClass && ownerName !== null &&
       ownerAddresses.every(address => address !== null) && (value.ownerAddresses === undefined || ownerAddresses.length > 0) &&
+      (value.sameNamePeople === undefined ? value.separateNames === undefined : value.sameNamePeople === true && value.separateNames !== undefined) &&
+      separateNames.every(name => name !== null) && new Set(separateNames).size === separateNames.length &&
       !Number.isNaN(Date.parse(text(value.confirmedAt, 'confirmation time'))), 'Invalid owner name rule.');
     return Object.assign(new Map<string, string>(), { originalBytes, inputDigest: hash(originalBytes),
-      confirmedAt: value.confirmedAt as string, ownerName, ownerAddresses });
+      confirmedAt: value.confirmedAt as string, ownerName, ownerAddresses, sameNamePeople: value.sameNamePeople === true, separateNames });
   }
   object(value, ['schemaVersion', 'dataClass', 'kind', 'museInputDigest', 'confirmedAt', 'slots'], 'self links');
   requireValue(value.schemaVersion === 1 && value.dataClass === dataClass && value.kind === 'owner-confirmed-self-slots' &&
@@ -251,7 +256,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     const parts = Object.fromEntries(formatter.formatToParts(new Date(value)).map(p => [p.type, p.value]));
     return `${parts.year}-${parts.month}-${parts.day}`;
   };
-  type Profile = 'reported' | 'confirmed' | 'address' | 'joined' | null;
+  type Profile = 'reported' | 'confirmed' | 'address' | 'joined' | 'sameName' | null;
   const nodes = new Map<string, GraphNode & { kinds: Set<GraphChat['kind']>; profile: Profile }>();
   const usedLinks = new Set<string>(), usedSelf = new Set<string>();
   const chats: GraphChat[] = [];
@@ -344,6 +349,44 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     roots.slice(1).forEach(root => parent.set(root, roots[0]));
     personOf.set(roots[0], person.displayName);
   }
+  // The owner's standing rule: chat entries with exactly the same normalized name are one person unless the owner listed the
+  // name as separate. Namesakes in one chat, different reported IDs on one platform, two confirmed people or two different
+  // photos are evidence of different people, so that name stays separate.
+  const sameNameJoined = new Set<string>();
+  if (selfLinks?.sameNamePeople) {
+    // Guards check everything a merged root already holds, so chained joins through one entry cannot combine conflicts.
+    const facts = new Map<string, { photos: Set<string>; reported: Set<string>; chats: Map<string, Set<string>> }>();
+    for (const entry of entries) {
+      const root = find(entry.key);
+      const fact = facts.get(root) ?? { photos: new Set(), reported: new Set(), chats: new Map() };
+      if (entry.photo) fact.photos.add(entry.photo.file);
+      if (entry.profile === 'reported') fact.reported.add(entry.key);
+      fact.chats.set(entry.chat.id, new Set([...fact.chats.get(entry.chat.id) ?? [], entry.key]));
+      facts.set(root, fact);
+    }
+    const groups = new Map<string, typeof entries>();
+    for (const entry of entries) {
+      const name = entry.platform === 'messenger' || entry.platform === 'instagram' ? comparableName(entry.name) : null;
+      if (name !== null && !selfLinks.separateNames.includes(name)) groups.set(name, [...groups.get(name) ?? [], entry]);
+    }
+    for (const group of groups.values()) {
+      const roots = [...new Set(group.map(entry => find(entry.key)))];
+      if (roots.length < 2) continue;
+      const held = roots.map(root => facts.get(root));
+      const photos = new Set(held.flatMap(fact => [...fact.photos]));
+      const reported = held.flatMap(fact => [...fact.reported]);
+      const platforms = reported.map(key => key.slice(0, key.indexOf('|')));
+      const chats = new Map<string, Set<string>>();
+      held.forEach(fact => fact.chats.forEach((keys, chat) => chats.set(chat, new Set([...chats.get(chat) ?? [], ...keys]))));
+      const named = new Set(roots.map(root => personOf.get(root)).filter(Boolean));
+      if (photos.size > 1 || new Set(platforms).size !== platforms.length || [...chats.values()].some(keys => keys.size > 1) ||
+        named.size > 1) continue;
+      roots.slice(1).forEach(root => { parent.set(root, roots[0]); personOf.delete(root); facts.delete(root); });
+      facts.set(roots[0], { photos, reported: new Set(reported), chats });
+      personOf.set(roots[0], [...named][0] ?? group[0].label);
+      sameNameJoined.add(roots[0]);
+    }
+  }
   for (const entry of entries) {
     const key = find(entry.key), person = personOf.get(key);
     let node = nodes.get(key);
@@ -351,7 +394,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       const label = person ?? entry.label;
       node = { id: `n${nodes.size + 1}`, label, initials: initials(label), ring: 'unknown', ringLabel: '', kind: 'unknown',
         lastActivity: null, lastNote: '', platforms: [], platformLabels: [], chats: [], photo: null, identityNote: '',
-        kinds: new Set(), profile: person ? 'joined' : entry.profile };
+        kinds: new Set(), profile: sameNameJoined.has(key) ? 'sameName' : person ? 'joined' : entry.profile };
       nodes.set(key, node);
     }
     if (entry.photo) {
@@ -386,11 +429,13 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
               last.chat.kind === 'text' ? 'latest observed message (inferred day)' :
                 last.chat.platform === 'gmail' ? 'latest email with only them' : 'latest one-to-one activity'}`,
       platformLabels: node.platforms.map(p => PLATFORMS[p]),
-      identityNote: profile === 'joined' ? 'You confirmed these entries are one person; they are joined only where you confirmed it.' :
+      identityNote: profile === 'sameName' ? 'Joined by your rule that the same name is the same person; names you listed as separate, and namesakes in one chat, stay apart.' :
+        profile === 'joined' ? 'You confirmed these entries are one person; they are joined only where you confirmed it.' :
         kind === 'text' ? 'Participants were not captured; not linked to any contact.' :
         profile === 'address' ? 'An email address you wrote to; joined with other sources only where you confirmed it.' :
         profile === 'confirmed' ? 'You confirmed this person matches a saved friend photo; joined only where you confirmed it.' :
         profile ? `Muse-reported profile ID; unverified.${node.photo ? ' Photo attached by exact profile ID match.' : ''}` :
+          selfLinks?.sameNamePeople ? 'No profile ID; not joined with any other entry.' :
           'No profile ID; this entry is local to one chat and never merged by name.' };
   });
   return { nodes: result, chats, linkedPhotos: [...linked.values()], selfIdentified, selfHidden, asOf, gmailHidden };

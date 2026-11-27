@@ -290,8 +290,8 @@ the rule with `slots` and `museInputDigest` as null.
 
 The owner directed that nodes be people, not chats: "We shouoldn't have duplicaed
 nodes even though we contact in different places." Without native IDs, the graph
-still never joins by name on its own. `contacts:people-links` proposes candidates
-on a private review page:
+never joins by name unless the owner saves the same-name rule below.
+`contacts:people-links` proposes candidates on a private review page:
 
 - ID-less, non-owner Muse slots with the same normalized name in different chats.
   A name that appears twice in one chat is visibly two people and is never
@@ -312,6 +312,22 @@ chat slot with its name, or a Gmail address. A member that no longer matches, is
 one of the owner's own entries, appears in two people, or a person with two
 different photos fails the preview. Joined nodes take the confirmed name and every
 member's chats, so recency is the latest across sources.
+
+The owner then directed a standing rule: "Just assume that same name = same
+person. Unless explicitly stated otherwise". Save it in the owner name rule file,
+listing any names that are really different people:
+
+```powershell
+npm run contacts:self-links -- --owner-name "<your exact display name>" --same-name-people on --separate-names "<Name A;Name B>" --output "<new self-links.private.json>"
+```
+
+With `sameNamePeople`, every build joins Messenger/Instagram entries whose
+normalized names match, in any snapshot, without a review page. A name stays
+separate when it is listed in `separateNames`, appears twice in one chat, carries
+two different reported profiles on one platform, spans two confirmed people, or
+would combine two different photos. Approved people links still apply first, and
+the joined node notes the rule. Gmail entries have addresses, not names, so they
+join only through approved people links.
 
 `contacts:csv --gmail` reads the saved Gmail observations. People are the to/cc
 addresses of messages the owner sent, minus the account, the owner's sending
