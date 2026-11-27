@@ -327,7 +327,28 @@ separate when it is listed in `separateNames`, appears twice in one chat, carrie
 two different reported profiles on one platform, spans two confirmed people, or
 would combine two different photos. Approved people links still apply first, and
 the joined node notes the rule. Gmail entries have addresses, not names, so they
-join only through approved people links.
+join only through approved people links or a same-as name below.
+
+The owner then asked for "a way to exclude people easily" and "a way to combine
+entries", e.g. a handle that is really a named person. Google Contacts has no
+nicknames or social links to bridge such handles, so these are owner decisions.
+Each person's panel in the chart has **Hide from chart** and **Same person as …**
+→ **Combine**; the **Hidden from chart** list offers **Show** and **Separate
+again**. Those choices are kept in this browser's local storage as hashed name
+tags (no names) and apply to every dashboard opened in the same browser. To keep
+them across browsers and rebuilds, save them to a new owner name rule file;
+`window.heartbeatChartEdits()` in the page console lists the current choices:
+
+```powershell
+npm run contacts:self-links -- --update "<owner name rule.json>" --hide "<Name A;Name B>" --show "<Name>" --same-as "<Other name=Person name;other@example.com=Person name>" --not-same "<Other name>" --output "<new self-links.private.json>"
+```
+
+`hiddenNames` people stay in the data but start hidden. Each `sameAs` row joins
+one chat name or Gmail address to the named person's entries, even with the
+same-name rule off. Rows cannot chain, name the owner or use a `separateNames`
+name. The same guards apply, so a same-as that would combine namesakes in one
+chat, different reported profiles or photos, or two confirmed people stays apart
+and the chart counts it. Each update writes a new file and leaves the old one.
 
 `contacts:csv --gmail` reads the saved Gmail observations. People are the to/cc
 addresses of messages the owner sent, minus the account, the owner's sending
