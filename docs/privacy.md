@@ -140,7 +140,10 @@ The owner also directed that the many same-name entries that are "just me ...
 shouldn't be shown". `contacts:self-links` proposes ID-less slots with exactly the
 owner's supplied name on the same kind of private review page; only approved
 numbers are omitted from the graph as the owner. Unapproved same-name people stay
-visible, and nothing is merged or deleted from source data.
+visible, and nothing is merged or deleted from source data. The owner later
+directed "just assume that anyone with my exact name is me"; a saved
+`contacts:self-links --owner-name` rule therefore omits every exact normalized
+name match in any snapshot. The rule file stays private like the review files.
 
 ## CONTACTS-010: owner-approved policy
 

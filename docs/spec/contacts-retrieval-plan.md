@@ -194,8 +194,9 @@ The preview presents one-to-one and group recency separately from observed
 message-frequency metrics; it does not link participants by name or force
 Instagram into the Messenger enum. Missing files/results remain unknown.
 An optional top-level `selfIds` array names the owner's own reported participant
-IDs so they are excluded from the graph; without it the owner may appear as a
-participant and the dashboard says so.
+IDs so they are excluded from the graph; unless every supplied source has it, the
+owner may appear as a participant and the dashboard says so (with the count of
+entries hidden by owner-confirmed self links or the owner name rule, below).
 
 The dashboard's **Your connections** panel draws an interactive concentric map
 with you at the center. Each ring is a recency band (today, this week, last two
@@ -270,6 +271,19 @@ different snapshot fails the preview. Approved slots are omitted from the graph;
 unapproved same-name participants stay. The preview copies it as
 `self-links.original.json` and records it under `ownerConfirmedSelf` in
 `contact-import.json`.
+
+The owner later directed: "just assume that anyone with my exact name is me". For
+that standing rule, save the name once instead of reviewing slots:
+
+```powershell
+npm run contacts:self-links -- --owner-name "<your exact display name>" --output "<new self-links.private.json>"
+```
+
+The file (`kind: owner-name-rule`) is not bound to one snapshot: every
+participant whose NFKC, whitespace- and case-normalized name equals it is omitted,
+in any snapshot, including reported profiles. Near matches stay, and an exact
+match that is also photo-linked fails the preview. `ownerConfirmedSelf` records
+the rule with `slots` and `museInputDigest` as null.
 
 ## V0 collection runbook
 

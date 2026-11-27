@@ -136,7 +136,7 @@ function importContactCSV(input: string, output: string, observationsFile?: stri
   requireValue(photoLinksFile === undefined || photos !== null, 'Photo links need the saved photos they were confirmed against.');
   const photoLinks = photoLinksFile === undefined ? null : readPhotoLinks(photoLinksFile, 'private', photos);
   const selfLinks = selfLinksFile === undefined ? null : readSelfLinks(selfLinksFile, 'private');
-  requireValue(selfLinks === null || muse.some(source => source.inputDigest === selfLinks.museInputDigest),
+  requireValue(selfLinks === null || selfLinks.ownerName !== undefined || muse.some(source => source.inputDigest === selfLinks.museInputDigest),
     'Self links were confirmed against a different Muse snapshot.');
   requireValue(timeZone === undefined || observations === null || observations.period.timeZone === timeZone,
     'The time zone must match the saved observations period.');
@@ -172,8 +172,10 @@ function importContactCSV(input: string, output: string, observationsFile?: stri
         ownerConfirmedLinks: photoLinks ? { file: 'photo-links.original.json', inputDigest: photoLinks.inputDigest,
           confirmedAt: photoLinks.confirmedAt, links: photoLinks.size } : null } : null,
       ownerConfirmedSelf: selfLinks ? { file: 'self-links.original.json', inputDigest: selfLinks.inputDigest,
-        museInputDigest: selfLinks.museInputDigest, confirmedAt: selfLinks.confirmedAt, slots: selfLinks.size,
-        rule: 'listed participant slots are the owner and are omitted from the graph' } : null,
+        museInputDigest: selfLinks.museInputDigest ?? null, confirmedAt: selfLinks.confirmedAt,
+        slots: selfLinks.ownerName === undefined ? selfLinks.size : null,
+        rule: selfLinks.ownerName === undefined ? 'listed participant slots are the owner and are omitted from the graph'
+          : 'every participant with exactly the owner\'s normalized name is the owner and is omitted from the graph' } : null,
       coverage: 'partial', ignoredRows: snapshot.ignoredRows,
       limitations: ['Provided export snapshot only; export scope/time are not independently verified.',
         'CSV lacks provider IDs; row IDs are bound to these exact bytes, not cross-export sync keys.',

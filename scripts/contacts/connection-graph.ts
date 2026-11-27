@@ -17,14 +17,18 @@ interface MuseSource {
 // Owner-confirmed pairings of one ID-less chat participant with one saved friend photo, keyed `source|chatId|position`.
 type PhotoLinks = Map<string, { name: string; key: string }> & { originalBytes?: Buffer; inputDigest?: string; confirmedAt?: string };
 // Owner-confirmed chat participant slots that are the owner, keyed `source|chatId|position`; they are never drawn as people.
-type SelfLinks = Map<string, string> & { originalBytes?: Buffer; inputDigest?: string; confirmedAt?: string; museInputDigest?: string };
+type SelfLinks = Map<string, string> & { originalBytes?: Buffer; inputDigest?: string; confirmedAt?: string; museInputDigest?: string;
+  ownerName?: string };
+const comparableName = (name: string | null | undefined) =>
+  typeof name !== 'string' ? null : name.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US') || null;
 interface TextObservations { period?: { end: string; timeZone: string }; messages: { threadUiId: string; inferredLocalDate: string | null; requestedWindowMembership: string }[] }
 interface GraphNode {
   id: string; label: string; initials: string; ring: Ring; ringLabel: string; kind: Kind; lastActivity: string | null;
   lastNote: string; platforms: Platform[]; platformLabels: string[]; chats: string[]; photo: string | null; identityNote: string;
 }
 interface GraphChat { id: string; platform: Platform; kind: 'one-to-one' | 'group' | 'unknown' | 'text'; label: string; latest: string | null; asOf: string | null; members: string[] }
-interface ConnectionModel { nodes: GraphNode[]; chats: GraphChat[]; linkedPhotos: Photo[]; selfIdentified: boolean; asOf: string | null }
+interface ConnectionModel { nodes: GraphNode[]; chats: GraphChat[]; linkedPhotos: Photo[]; selfIdentified: boolean; selfHidden: number;
+  asOf: string | null }
 
 const PLATFORMS: Record<Platform, string> = { messenger: 'Messenger', instagram: 'Instagram', messages: 'Google Messages' };
 // Rings are calendar-day age of the latest shared-chat activity, relative to that chat's own source snapshot day.
@@ -130,6 +134,15 @@ function readSelfLinks(file: string, dataClass: string): SelfLinks {
   requireValue(fs.realpathSync(resolved) === resolved && fs.statSync(resolved).isFile() && fs.statSync(resolved).size <= 1024 * 1024,
     'Choose a bounded, non-redirected self links file.');
   const originalBytes = fs.readFileSync(resolved), value = JSON.parse(originalBytes.toString('utf8'));
+  if (value?.kind === 'owner-name-rule') {
+    // The owner's standing rule: every participant with exactly the owner's normalized name is the owner, in any snapshot.
+    object(value, ['schemaVersion', 'dataClass', 'kind', 'ownerName', 'confirmedAt'], 'owner name rule');
+    const ownerName = comparableName(text(value.ownerName, 'owner name'));
+    requireValue(value.schemaVersion === 1 && value.dataClass === dataClass && ownerName !== null &&
+      !Number.isNaN(Date.parse(text(value.confirmedAt, 'confirmation time'))), 'Invalid owner name rule.');
+    return Object.assign(new Map<string, string>(), { originalBytes, inputDigest: hash(originalBytes),
+      confirmedAt: value.confirmedAt as string, ownerName });
+  }
   object(value, ['schemaVersion', 'dataClass', 'kind', 'museInputDigest', 'confirmedAt', 'slots'], 'self links');
   requireValue(value.schemaVersion === 1 && value.dataClass === dataClass && value.kind === 'owner-confirmed-self-slots' &&
     typeof value.museInputDigest === 'string' && /^[0-9a-f]{64}$/.test(value.museInputDigest) &&
@@ -169,7 +182,9 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
   const chats: GraphChat[] = [];
   const photoByKey = new Map((photos?.photos ?? []).map(photo => [photo.key, photo]));
   const linked = new Map<string, Photo>();
-  let selfIdentified = false;
+  // Only reported account IDs in every source identify the owner; name-based hiding can miss differently named slots.
+  const selfIdentified = muse.length > 0 && muse.every(source => (source.selfIds ?? []).length > 0);
+  let selfHidden = 0;
   const add = (key: string, label: string, platform: Platform, chat: GraphChat, profile: 'reported' | 'confirmed' | null, photo: Photo | null) => {
     let node = nodes.get(key);
     if (!node) {
@@ -186,7 +201,6 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
   for (const source of muse) {
     const platform: Platform = source.source;
     const self = new Set((source.selfIds ?? []).map(id => participantKey(platform, id)).filter(Boolean));
-    if (self.size) selfIdentified = true;
     const sourceDay = dayOf(source.retrievedAt);
     source.records.forEach((row, index) => {
       const kind = row.chatType === 'group' ? 'group' : row.chatType === 'unknown' ? 'unknown' : 'one-to-one';
@@ -197,10 +211,15 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
         const reported = participantKey(platform, participant.id);
         if (reported && self.has(reported)) return;
         const at = `${platform}|${row.reportedChatId}|${position}`;
+        if (selfLinks?.ownerName && comparableName(participant.name) === selfLinks.ownerName) {
+          requireValue(reported !== null || !photoLinks?.has(at), 'The owner name rule conflicts with a confirmed photo link.');
+          selfHidden++;
+          return;
+        }
         if (reported === null && selfLinks?.has(at)) {
           requireValue(selfLinks.get(at) === participant.name && !photoLinks?.has(at),
             'A confirmed self link no longer matches its chat participant, or conflicts with a photo link.');
-          usedSelf.add(at); selfIdentified = true;
+          usedSelf.add(at); selfHidden++;
           return;
         }
         const link = reported === null ? photoLinks?.get(at) : undefined;
@@ -254,7 +273,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
         profile ? `Muse-reported profile ID; unverified.${node.photo ? ' Photo attached by exact profile ID match.' : ''}` :
           'No profile ID; this entry is local to one chat and never merged by name.' };
   });
-  return { nodes: result, chats, linkedPhotos: [...linked.values()], selfIdentified, asOf };
+  return { nodes: result, chats, linkedPhotos: [...linked.values()], selfIdentified, selfHidden, asOf };
 }
 
 const BADGES = `<g id="badge-messenger"><circle r="8" fill="#0a7cff" stroke="#fffdf9" stroke-width="2"/><path d="M-4.6 2.3L-1.2-1.9L1 .4L4.6-2.3L1.2 1.9L-1-.4Z" fill="#fff"/></g>
@@ -378,8 +397,10 @@ ${platforms.map(p => `<label class="chip"><input type="checkbox" data-platform-f
 <p id="connection-platforms"></p><ul id="connection-chats"></ul><p id="connection-identity" class="notice"></p>
 <button type="button" id="connection-clear" class="chip">Clear selection</button></div>
 <div class="notice">Muse-reported, unverified and partial. Photos attach only by exact Facebook profile ID or a pairing you confirmed, never by automatic name or face matching.
-${model.selfIdentified ? '' : 'Your own account was not identified in this snapshot, so you may appear as a participant.'}</div></aside></div></section>`;
+${model.selfIdentified ? '' : model.selfHidden
+    ? `${model.selfHidden} of your own participant entries were hidden by your confirmation; your account was not identified by ID, so other entries for you may still appear.`
+    : 'Your own account was not identified in this snapshot, so you may appear as a participant.'}</div></aside></div></section>`;
 }
 
-export { profileKey, readProfilePhotos, readPhotoLinks, readSelfLinks, connectionModel, connectionSVG, connectionsPanel, CONNECTIONS_SCRIPT, CONNECTIONS_STYLE };
+export { profileKey, comparableName, readProfilePhotos, readPhotoLinks, readSelfLinks, connectionModel, connectionSVG, connectionsPanel, CONNECTIONS_SCRIPT, CONNECTIONS_STYLE };
 export type { PhotoSet, ConnectionModel };

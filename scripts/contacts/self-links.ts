@@ -2,11 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { manualOutputLocation } from './manual-retrieval.ts';
 import { readMuseRecency } from './contact-dashboard.ts';
+import { comparableName } from './connection-graph.ts';
 import { array, object, text, requireValue, publish, publishText, runCLI, errorCode, hash } from './lib.ts';
 
-// The owner's own name only proposes slots for review; a slot is treated as the owner only after explicit approval.
-const comparable = (name: string | null) =>
-  name === null ? null : name.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US') || null;
+// The owner's name only proposes slots for review, unless the owner saves a standing exact-name rule with --owner-name.
+const comparable = comparableName;
 const escape = (value: unknown) => String(value).replace(/[&<>"']/g, char =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 
@@ -56,15 +56,30 @@ function confirmSelfLinks(candidatesFile: string, approve: string, output: strin
   return { approved: numbers.length, digest: hash(fs.readFileSync(target)) };
 }
 
+function saveOwnerNameRule(ownerName: string, output: string, dataClass = 'private', now = new Date().toISOString()) {
+  const target = path.resolve(output);
+  manualOutputLocation(path.dirname(target), dataClass);
+  requireValue(!fs.existsSync(target), 'Choose a new self links file.', 'existing_output');
+  requireValue(comparable(ownerName) !== null, 'Supply your own display name.');
+  publish(target, { schemaVersion: 1, dataClass, kind: 'owner-name-rule', ownerName: ownerName.trim(), confirmedAt: now });
+  return { digest: hash(fs.readFileSync(target)) };
+}
+
 if (require.main === module) {
   runCLI(() => {
     const args = process.argv.slice(2), flags = new Map<string, string>();
     requireValue(args.length % 2 === 0, 'Expected flag/value pairs.');
     for (let i = 0; i < args.length; i += 2) {
-      requireValue(['--muse', '--name', '--output', '--candidates', '--approve'].includes(args[i]) && !flags.has(args[i]), 'Invalid self link arguments.');
+      requireValue(['--muse', '--name', '--output', '--candidates', '--approve', '--owner-name'].includes(args[i]) && !flags.has(args[i]),
+        'Invalid self link arguments.');
       flags.set(args[i], args[i + 1]);
     }
-    if (flags.has('--approve')) {
+    if (flags.has('--owner-name')) {
+      requireValue(flags.has('--output') && flags.size === 2,
+        'Usage: contacts:self-links --owner-name <your exact display name> --output <new self.json>');
+      saveOwnerNameRule(flags.get('--owner-name'), flags.get('--output'));
+      process.stdout.write('Saved owner name rule: everyone with exactly your name is treated as you.\n');
+    } else if (flags.has('--approve')) {
       requireValue(flags.has('--candidates') && flags.has('--output') && flags.size === 3,
         'Usage: contacts:self-links --candidates <self-link-candidates.json> --approve <1,2,…|all|none> --output <new self.json>');
       const result = confirmSelfLinks(flags.get('--candidates'), flags.get('--approve'), flags.get('--output'));
@@ -82,4 +97,4 @@ if (require.main === module) {
   });
 }
 
-export { selfLinkCandidates, confirmSelfLinks };
+export { selfLinkCandidates, confirmSelfLinks, saveOwnerNameRule };

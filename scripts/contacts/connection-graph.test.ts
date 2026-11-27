@@ -4,11 +4,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { hash } from './lib.ts';
-import { profileKey, readProfilePhotos, readPhotoLinks, readSelfLinks, connectionModel } from './connection-graph.ts';
+import { profileKey, readProfilePhotos, readPhotoLinks, readSelfLinks, connectionModel, connectionsPanel } from './connection-graph.ts';
 import { projectGoogleCSV, importContactCSV } from './contact-csv.ts';
 import { renderDashboard, readMuseRecency } from './contact-dashboard.ts';
 import { photoLinkCandidates, confirmPhotoLinks } from './photo-links.ts';
-import { selfLinkCandidates, confirmSelfLinks } from './self-links.ts';
+import { selfLinkCandidates, confirmSelfLinks, saveOwnerNameRule } from './self-links.ts';
 
 const now = '2026-11-26T12:00:00.000Z';
 const png = Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.from('synthetic fixture image')]);
@@ -218,7 +218,7 @@ test('self review hides only owner-approved same-name slots from the graph', t =
   confirmSelfLinks(candidates, '1,3', self, 'private', now);
   const muse = readMuseRecency(museFile, 'private');
   const model = connectionModel(null, [muse], null, 'UTC', null, readSelfLinks(self, 'private'));
-  assert.equal(model.selfIdentified, true);
+  assert.deepEqual([model.selfIdentified, model.selfHidden], [false, 2], 'name-based hiding never claims the owner account is identified');
   assert.equal(model.nodes.filter(node => node.label.toLowerCase().replace(/\s+/g, ' ') === 'owner fixture').length, 2,
     'an unapproved same-name slot and a different reported profile both stay');
   assert.equal(model.chats[0].members.length, 1);
@@ -232,4 +232,28 @@ test('self review hides only owner-approved same-name slots from the graph', t =
   fs.writeFileSync(self, JSON.stringify({ ...stale, museInputDigest: 'e'.repeat(64) }));
   const again = path.join(folder, 'preview-again'); fs.mkdirSync(again);
   assert.throws(() => importContactCSV(csv, again, undefined, [museFile], undefined, 'UTC', undefined, self), /different Muse snapshot/);
+});
+
+test('owner name rule hides every exact-name participant in any snapshot', t => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'owner-name-rule-synthetic-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const museFile = path.join(folder, 'muse.private.json'), rule = path.join(folder, 'self.json');
+  const record = (id: string, participants: { name: string; id: string | null }[]) =>
+    ({ chatType: 'group', reportedChatId: id, participants, reportedLatestSentAt: now, nativeEvidenceVerified: false });
+  fs.writeFileSync(museFile, JSON.stringify({ schemaVersion: 1, dataClass: 'private', kind: 'muse-reported-chat-recency', source: 'messenger',
+    retrievedAt: now, requestedPeriod: 'last 14 days', coverage: 'partial', gaps: ['Synthetic gap'], records: [
+      record('g1', [{ name: 'Owner  FIXTURE', id: null }, { name: 'Ada Fixture', id: null }]),
+      record('g2', [{ name: 'Owner Fixture', id: 'https://www.facebook.com/owner.other' }, { name: 'Owner Fixtures', id: null }])] }));
+  assert.throws(() => saveOwnerNameRule('  ', rule), /display name/);
+  saveOwnerNameRule('owner fixture', rule, 'private', now);
+  const model = connectionModel(null, [readMuseRecency(museFile, 'private')], null, 'UTC', null, readSelfLinks(rule, 'private'));
+  assert.deepEqual([model.selfIdentified, model.selfHidden], [false, 2]);
+  assert.deepEqual(model.nodes.map(node => node.label).sort(), ['Ada Fixture', 'Owner Fixtures'], 'only an exact normalized match is hidden');
+  assert.match(connectionsPanel(model), /2 of your own participant entries were hidden/);
+  const csv = path.join(folder, 'fixture.csv'), output = path.join(folder, 'preview-out');
+  fs.writeFileSync(csv, 'Name\nFixture\n'); fs.mkdirSync(output);
+  importContactCSV(csv, output, undefined, [museFile], undefined, 'UTC', undefined, rule);
+  const imported = JSON.parse(fs.readFileSync(path.join(output, 'preview', 'contact-import.json'), 'utf8')).ownerConfirmedSelf;
+  assert.deepEqual([imported.slots, imported.museInputDigest], [null, null]);
+  assert.match(imported.rule, /exactly the owner/);
 });
