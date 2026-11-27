@@ -57,8 +57,10 @@ function confirmSelfLinks(candidatesFile: string, approve: string, output: strin
 }
 
 // Optional owner email addresses are hidden from Gmail people, in addition to the account and addresses you sent from.
+// The optional same-name rule records the owner's standing decision that chat entries with the same name are one person,
+// except the names listed as separate people.
 function saveOwnerNameRule(ownerName: string, output: string, dataClass = 'private', now = new Date().toISOString(),
-  ownerAddresses: string[] = []) {
+  ownerAddresses: string[] = [], sameName: { separateNames: string[] } | null = null) {
   const target = path.resolve(output);
   manualOutputLocation(path.dirname(target), dataClass);
   requireValue(!fs.existsSync(target), 'Choose a new self links file.', 'existing_output');
@@ -66,8 +68,12 @@ function saveOwnerNameRule(ownerName: string, output: string, dataClass = 'priva
   const addresses = ownerAddresses.map(address => emailKey(address.trim()));
   requireValue(addresses.every(address => address !== null) && new Set(addresses).size === addresses.length,
     'Supply distinct plain email addresses of your own.');
+  const separate = (sameName?.separateNames ?? []).map(name => name.trim());
+  requireValue(separate.every(name => comparable(name) !== null) && new Set(separate.map(comparable)).size === separate.length,
+    'Supply distinct names to keep separate.');
   publish(target, { schemaVersion: 1, dataClass, kind: 'owner-name-rule', ownerName: ownerName.trim(), confirmedAt: now,
-    ...(addresses.length ? { ownerAddresses: addresses } : {}) });
+    ...(addresses.length ? { ownerAddresses: addresses } : {}),
+    ...(sameName ? { sameNamePeople: true, separateNames: separate } : {}) });
   return { digest: hash(fs.readFileSync(target)) };
 }
 
@@ -76,16 +82,21 @@ if (require.main === module) {
     const args = process.argv.slice(2), flags = new Map<string, string>();
     requireValue(args.length % 2 === 0, 'Expected flag/value pairs.');
     for (let i = 0; i < args.length; i += 2) {
-      requireValue(['--muse', '--name', '--output', '--candidates', '--approve', '--owner-name', '--owner-emails'].includes(args[i]) &&
-        !flags.has(args[i]), 'Invalid self link arguments.');
+      requireValue(['--muse', '--name', '--output', '--candidates', '--approve', '--owner-name', '--owner-emails', '--same-name-people',
+        '--separate-names'].includes(args[i]) && !flags.has(args[i]), 'Invalid self link arguments.');
       flags.set(args[i], args[i + 1]);
     }
     if (flags.has('--owner-name')) {
-      requireValue(flags.has('--output') && flags.size === (flags.has('--owner-emails') ? 3 : 2),
-        'Usage: contacts:self-links --owner-name <your exact display name> [--owner-emails <a@x,b@y>] --output <new self.json>');
+      const sameName = flags.get('--same-name-people');
+      requireValue(flags.has('--output') && (sameName === undefined || sameName === 'on') &&
+        (!flags.has('--separate-names') || sameName === 'on') &&
+        flags.size === 2 + ['--owner-emails', '--same-name-people', '--separate-names'].filter(flag => flags.has(flag)).length,
+        'Usage: contacts:self-links --owner-name <your exact display name> [--owner-emails <a@x,b@y>] [--same-name-people on [--separate-names <Name A;Name B>]] --output <new self.json>');
       saveOwnerNameRule(flags.get('--owner-name'), flags.get('--output'), 'private', undefined,
-        flags.has('--owner-emails') ? flags.get('--owner-emails').split(',') : []);
-      process.stdout.write('Saved owner name rule: everyone with exactly your name is treated as you.\n');
+        flags.has('--owner-emails') ? flags.get('--owner-emails').split(',') : [],
+        sameName === 'on' ? { separateNames: flags.has('--separate-names') ? flags.get('--separate-names').split(';') : [] } : null);
+      process.stdout.write(`Saved owner name rule: everyone with exactly your name is treated as you${
+        sameName === 'on' ? '; chat entries with the same name are one person unless listed as separate' : ''}.\n`);
     } else if (flags.has('--approve')) {
       requireValue(flags.has('--candidates') && flags.has('--output') && flags.size === 3,
         'Usage: contacts:self-links --candidates <self-link-candidates.json> --approve <1,2,…|all|none> --output <new self.json>');

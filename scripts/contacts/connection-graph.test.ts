@@ -333,6 +333,33 @@ test('Gmail shows only addresses you wrote to, and approved people join entries 
   assert.throws(() => readPeopleLinks(links, 'private'), /one chat are different people/);
 });
 
+test('the same-name rule joins exact names across chats, except listed names and evidence of different people', t => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'same-name-rule-synthetic-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const museFile = path.join(folder, 'muse.private.json'), rule = path.join(folder, 'self.json');
+  const record = (id: string, chatType: string, participants: { name: string; id: string | null }[]) =>
+    ({ chatType, reportedChatId: id, participants, reportedLatestSentAt: now, nativeEvidenceVerified: false });
+  fs.writeFileSync(museFile, JSON.stringify({ schemaVersion: 1, dataClass: 'private', kind: 'muse-reported-chat-recency', source: 'messenger',
+    retrievedAt: now, requestedPeriod: 'last 14 days', coverage: 'partial', gaps: ['Synthetic gap'], records: [
+      record('g1', 'group', [{ name: 'Owner Fixture', id: null }, { name: 'Ada Fixture', id: null }, { name: 'Bo Fixture', id: null }]),
+      record('d1', 'one_to_one', [{ name: 'ada  FIXTURE', id: null }]),
+      record('g2', 'group', [{ name: 'Bo Fixture', id: null }, { name: 'Dee Fixture', id: null }, { name: 'Dee Fixture', id: null }]),
+      record('g3', 'group', [{ name: 'Dee Fixture', id: null }, { name: 'Eve Fixture', id: 'https://www.facebook.com/eve.one' }]),
+      record('g4', 'group', [{ name: 'Eve Fixture', id: 'https://www.facebook.com/eve.two' }])] }));
+  assert.throws(() => saveOwnerNameRule('owner fixture', rule, 'private', now, [], { separateNames: ['Bo Fixture', 'bo  fixture'] }), /distinct names/);
+  saveOwnerNameRule('owner fixture', rule, 'private', now, [], { separateNames: ['Bo Fixture'] });
+  const model = connectionModel(null, [readMuseRecency(museFile, 'private')], null, 'UTC', null, readSelfLinks(rule, 'private'));
+  const count = (name: RegExp) => model.nodes.filter(n => name.test(n.label)).length;
+  assert.deepEqual([count(/ada/i), count(/bo/i), count(/dee/i), count(/eve/i), count(/owner/i)], [1, 2, 3, 2, 0],
+    'listed names, namesakes in one chat and different reported profiles stay separate; the owner stays hidden');
+  const ada = model.nodes.find(n => /ada/i.test(n.label));
+  assert.deepEqual([ada.label, ada.chats.length, ada.kind], ['Ada Fixture', 2, 'direct']);
+  assert.match(ada.identityNote, /same name is the same person/);
+  const saved = JSON.parse(fs.readFileSync(rule, 'utf8'));
+  fs.writeFileSync(rule, JSON.stringify({ ...saved, sameNamePeople: undefined }));
+  assert.throws(() => readSelfLinks(rule, 'private'), /Invalid owner name rule/);
+});
+
 test('a confirmed person never carries two different photos', () => {
   const other = `profile-photo-${'b'.repeat(64)}.png`;
   const twoPhotos = { inputDigest: 'x', photos: [...photos.photos, { key: 'user:other.fixture', file: other, bytes: png, digest: hash(png) }] };
@@ -340,4 +367,7 @@ test('a confirmed person never carries two different photos', () => {
   const people = { people: [{ displayName: 'Ada Fixture', members: [member('direct'), member('group')] }] };
   assert.equal(connectionModel(null, [muse()], photos, 'UTC', null, null, null, people).nodes.filter(n => /Ada/.test(n.label)).length, 1);
   assert.throws(() => connectionModel(null, [muse()], twoPhotos, 'UTC', null, null, null, people), /different photos/);
+  const sameName = Object.assign(new Map<string, string>(), { sameNamePeople: true, separateNames: [] });
+  assert.equal(connectionModel(null, [muse()], twoPhotos, 'UTC', null, sameName).nodes.filter(n => /Ada/.test(n.label)).length, 2,
+    'the same-name rule keeps different reported profiles and photos apart instead of failing');
 });
