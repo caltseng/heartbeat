@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { hash } from './lib.ts';
-import { profileKey, readProfilePhotos, readPhotoLinks, readSelfLinks, readPeopleLinks, connectionModel, connectionsPanel } from './connection-graph.ts';
+import { profileKey, readProfilePhotos, readPhotoLinks, readSelfLinks, readPeopleLinks, connectionModel, connectionSVG, connectionsPanel } from './connection-graph.ts';
 import { projectGoogleCSV, importContactCSV } from './contact-csv.ts';
 import { renderDashboard, readMuseRecency } from './contact-dashboard.ts';
 import { readGmailMetadata } from './gmail-metadata.ts';
@@ -92,12 +92,45 @@ test('concentric graph keeps group membership spoke-free, excludes self IDs and 
   assert.ok(html.includes('never by automatic name or face matching'));
 });
 
+test('group-only people are inspected through one spoke-free node per chat, with independent chat recency', () => {
+  const model = connectionModel(null, [muse(['100001'])], null, 'UTC');
+  const svg = connectionSVG(model);
+  const elements = [...svg.matchAll(/<g class="node ([^"]+)" data-node="([^"]+)"/g)];
+  const drawn = elements.filter(([, classes]) => !classes.split(' ').includes('filtered')).map(([, , id]) => id);
+  const direct = model.nodes.find(node => node.kind === 'direct');
+  assert.deepEqual(drawn.sort(), [direct.id, ...model.groups.map(node => node.id)].sort());
+  assert.equal(model.groups.length, 2, 'one group node, not one node per group-only participant');
+  assert.equal(svg.match(/data-bubble=/g).length, 2);
+  assert.equal(svg.match(/class="bubble-members"/g).length, 2, 'each group has a member-reveal surface');
+  assert.deepEqual(model.groups.map(node => [node.ring, node.lastActivity]), [['unknown', null], ['fortnight', '2026-11-16']]);
+  for (const group of model.groups) {
+    assert.ok(!svg.includes(`data-spoke="${group.id}"`));
+    assert.match(group.lastNote, /(?:not a direct interaction|no dated interaction)/);
+    assert.match(group.identityNote, /membership is not evidence of a direct interaction/);
+  }
+  assert.equal(model.chats[1].members.includes(direct.id), true, 'people with direct chats remain listed group members too');
+  const unknown = connectionModel(null, [muse(['100001'])], null);
+  assert.ok(unknown.groups.every(group => group.ring === 'unknown'), 'a group timestamp without a time zone is still unknown');
+  const directOnly = connectionModel(null, [{ ...muse(['100001']), records: [muse(['100001']).records[0]] }], null, 'UTC');
+  assert.deepEqual(directOnly.groups, []);
+});
+
+test('group plus unknown chat does not claim that a person has only group chats', () => {
+  const source = { ...muse(['100001']), records: muse(['100001']).records.map((row, i) => i ? row : { ...row, chatType: 'unknown' }) };
+  const model = connectionModel(null, [source], null, 'UTC');
+  const person = model.nodes.find(node => node.chats.length === 2);
+  const svg = connectionSVG(model);
+  assert.match(svg, new RegExp(`<g class="node kind-group" data-node="${person.id}"`));
+  assert.ok(!svg.includes(`data-spoke="${person.id}"`), 'unknown chat type is not direct interaction evidence');
+});
+
 test('every platform chip and legend entry has a bounded icon referencing its source badge', () => {
   const platforms = ['messenger', 'instagram', 'messages', 'gmail'] as const;
   const labels = ['Messenger', 'Instagram', 'Google Messages', 'Gmail'];
   const model = connectionModel(null, [muse(['100001'])], null, 'UTC');
   model.nodes = platforms.map((platform, index) => ({ ...model.nodes[0], id: `synthetic-${platform}`,
     platforms: [platform], platformLabels: [labels[index]] }));
+  model.groups = [];
   const html = connectionsPanel(model);
   const chips = [...html.matchAll(/<label class="chip">(<input[^>]*data-platform-filter[^>]*>)(.*?)<\/label>/g)];
   const legend = html.match(/<div class="legend">(.*?)<\/div>/)[1];
