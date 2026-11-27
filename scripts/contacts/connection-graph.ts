@@ -20,7 +20,7 @@ interface MuseSource {
 type PhotoLinks = Map<string, { name: string; key: string }> & { originalBytes?: Buffer; inputDigest?: string; confirmedAt?: string };
 // Owner-confirmed chat participant slots that are the owner, keyed `source|chatId|position`; they are never drawn as people.
 type SelfLinks = Map<string, string> & { originalBytes?: Buffer; inputDigest?: string; confirmedAt?: string; museInputDigest?: string;
-  ownerName?: string };
+  ownerName?: string; ownerAddresses?: string[] };
 // Owner-confirmed people: each groups entries from any source that the owner said are the same person.
 type PersonMember = { source: 'messenger' | 'instagram'; reportedChatId: string; participantIndex: number; participantName: string } |
   { source: 'gmail'; address: string };
@@ -146,12 +146,15 @@ function readSelfLinks(file: string, dataClass: string): SelfLinks {
   const originalBytes = fs.readFileSync(resolved), value = JSON.parse(originalBytes.toString('utf8'));
   if (value?.kind === 'owner-name-rule') {
     // The owner's standing rule: every participant with exactly the owner's normalized name is the owner, in any snapshot.
-    object(value, ['schemaVersion', 'dataClass', 'kind', 'ownerName', 'confirmedAt'], 'owner name rule');
+    object(value, ['schemaVersion', 'dataClass', 'kind', 'ownerName', 'confirmedAt', 'ownerAddresses'], 'owner name rule');
     const ownerName = comparableName(text(value.ownerName, 'owner name'));
+    const ownerAddresses = value.ownerAddresses === undefined ? [] :
+      array(value.ownerAddresses, 'owner addresses').map(address => emailKey(text(address, 'owner address')));
     requireValue(value.schemaVersion === 1 && value.dataClass === dataClass && ownerName !== null &&
+      ownerAddresses.every(address => address !== null) && (value.ownerAddresses === undefined || ownerAddresses.length > 0) &&
       !Number.isNaN(Date.parse(text(value.confirmedAt, 'confirmation time'))), 'Invalid owner name rule.');
     return Object.assign(new Map<string, string>(), { originalBytes, inputDigest: hash(originalBytes),
-      confirmedAt: value.confirmedAt as string, ownerName });
+      confirmedAt: value.confirmedAt as string, ownerName, ownerAddresses });
   }
   object(value, ['schemaVersion', 'dataClass', 'kind', 'museInputDigest', 'confirmedAt', 'slots'], 'self links');
   requireValue(value.schemaVersion === 1 && value.dataClass === dataClass && value.kind === 'owner-confirmed-self-slots' &&
@@ -203,6 +206,8 @@ function readPeopleLinks(file: string, dataClass: string): PeopleLinks {
       return parsed;
     });
     requireValue(members.length >= 2, 'A confirmed person joins at least two entries.');
+    const chats = members.filter(m => m.source !== 'gmail').map(m => `${m.source}|${(m as { reportedChatId: string }).reportedChatId}`);
+    requireValue(new Set(chats).size === chats.length, 'Two entries in one chat are different people and never join.');
     return { displayName: text(row.displayName, 'person display name'), members };
   });
   return { people, originalBytes, inputDigest: hash(originalBytes), confirmedAt: value.confirmedAt as string };
@@ -213,20 +218,22 @@ function initials(label: string): string {
   return letters.join('').toLocaleUpperCase() || '?';
 }
 
-// Every sent row's sender is one of the owner's addresses. Only addresses the owner wrote to count as correspondents;
-// received-only senders (often automated) stay hidden until the owner writes to them.
-function gmailPeople(gmail: GmailSource) {
+// Every sent row's sender is one of the owner's addresses, as are any the owner listed. Only addresses the owner wrote to
+// count as correspondents; received-only senders (often automated) stay hidden until the owner writes to them.
+// A message is one-to-one only when exactly one non-owner address, hidden ones included, is on it.
+function gmailPeople(gmail: GmailSource, ownerAddresses: readonly string[] = []) {
   const sent = gmail.observations.filter(row => row.direction === 'sent');
-  const owner = new Set([gmail.account, ...sent.map(row => row.from)]);
+  const owner = new Set([gmail.account, ...ownerAddresses, ...sent.map(row => row.from)]);
   const correspondents = new Set(sent.flatMap(row => [...row.to, ...row.cc]).filter(a => !owner.has(a)));
   const hidden = new Set(gmail.observations.flatMap(row => [row.from, ...row.to, ...row.cc])
     .filter(a => !owner.has(a) && !correspondents.has(a)));
-  const threads = new Map<string, { people: string[]; latest: string }>();
+  const threads = new Map<string, { people: string[]; direct: boolean; latest: string }>();
   for (const row of gmail.observations) {
-    const people = [...new Set([row.from, ...row.to, ...row.cc])].filter(a => correspondents.has(a)).sort();
+    const others = [...new Set([row.from, ...row.to, ...row.cc])].filter(a => !owner.has(a)).sort();
+    const people = others.filter(a => correspondents.has(a));
     if (!people.length) continue;
-    const key = JSON.stringify(people), found = threads.get(key);
-    if (!found || row.timestamp > found.latest) threads.set(key, { people, latest: row.timestamp });
+    const key = JSON.stringify(others), found = threads.get(key);
+    if (!found || row.timestamp > found.latest) threads.set(key, { people, direct: others.length === 1, latest: row.timestamp });
   }
   return { owner, correspondents, hiddenAddresses: hidden.size, threads: [...threads.values()] };
 }
@@ -311,10 +318,10 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
   });
   let gmailHidden: number | null = null;
   if (gmail) {
-    const people = gmailPeople(gmail), asOf = dayOf(new Date(Date.parse(gmail.coverage.end) - 1).toISOString());
+    const people = gmailPeople(gmail, selfLinks?.ownerAddresses), asOf = dayOf(new Date(Date.parse(gmail.coverage.end) - 1).toISOString());
     gmailHidden = people.hiddenAddresses;
     people.threads.forEach((thread, index) => {
-      const kind = thread.people.length === 1 ? 'one-to-one' : 'group';
+      const kind = thread.direct ? 'one-to-one' : 'group';
       const chat: GraphChat = { id: `c${chats.length + 1}`, platform: 'gmail', kind, latest: thread.latest, asOf, members: [],
         label: `${kind === 'group' ? 'Group email' : 'Email'} ${index + 1}` };
       chats.push(chat);

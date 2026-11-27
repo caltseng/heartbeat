@@ -277,19 +277,21 @@ test('Gmail shows only addresses you wrote to, and approved people join entries 
     retrievedAt: now, requestedPeriod: 'last 14 days', coverage: 'partial', gaps: ['Synthetic gap'], records: [
       record('g1', 'group', [{ name: 'Owner Fixture', id: null }, { name: 'Ada Fixture', id: null }, { name: 'Bo Fixture', id: null }]),
       record('g2', 'group', [{ name: 'ada  fixture', id: null }]),
-      record('d1', 'one_to_one', [{ name: 'Cy Fixture', id: null }])] }));
-  saveOwnerNameRule('owner fixture', rule, 'private', now);
+      record('d1', 'one_to_one', [{ name: 'Cy Fixture', id: null }]),
+      record('g3', 'group', [{ name: 'Dee Fixture', id: null }, { name: 'Dee Fixture', id: null }]),
+      record('g4', 'group', [{ name: 'Dee Fixture', id: null }])] }));
+  saveOwnerNameRule('owner fixture', rule, 'private', now, ['Me@Example.com']);
   const row = (direction: string, from: string, to: string[], cc: string[], timestamp: string) => ({ timestamp, direction, from, to, cc, batch: 1 });
   fs.writeFileSync(gmailFile, JSON.stringify({ dataClass: 'private', source: 'email', account: 'Owner@Example.com', connector: 'synthetic',
     fields: [], excluded: [], providerIds: false, rawRows: 4, uniqueRows: 4,
     coverage: { start: '2026-11-12T08:00:00.000Z', end: now, completeness: 'partial', basis: 'synthetic' }, observations: [
-      row('sent', 'owner@example.com', ['ada@example.com'], [], '2026-11-20T12:00:00.000Z'),
+      row('sent', 'owner@example.com', ['ada@example.com', 'me@example.com'], [], '2026-11-20T12:00:00.000Z'),
       row('sent', 'alias@example.com', ['cy@example.com', 'owner@example.com'], ['ADA@example.com'], '2026-11-21T12:00:00.000Z'),
-      row('received', 'news@example.com', ['owner@example.com'], [], '2026-11-25T12:00:00.000Z'),
+      row('received', 'news@example.com', ['owner@example.com', 'ada@example.com'], [], '2026-11-25T12:00:00.000Z'),
       row('received', 'ada@example.com', ['alias@example.com'], [], '2026-11-24T12:00:00.000Z')] }));
   fs.writeFileSync(csv, 'Name,E-mail 1 - Value\nAda Fixture,ada@example.com\nCy Fixture,cy@example.com\nCy Fixture,\n');
   assert.deepEqual(peopleLinkCandidates({ muse: [museFile], gmail: gmailFile, contacts: csv, selfLinks: rule, output: review }),
-    { candidates: 1, entries: 3, bridged: 1 }, 'ambiguous contact names and single entries are never proposed');
+    { candidates: 1, entries: 3, bridged: 1 }, 'ambiguous contact names, same-chat namesakes and single entries are never proposed');
   assert.ok(!fs.readFileSync(path.join(review, 'review.html'), 'utf8').includes('<script'));
   const candidates = path.join(review, 'people-link-candidates.json');
   assert.throws(() => confirmPeopleLinks(candidates, '2', links), /candidate numbers/);
@@ -297,13 +299,17 @@ test('Gmail shows only addresses you wrote to, and approved people join entries 
   const muse = readMuseRecency(museFile, 'private'), gmail = readGmailMetadata(gmailFile, 'private'), self = readSelfLinks(rule, 'private');
   const unjoined = connectionModel(null, [muse], null, 'UTC', null, self, gmail);
   assert.deepEqual(unjoined.nodes.filter(n => n.platforms.includes('gmail')).map(n => n.label).sort(), ['ada@example.com', 'cy@example.com'],
-    'owner addresses and received-only senders are not people');
+    'owner addresses, listed owner addresses and received-only senders are not people');
   assert.equal(unjoined.gmailHidden, 1);
+  const newsletter = unjoined.chats.find(c => c.platform === 'gmail' && c.latest === '2026-11-25T12:00:00.000Z');
+  assert.equal(newsletter.kind, 'group', 'mail that also went to a hidden address is never one-to-one');
+  assert.deepEqual(unjoined.chats.filter(c => c.platform === 'gmail' && c.kind === 'one-to-one').map(c => c.latest),
+    ['2026-11-24T12:00:00.000Z'], 'one-to-one keeps the latest message with only them');
   assert.equal(unjoined.nodes.filter(n => /ada/i.test(n.label)).length, 3, 'without approval nothing joins by name or address');
   const model = connectionModel(null, [muse], null, 'UTC', null, self, gmail, readPeopleLinks(links, 'private'));
   const ada = model.nodes.filter(n => /ada/i.test(n.label));
   assert.equal(ada.length, 1);
-  assert.deepEqual([ada[0].label, ada[0].platforms, ada[0].chats.length, ada[0].kind], ['Ada Fixture', ['messenger', 'gmail'], 4, 'direct']);
+  assert.deepEqual([ada[0].label, ada[0].platforms, ada[0].chats.length, ada[0].kind], ['Ada Fixture', ['messenger', 'gmail'], 5, 'direct']);
   assert.equal(ada[0].lastActivity, '2026-11-26');
   assert.match(ada[0].identityNote, /You confirmed these entries are one person/);
   assert.match(connectionsPanel(model), /1 address\(es\) that only wrote to you are not shown/);
@@ -319,9 +325,12 @@ test('Gmail shows only addresses you wrote to, and approved people join entries 
   assert.throws(() => connectionModel(null, [muse], null, 'UTC', null, self, gmail, readPeopleLinks(links, 'private')), /no longer matches/);
   const ownSlot = { ...saved, people: [{ displayName: 'Owner', members: [
     { source: 'messenger', reportedChatId: 'g1', participantIndex: 0, participantName: 'Owner Fixture' },
-    { source: 'messenger', reportedChatId: 'g1', participantIndex: 2, participantName: 'Bo Fixture' }] }] };
+    { source: 'messenger', reportedChatId: 'g2', participantIndex: 0, participantName: 'ada  fixture' }] }] };
   fs.writeFileSync(links, JSON.stringify(ownSlot));
   assert.throws(() => connectionModel(null, [muse], null, 'UTC', null, self, gmail, readPeopleLinks(links, 'private')), /your own entries/);
+  const dee = (index: number) => ({ source: 'messenger', reportedChatId: 'g3', participantIndex: index, participantName: 'Dee Fixture' });
+  fs.writeFileSync(links, JSON.stringify({ ...saved, people: [{ displayName: 'Dee', members: [dee(0), dee(1)] }] }));
+  assert.throws(() => readPeopleLinks(links, 'private'), /one chat are different people/);
 });
 
 test('a confirmed person never carries two different photos', () => {

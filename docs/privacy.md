@@ -148,9 +148,11 @@ name match in any snapshot. The rule file stays private like the review files.
 The owner directed that the view be people-centric, without duplicate nodes for
 one person reached in several places. `contacts:people-links` only proposes
 same-name chat slots and contact-bridged Gmail addresses on a private review page;
-nothing joins until the owner approves numbers. Gmail correspondents are only the
-recipients of messages the owner sent; addresses that only wrote to the owner are
-counted, not shown. The candidates, review page, links file and Gmail copy in the
+nothing joins until the owner approves numbers. Two entries in one chat are
+different people and never join. Gmail correspondents are only the recipients of
+messages the owner sent, minus the owner's own addresses; addresses that only
+wrote to the owner are counted, not shown, and a message is one-to-one only when
+it has exactly one non-owner address. The candidates, review page, links file and Gmail copy in the
 preview stay private, outside Git, PRs, CI and Library.
 
 ## CONTACTS-010: owner-approved policy

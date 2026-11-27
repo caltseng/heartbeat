@@ -29,6 +29,8 @@ function peopleLinkCandidates(options: { muse: string[]; gmail?: string; contact
     contacts = projectGoogleCSV(fs.readFileSync(source), dataClass as 'private');
   }
   const byName = new Map<string, { displayName: string; members: PersonMember[]; chats: Set<string>; bridge: string | null }>();
+  // Two same-name entries in one chat are visibly different people, so that name is never proposed.
+  const sameChat = new Set<string>();
   for (const source of muse) {
     const self = new Set((source.selfIds ?? []).map(id => participantKey(source.source, id)).filter(Boolean));
     source.records.forEach(record => record.participants.forEach((participant, participantIndex) => {
@@ -36,11 +38,14 @@ function peopleLinkCandidates(options: { muse: string[]; gmail?: string; contact
       if (name === null || participant.id !== null || record.reportedChatId === null || self.has(participantKey(source.source, participant.id)) ||
         name === selfLinks?.ownerName || selfLinks?.has(at)) return;
       const entry = byName.get(name) ?? { displayName: participant.name, members: [], chats: new Set(), bridge: null };
+      const chat = `${source.source}|${record.reportedChatId}`;
+      if (entry.chats.has(chat)) sameChat.add(name);
       entry.members.push({ source: source.source, reportedChatId: record.reportedChatId, participantIndex, participantName: participant.name });
-      entry.chats.add(`${source.source}|${record.reportedChatId}`);
+      entry.chats.add(chat);
       byName.set(name, entry);
     }));
   }
+  sameChat.forEach(name => byName.delete(name));
   let ambiguousNames = 0, bridged = 0;
   if (gmail && contacts) {
     const names = new Map<string, number>(), owners = new Map<string, Set<string>>();
@@ -53,12 +58,12 @@ function peopleLinkCandidates(options: { muse: string[]; gmail?: string; contact
       }
     }
     ambiguousNames = [...names.values()].filter(count => count > 1).length;
-    const people = gmailPeople(gmail);
+    const people = gmailPeople(gmail, selfLinks?.ownerAddresses);
     for (const address of people.correspondents) {
       const owner = owners.get(address);
       if (owner?.size !== 1) continue;
       const contact = contacts.contacts.find(c => c.personId === [...owner][0]), name = comparableName(contact.displayName);
-      if (name === null || names.get(name) !== 1) continue;
+      if (name === null || names.get(name) !== 1 || sameChat.has(name) || name === selfLinks?.ownerName) continue;
       const entry = byName.get(name) ?? { displayName: contact.displayName, members: [], chats: new Set(), bridge: null };
       entry.members.push({ source: 'gmail', address });
       entry.bridge = contact.displayName;

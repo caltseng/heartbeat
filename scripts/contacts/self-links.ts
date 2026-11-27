@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { manualOutputLocation } from './manual-retrieval.ts';
 import { readMuseRecency } from './contact-dashboard.ts';
-import { comparableName } from './connection-graph.ts';
+import { comparableName, emailKey } from './connection-graph.ts';
 import { array, object, text, requireValue, publish, publishText, runCLI, errorCode, hash } from './lib.ts';
 
 // The owner's name only proposes slots for review, unless the owner saves a standing exact-name rule with --owner-name.
@@ -56,12 +56,18 @@ function confirmSelfLinks(candidatesFile: string, approve: string, output: strin
   return { approved: numbers.length, digest: hash(fs.readFileSync(target)) };
 }
 
-function saveOwnerNameRule(ownerName: string, output: string, dataClass = 'private', now = new Date().toISOString()) {
+// Optional owner email addresses are hidden from Gmail people, in addition to the account and addresses you sent from.
+function saveOwnerNameRule(ownerName: string, output: string, dataClass = 'private', now = new Date().toISOString(),
+  ownerAddresses: string[] = []) {
   const target = path.resolve(output);
   manualOutputLocation(path.dirname(target), dataClass);
   requireValue(!fs.existsSync(target), 'Choose a new self links file.', 'existing_output');
   requireValue(comparable(ownerName) !== null, 'Supply your own display name.');
-  publish(target, { schemaVersion: 1, dataClass, kind: 'owner-name-rule', ownerName: ownerName.trim(), confirmedAt: now });
+  const addresses = ownerAddresses.map(address => emailKey(address.trim()));
+  requireValue(addresses.every(address => address !== null) && new Set(addresses).size === addresses.length,
+    'Supply distinct plain email addresses of your own.');
+  publish(target, { schemaVersion: 1, dataClass, kind: 'owner-name-rule', ownerName: ownerName.trim(), confirmedAt: now,
+    ...(addresses.length ? { ownerAddresses: addresses } : {}) });
   return { digest: hash(fs.readFileSync(target)) };
 }
 
@@ -70,14 +76,15 @@ if (require.main === module) {
     const args = process.argv.slice(2), flags = new Map<string, string>();
     requireValue(args.length % 2 === 0, 'Expected flag/value pairs.');
     for (let i = 0; i < args.length; i += 2) {
-      requireValue(['--muse', '--name', '--output', '--candidates', '--approve', '--owner-name'].includes(args[i]) && !flags.has(args[i]),
-        'Invalid self link arguments.');
+      requireValue(['--muse', '--name', '--output', '--candidates', '--approve', '--owner-name', '--owner-emails'].includes(args[i]) &&
+        !flags.has(args[i]), 'Invalid self link arguments.');
       flags.set(args[i], args[i + 1]);
     }
     if (flags.has('--owner-name')) {
-      requireValue(flags.has('--output') && flags.size === 2,
-        'Usage: contacts:self-links --owner-name <your exact display name> --output <new self.json>');
-      saveOwnerNameRule(flags.get('--owner-name'), flags.get('--output'));
+      requireValue(flags.has('--output') && flags.size === (flags.has('--owner-emails') ? 3 : 2),
+        'Usage: contacts:self-links --owner-name <your exact display name> [--owner-emails <a@x,b@y>] --output <new self.json>');
+      saveOwnerNameRule(flags.get('--owner-name'), flags.get('--output'), 'private', undefined,
+        flags.has('--owner-emails') ? flags.get('--owner-emails').split(',') : []);
       process.stdout.write('Saved owner name rule: everyone with exactly your name is treated as you.\n');
     } else if (flags.has('--approve')) {
       requireValue(flags.has('--candidates') && flags.has('--output') && flags.size === 3,

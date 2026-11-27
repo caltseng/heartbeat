@@ -294,6 +294,8 @@ still never joins by name on its own. `contacts:people-links` proposes candidate
 on a private review page:
 
 - ID-less, non-owner Muse slots with the same normalized name in different chats.
+  A name that appears twice in one chat is visibly two people and is never
+  proposed; a people file joining two entries of one chat fails.
 - A Gmail correspondent whose address is saved on exactly one CSV contact whose
   name is unique in the CSV and equals that slot name. Shared contact names are
   never used as a bridge.
@@ -312,10 +314,14 @@ different photos fails the preview. Joined nodes take the confirmed name and eve
 member's chats, so recency is the latest across sources.
 
 `contacts:csv --gmail` reads the saved Gmail observations. People are the to/cc
-addresses of messages the owner sent, minus the account and the owner's sending
-addresses. Addresses that only wrote to the owner are counted but not shown, so
-newsletters do not become people. Threads are grouped by the exact correspondent
-set; the as-of is the end of coverage. The preview copies `gmail.original.json`
+addresses of messages the owner sent, minus the account, the owner's sending
+addresses and any extra own addresses saved with
+`contacts:self-links --owner-name "<name>" --owner-emails "<a@x,b@y>"`.
+Addresses that only wrote to the owner are counted but not shown, so newsletters
+do not become people. Messages are grouped by their exact set of non-owner
+addresses, hidden ones included; only a message with exactly one is one-to-one, so
+newsletters or lists that include a person stay group email. The as-of is the end
+of coverage. The preview copies `gmail.original.json`
 and `people-links.original.json` and records `gmail` and `ownerConfirmedPeople`
 in `contact-import.json`.
 
