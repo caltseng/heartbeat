@@ -40,10 +40,12 @@ const mailboxKey = (value: string) => {
 interface SavedContact { displayName: string | null; addresses: { type: string; value: string }[]; business?: 'label' | 'company' }
 // Guesses only: role mailboxes (orders@, noreply@ …) and bulk-mail sending subdomains usually belong to organizations.
 const ROLE_MAILBOX = /^(no-?reply|do-?not-?reply|donotreply|info|support|help|hello|team|sales|billing|orders?|receipts?|notifications?|news|newsletters?|marketing|admin|contact|service|customer-?service|accounts?|updates|mail|mailer|jobs|careers|office|events|reservations?|bookings?|feedback|press|shop|store|front-?desk|reception|appointments?|scheduling|general|registrar|webmaster|postmaster|alerts?|membership|donations?|giving|invoices?|payments?|bounces?)([._+-].*)?$/;
-const BULK_DOMAIN = /^(e|em|email|mail|mailer|news|reply|notifications?|mg|mkt|marketing|info|bounce)\d*\./;
+// The prefix must be a subdomain of an organization's domain (mail.shop.example), not a consumer provider (mail.com) or a school.
+const BULK_DOMAIN = /^(e|em|email|mail|mailer|news|reply|notifications?|mg|mkt|marketing|info|bounce)\d*\.[^.]+\.[^.]+/;
+const SCHOOL_DOMAIN = /\.(edu|edu\.[a-z]{2}|ac\.[a-z]{2})$/;
 const automatedAddress = (address: string) => {
   const [local, domain = ''] = address.toLowerCase().split('@');
-  return ROLE_MAILBOX.test(local) || BULK_DOMAIN.test(domain) || /noreply|newsletter|mailer-daemon/.test(local);
+  return ROLE_MAILBOX.test(local) || (BULK_DOMAIN.test(domain) && !SCHOOL_DOMAIN.test(domain)) || /noreply|newsletter|mailer-daemon/.test(local);
 };
 const comparableName = (name: string | null | undefined) =>
   typeof name !== 'string' ? null : name.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US') || null;

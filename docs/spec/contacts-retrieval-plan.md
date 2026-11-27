@@ -372,7 +372,8 @@ copy as well. The chart marks a person as a business, in this order:
    removes the name from the other list, and a name cannot be in both.
 3. **Guess.** A Gmail-only correspondent with no saved contact name, whose every
    address is a role mailbox (`noreply`, `orders`, `info` …) or comes from a bulk
-   mail subdomain (`mail.`, `e.`, `news.` …), is shown as a guess.
+   mail subdomain of an organization (`mail.shop.example`, `e.brand.example` …,
+   not a provider such as `mail.com` or a school), is shown as a guess.
 
 Businesses start filtered out of the chart; **Show businesses** brings them back,
 and the **Businesses** list names each one with its basis.

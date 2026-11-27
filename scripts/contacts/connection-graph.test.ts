@@ -472,7 +472,7 @@ test('businesses come from Google Contacts first, then the name rule, and automa
       { chatType: 'one_to_one', reportedChatId: 'd1', participants: [{ name: 'Cafe Fixture', id: null }], reportedLatestSentAt: now,
         nativeEvidenceVerified: false }] }));
   const to = ['shop@acme.example', 'orders@ink.example', 'deals@news.brand.example', 'bo@example.com', 'help@friend.example',
-    'info@rule.example', 'noreply@kept.example', 'alex@mail.example'];
+    'info@rule.example', 'noreply@kept.example', 'alex@mail.com', 'sam@mail.school.edu', 'deals@mail.shop.example'];
   fs.writeFileSync(gmailFile, JSON.stringify({ dataClass: 'private', source: 'email', account: 'owner@example.com', connector: 'synthetic',
     fields: [], excluded: [], providerIds: false, rawRows: 1, uniqueRows: 1,
     coverage: { start: '2026-11-12T08:00:00.000Z', end: now, completeness: 'partial', basis: 'synthetic' }, observations: [
@@ -489,8 +489,8 @@ test('businesses come from Google Contacts first, then the name rule, and automa
     readSelfLinks(file, 'private'), readGmailMetadata(gmailFile, 'private'), null, contacts).nodes.map(n => [n.label, n.business ?? null]));
   assert.deepEqual(model(rule), { 'Cafe Fixture': 'rule', 'Acme Store': 'contacts', 'orders@ink.example': 'guess',
     'deals@news.brand.example': 'guess', 'Bo Person': null, 'Helpful Friend': null, 'info@rule.example': 'rule',
-    'noreply@kept.example': null, 'alex@mail.example': 'guess' },
-  'the Contacts label wins over a person mark; marks beat guesses; a saved contact name is never guessed');
+    'noreply@kept.example': null, 'alex@mail.com': null, 'sam@mail.school.edu': null, 'deals@mail.shop.example': 'guess' },
+  'the Contacts label wins over a person mark; marks beat guesses; a saved contact name, a consumer provider or a school is never guessed');
   const moved = path.join(folder, 'self-3.json');
   updateNameRule(rule, moved, { person: ['CAFE  fixture'] }, 'private', now);
   const saved = JSON.parse(fs.readFileSync(moved, 'utf8'));
