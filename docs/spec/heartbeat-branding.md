@@ -22,6 +22,9 @@ resampling. The README uses the complete color wordmark with descriptive alt
 text and a repository-relative path. No image or font dependency is required.
 
 The opaque warm background preserves legibility in light/dark themes.
+The generated contacts dashboard embeds the complete approved wordmark as a
+PNG data URL, with descriptive alt text and proportional sizing. No companion
+logo file or network access is needed to open the saved dashboard offline.
 Engineering alternatives, pixel validation and revisit conditions are recorded
 in the [central history](../decisions.md#branding).
 

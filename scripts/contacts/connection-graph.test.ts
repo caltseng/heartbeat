@@ -41,6 +41,20 @@ test('profile keys use exact native Facebook references and never derive identit
   }
 });
 
+test('dashboard embeds the approved wordmark without a companion asset or network dependency', () => {
+  const html = renderDashboard(projectGoogleCSV(Buffer.from('Name\nFixture\n'), 'synthetic', now), null, []);
+  const header = html.match(/<header>(.*?)<\/header>/s)?.[1];
+  assert.ok(header);
+  const logo = header.match(/<img class="wordmark" src="data:image\/png;base64,([A-Za-z0-9+/=]+)" width="972" height="180" alt="([^"]+)">/);
+  assert.ok(logo, 'the header contains an accessible, embedded PNG with the approved aspect ratio');
+  assert.deepEqual(Buffer.from(logo[1], 'base64'),
+    fs.readFileSync(path.join(__dirname, '..', '..', 'docs', 'assets', 'heartbeat-wordmark.png')));
+  assert.equal(logo[2], 'Heartbeat — ping-and-reply H logo and wordmark');
+  assert.ok(!header.includes('<span class="dot">'), 'the old text wordmark is removed');
+  assert.match(header, /Private · offline · read-only/);
+  assert.match(html, /img-src 'self' data:; connect-src 'none'/);
+});
+
 test('concentric graph keeps group membership spoke-free, excludes self IDs and attaches faces only by exact profile ID', () => {
   const model = connectionModel(null, [muse(['https://www.facebook.com/profile.php?id=100001'])], photos, 'America/Los_Angeles');
   assert.equal(model.selfIdentified, true);
@@ -71,7 +85,7 @@ test('concentric graph keeps group membership spoke-free, excludes self IDs and 
   }
 
   const html = renderDashboard(projectGoogleCSV(Buffer.from('Name\nFixture\n'), 'synthetic', now), null, [], [muse(['100001'])], photos);
-  assert.match(html, /script-src 'sha256-[^']+' 'sha256-[^']+'; style-src 'unsafe-inline'; img-src 'self';/);
+  assert.match(html, /script-src 'sha256-[^']+' 'sha256-[^']+'; style-src 'unsafe-inline'; img-src 'self' data:;/);
   assert.equal(html.match(/<image href="photos\//g).length, 1);
   assert.equal(html.match(/data-spoke=/g).length, 1, 'only the one-to-one participant gets a spoke');
   assert.ok(!html.includes('<b>Ada</b>'));
