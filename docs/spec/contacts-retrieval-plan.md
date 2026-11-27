@@ -208,13 +208,26 @@ never the render clock or another source's later snapshot. Calendar days need a
 time zone: the saved observations period supplies it, or pass
 `--time-zone <IANA zone>` (which must match the observations if both exist);
 without one, timestamped activity stays in the unknown ring. Spokes show evidence type: solid
-for one-to-one, dashed for Google Messages conversations whose participants are
-unlinked, and none for group-chat-only members. For those members the ring
-reflects group activity, not necessarily interaction with them, and the inspector
-says so. A missing date stays in the unknown ring rather than being treated as old.
+for one-to-one and dashed for Google Messages conversations whose participants are
+unlinked. People whose shared chats are exclusively groups are not drawn separately:
+each such group chat has one **GC** node without a spoke, on that chat's own recency
+ring. Each bubble shows its eligible listed-member count. Hover, focus or click a
+group to reveal its members; group-only avatars fan out around their home bubble
+(their latest dated group, first group on ties). Selection and matching member
+searches open that home bubble too. Clicking pins the
+inspector, where selecting a member exposes the existing hide, business and guarded
+combine controls. People with any one-to-one or text chat remain individual nodes,
+and still appear in their groups' member lists. Unknown chat types are not assumed
+to be groups or direct interactions. Group membership and group activity never
+imply a direct interaction with any member. A missing date stays in the unknown ring
+rather than being treated as old.
 Each node carries a platform badge (Messenger, Instagram,
 Google Messages). Selecting a node lists its chats and highlights people who share
-those chats; search, platform filters, zoom and pan are local. People are joined
+those chats; search, platform filters, zoom and pan are local. Searching a listed
+member finds their group node; hidden people and excluded businesses do not make a
+group match and are omitted from its inspector. A group disappears when no eligible
+group-only member remains. Browser combines preserve group membership and reproject
+the graph without converting membership into a direct-interaction spoke. People are joined
 across chats only by an exact reported profile ID or an owner-confirmed photo link
 (below); other ID-less participants stay local to one chat and are never merged
 automatically by name. The interaction script is fixed

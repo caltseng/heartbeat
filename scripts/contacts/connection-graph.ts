@@ -54,11 +54,12 @@ interface GraphNode {
   id: string; label: string; initials: string; ring: Ring; ringLabel: string; kind: Kind; lastActivity: string | null;
   lastNote: string; platforms: Platform[]; platformLabels: string[]; chats: string[]; photo: string | null; identityNote: string;
   hidden?: boolean; reportedOn?: Platform[]; confirmed?: boolean;
+  groupChat?: string;
   // Why this entry counts as a business: the owner's Google Contacts, the owner's name rule, or an automated-address guess.
   business?: 'contacts' | 'rule' | 'guess';
 }
 interface GraphChat { id: string; platform: Platform; kind: 'one-to-one' | 'group' | 'unknown' | 'text'; label: string; latest: string | null; asOf: string | null; members: string[] }
-interface ConnectionModel { nodes: GraphNode[]; chats: GraphChat[]; linkedPhotos: Photo[]; selfIdentified: boolean; selfHidden: number;
+interface ConnectionModel { nodes: GraphNode[]; groups: GraphNode[]; chats: GraphChat[]; linkedPhotos: Photo[]; selfIdentified: boolean; selfHidden: number;
   asOf: string | null; gmailHidden?: number | null; sameAsUnjoined?: number }
 
 const PLATFORMS: Record<Platform, string> = { messenger: 'Messenger', instagram: 'Instagram', messages: 'Google Messages', gmail: 'Gmail' };
@@ -582,7 +583,19 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       ...(reportedOn.length ? { reportedOn } : {}), ...(hiddenNames.has(comparableName(node.label)) ? { hidden: true } : {}),
       ...(business ? { business } : {}) };
   });
-  return { nodes: result, chats, linkedPhotos: [...linked.values()], selfIdentified, selfHidden, asOf, gmailHidden,
+  const groups: GraphNode[] = chats.filter(chat => chat.kind === 'group' && chat.members.length).map(chat => {
+    const day = dayOf(chat.latest);
+    const age = day === null || chat.asOf === null ? null :
+      Math.max(0, (Date.parse(`${chat.asOf}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86400000);
+    const ring = age === null ? RINGS.at(-1) : RINGS.find(r => age <= r.maxAge);
+    return { id: `group-${chat.id}`, groupChat: chat.id, label: chat.label, initials: 'GC', kind: 'group',
+      ring: ring.id, ringLabel: ring.label, lastActivity: age === null ? null : day,
+      lastNote: age === null ? 'Group activity date unknown; no dated interaction with any member is inferred.' :
+        `${day} · latest group activity against its ${chat.asOf} snapshot, not a direct interaction with any member.`,
+      platforms: [chat.platform], platformLabels: [PLATFORMS[chat.platform]], chats: [chat.id], photo: null,
+      identityNote: 'Listed group membership is not evidence of a direct interaction. Members retain their own identity and hide/combine choices.' };
+  });
+  return { nodes: result, groups, chats, linkedPhotos: [...linked.values()], selfIdentified, selfHidden, asOf, gmailHidden,
     ...(aliases.size ? { sameAsUnjoined } : {}) };
 }
 
@@ -591,46 +604,62 @@ const BADGES = `<g id="badge-messenger"><circle r="8" fill="#0a7cff" stroke="#ff
 <g id="badge-messages"><circle r="8" fill="#1e8e3e" stroke="#fffdf9" stroke-width="2"/><path d="M-4-3.4h8a1 1 0 0 1 1 1v4.1a1 1 0 0 1-1 1h-4.2l-2.6 2.1v-2.1h-1.2a1 1 0 0 1-1-1v-4.1a1 1 0 0 1 1-1z" fill="#fff"/></g>
 <g id="badge-gmail"><circle r="8" fill="#c5221f" stroke="#fffdf9" stroke-width="2"/><rect x="-4.4" y="-3.2" width="8.8" height="6.4" rx="1" fill="#fff"/><path d="M-4.2-2.8L0 .6L4.2-2.8" fill="none" stroke="#c5221f" stroke-width="1.2"/></g>`;
 
-function connectionSVG(model: ConnectionModel): string {
-  const used = RINGS.filter(ring => model.nodes.some(node => node.ring === ring.id));
+function groupOnly(node: GraphNode, chats: Map<string, GraphChat>): boolean {
+  return !node.groupChat && node.chats.length > 0 && node.chats.every(id => chats.get(id)?.kind === 'group');
+}
+
+function connectionLayout(nodes: GraphNode[], rings: typeof RINGS) {
+  const used = rings.filter(ring => nodes.some(node => node.ring === ring.id));
   let previous = 60;
   const radii = used.map(ring => {
-    const count = model.nodes.filter(node => node.ring === ring.id).length, label = ring.label.length * 6.6 + 50;
+    const count = nodes.filter(node => node.ring === ring.id).length, label = ring.label.length * 6.6 + 50;
     previous = Math.max(ring.base, previous + 100, Math.ceil((count * 58 + label) / (2 * Math.PI)));
     return { ...ring, radius: previous, count, gap: Math.min(Math.PI, label / previous) };
   });
-  const extent = previous + 80;
+  const positions = new Map<string, { x: number; y: number }>();
+  radii.forEach((ring, k) => nodes.filter(node => node.ring === ring.id).forEach((node, index) => {
+    const angle = -Math.PI / 2 + ring.gap / 2 + ((index + 0.5 + k * 0.37) % ring.count) * (2 * Math.PI - ring.gap) / ring.count;
+    positions.set(node.id, { x: +(ring.radius * Math.cos(angle)).toFixed(1), y: +(ring.radius * Math.sin(angle)).toFixed(1) });
+  }));
+  return { radii, positions, extent: previous + 80 };
+}
+
+function connectionSVG(model: ConnectionModel): string {
+  const chats = new Map(model.chats.map(chat => [chat.id, chat]));
+  const groups = model.groups.filter(node => chats.get(node.groupChat).members.some(id => groupOnly(model.nodes.find(n => n.id === id), chats)));
+  const displayed = [...model.nodes.filter(node => !groupOnly(node, chats)), ...groups];
+  const { radii, positions, extent } = connectionLayout(displayed, RINGS);
   const circles = radii.map(ring => `<circle class="ring" r="${ring.radius}"/>
 <text class="ring-label" y="${-ring.radius + 4}" text-anchor="middle">${escape(ring.label)}</text>`).join('');
   const spokes: string[] = [], items: string[] = [];
-  radii.forEach((ring, k) => {
-    model.nodes.filter(node => node.ring === ring.id).forEach((node, index) => {
-      const angle = -Math.PI / 2 + ring.gap / 2 + ((index + 0.5 + k * 0.37) % ring.count) * (2 * Math.PI - ring.gap) / ring.count;
-      const x = +(ring.radius * Math.cos(angle)).toFixed(1), y = +(ring.radius * Math.sin(angle)).toFixed(1);
+  [...model.nodes, ...model.groups].forEach(node => {
+      const { x, y } = positions.get(node.id) ?? { x: 0, y: 0 };
       if (node.kind === 'direct' || node.kind === 'text') spokes.push(`<line class="spoke ${node.kind}" data-spoke="${node.id}" x1="0" y1="0" x2="${x}" y2="${y}"/>`);
-      const short = Array.from(node.label.split(/\s+/)[0] ?? '').slice(0, 12).join('');
-      items.push(`<g class="node kind-${node.kind}" data-node="${node.id}" transform="translate(${x} ${y})" tabindex="0" role="button" aria-pressed="false"
+      const short = node.groupChat ? node.label.replace(`${node.platformLabels[0]} `, '') :
+        Array.from(node.label.split(/\s+/)[0] ?? '').slice(0, 12).join('');
+      items.push(`<g class="node kind-${node.kind}${node.groupChat ? ' group-chat bubble' : ''}${positions.has(node.id) ? '' : ' filtered'}" data-node="${node.id}"${node.groupChat ? ` data-bubble="${escape(node.groupChat)}"` : ''} transform="translate(${x} ${y})" tabindex="0" role="button" aria-pressed="false"
 aria-label="${escape(`${node.label}: ${node.ringLabel}; ${node.platformLabels.join(', ')}`)}"><title>${escape(node.label)}</title>
+${node.groupChat ? '<circle class="bubble-hit" r="38"/>' : ''}
 <circle class="halo" r="28"/>${node.photo ? `<image href="photos/${escape(node.photo)}" x="-22" y="-22" width="44" height="44" clip-path="url(#avatar-clip)" preserveAspectRatio="xMidYMid slice"/>`
         : `<circle class="disc" r="22"/><text class="initials" y="5" text-anchor="middle">${escape(node.initials)}</text>`}
 <circle class="rim" r="22"/>${node.platforms.map((platform, i) => `<use href="#badge-${platform}" x="${16 - i * 15}" y="16"/>`).join('')}
-<text class="node-label" y="40" text-anchor="middle">${escape(short)}</text></g>`);
-    });
+<text class="node-label" y="40" text-anchor="middle">${escape(short)}</text>${node.groupChat ? '<text class="bubble-count" y="53" text-anchor="middle"></text><g class="bubble-members"></g>' : ''}</g>`);
   });
   return `<svg id="connections-svg" xmlns="http://www.w3.org/2000/svg" viewBox="${-extent} ${-extent} ${extent * 2} ${extent * 2}" role="group" aria-labelledby="connections-title connections-desc">
 <title id="connections-title">Your connections in concentric rings</title>
-<desc id="connections-desc">You are at the center. Rings show how recently a shared chat was active relative to its source snapshot${model.asOf ? ` (${escape(model.asOf)})` : ''}, closest first. Spokes mark one-to-one or observed text conversations; group-only members have no spoke.</desc>
+<desc id="connections-desc">You are at the center. Rings show how recently a shared chat was active relative to its source snapshot${model.asOf ? ` (${escape(model.asOf)})` : ''}, closest first. Spokes mark one-to-one or observed text conversations. Group-only contacts appear inside group-chat nodes without spokes; hover or select a group to inspect its members.</desc>
 <defs><clipPath id="avatar-clip"><circle r="22"/></clipPath>${BADGES}</defs>
-${circles}${spokes.join('')}<circle class="self" r="34"/><text class="self-label" y="6" text-anchor="middle">You</text>${items.join('')}</svg>`;
+<g class="recency-rings">${circles}</g>${spokes.join('')}<circle class="self" r="34"/><text class="self-label" y="6" text-anchor="middle">You</text>${items.join('')}</svg>`;
 }
 
 const CONNECTIONS_SCRIPT = `(()=>{
 const svg=document.getElementById('connections-svg');if(!svg)return;
 const model=JSON.parse(document.getElementById('connections-data').textContent);
-const byId=new Map(model.nodes.map(n=>[n.id,n])),chats=new Map(model.chats.map(c=>[c.id,c]));
+const byId=new Map([...model.nodes,...model.groups].map(n=>[n.id,n])),chats=new Map(model.chats.map(c=>[c.id,c]));
+const groupOnly=${groupOnly.toString()},connectionLayout=${connectionLayout.toString()};
 const nodes=[...svg.querySelectorAll('[data-node]')],els=new Map(nodes.map(el=>[el.dataset.node,el])),NS='http://www.w3.org/2000/svg';
 const detail=document.getElementById('connection-detail'),empty=document.getElementById('connection-empty');
-let selected=null,moved=false;
+let selected=null,hovered=null,moved=false;
 // Hide/combine choices persist in this browser as one-way name tags, never names.
 const KEY='heartbeat.chartEdits.v1';
 const canon=s=>String(s).normalize('NFKC').trim().replace(/\\s+/g,' ').toLocaleLowerCase('en-US');
@@ -648,7 +677,7 @@ const platformLabel=new Map(model.nodes.flatMap(n=>n.platforms.map((p,i)=>[p,n.p
 const order=['today','week','fortnight','month','older','unknown'];
 const newer=(a,b)=>{const x=order.indexOf(a.ring),y=order.indexOf(b.ring);return x<y||(x===y&&(a.lastActivity||'')>(b.lastActivity||''));};
 const absorbed=new Map();
-const live=()=>[...byId.values()].filter(x=>!absorbed.has(x.id)),named=t=>live().filter(x=>tag(x.label)===t);
+const live=()=>[...byId.values()].filter(x=>!x.groupChat&&!absorbed.has(x.id)),named=t=>live().filter(x=>tag(x.label)===t);
 // Mirrors the model's guards: evidence of two different people is never overridden by a browser combine.
 function differ(n,T){if(n.photo&&T.photo&&n.photo!==T.photo)return 'they have different photos';
 if(n.chats.some(c=>T.chats.includes(c)))return 'they are both in one chat';
@@ -681,6 +710,14 @@ identityNote:'You combined '+n.label+' into '+T.label+' in this browser. '+T.ide
 byId.set(keep.id,merged);absorbed.set(other.id,keep.id);
 for(const c of chats.values())c.members=[...new Set(c.members.map(m=>m===other.id?keep.id:m))];
 redraw(keep.id,merged,els.get(other.id));}}
+const layout=connectionLayout([...live().filter(n=>!groupOnly(n,chats)),...model.groups.filter(g=>chats.get(g.groupChat).members.some(id=>groupOnly(byId.get(id),chats)))],${JSON.stringify(RINGS)});
+const ringLayer=svg.querySelector('.recency-rings');ringLayer.replaceChildren();
+for(const r of layout.radii){const circle=document.createElementNS(NS,'circle'),label=document.createElementNS(NS,'text');
+circle.setAttribute('class','ring');circle.setAttribute('r',r.radius);label.setAttribute('class','ring-label');label.setAttribute('y',-r.radius+4);
+label.setAttribute('text-anchor','middle');label.textContent=r.label;ringLayer.append(circle,label);}
+svg.setAttribute('viewBox',[-layout.extent,-layout.extent,layout.extent*2,layout.extent*2].join(' '));
+for(const [id,p] of layout.positions){els.get(id).setAttribute('transform','translate('+p.x+' '+p.y+')');
+const spoke=[...svg.querySelectorAll('[data-spoke]')].find(s=>s.dataset.spoke===id);if(spoke){spoke.setAttribute('x2',p.x);spoke.setAttribute('y2',p.y);}}
 const hiddenNow=n=>{const t=tag(n.label);return edits.hide.includes(t)||(!!n.hidden&&!edits.show.includes(t));};
 // Google Contacts labels cannot be overridden here; browser marks override the name rule and automatic guesses.
 const bizNow=n=>{if(n.business==='contacts')return true;const t=tag(n.label);return edits.business.includes(t)||(!!n.business&&!edits.person.includes(t));};
@@ -688,21 +725,31 @@ const BASIS={contacts:'Business: from your Google Contacts (a "Business" label, 
 rule:'Business: saved in your name rule.',guess:'Business (guess): every address looks automated, like noreply, orders or a bulk-mail domain. Mark as not a business if wrong.'};
 function setBiz(n,on){const t=tag(n.label);edits.business=without(edits.business,t);edits.person=without(edits.person,t);
 if(on&&!n.business)edits.business.push(t);if(!on&&n.business)edits.person.push(t);save();filter();paint();}
-function related(id){const set=new Set();for(const c of byId.get(id).chats)for(const m of chats.get(c).members)set.add(m);return set;}
+function related(id){const set=new Set([id]);for(const c of byId.get(id).chats){for(const m of chats.get(c).members)set.add(m);
+for(const g of model.groups)if(g.groupChat===c)set.add(g.id);}return set;}
 const same=document.getElementById('connection-same'),combine=document.getElementById('connection-combine'),combineNote=document.getElementById('combine-note');
-function paint(){const rel=selected?related(selected):null;
+function paint(){const active=hovered||selected,rel=active?related(active):null;
 for(const el of nodes){const id=el.dataset.node;el.classList.toggle('selected',id===selected);
 el.classList.toggle('related',!!rel&&id!==selected&&rel.has(id));el.classList.toggle('dimmed',!!rel&&!rel.has(id));
 el.setAttribute('aria-pressed',String(id===selected));}
+for(const g of model.groups){const el=els.get(g.id),open=hovered===g.id||selected===g.id||
+(selected&&groupOnly(byId.get(selected),chats)&&homeOf(byId.get(selected))===g.id)||el.classList.contains('search-open');
+el.classList.toggle('open',!!open);el.querySelector('.bubble-hit').setAttribute('r',open?90:Number(el.dataset.radius)+8);}
 for(const s of svg.querySelectorAll('[data-spoke]'))s.classList.toggle('dimmed',!!rel&&!rel.has(s.dataset.spoke));
-if(!selected){detail.hidden=true;empty.hidden=false;return;}
-const n=byId.get(selected);document.getElementById('connection-name').textContent=n.label;
+if(!active){detail.hidden=true;empty.hidden=false;return;}
+const n=byId.get(active);document.getElementById('connection-name').textContent=n.label;
 document.getElementById('connection-ring').textContent=n.ringLabel+' · '+n.lastNote;
 document.getElementById('connection-platforms').textContent=n.platformLabels.join(' · ');
 document.getElementById('connection-identity').textContent=n.identityNote;
 const list=document.getElementById('connection-chats');list.replaceChildren();
 for(const id of n.chats){const c=chats.get(id);const item=document.createElement('li');
 item.textContent=c.label+' · latest sent as returned: '+(c.latest||'unknown')+(c.kind==='group'?' · '+c.members.length+' other listed members':'');list.append(item);}
+const members=document.getElementById('connection-members');members.replaceChildren();members.hidden=!n.groupChat;
+if(n.groupChat){for(const id of chats.get(n.groupChat).members){const member=byId.get(id);if(!eligible(member))continue;
+const item=document.createElement('li'),button=document.createElement('button');button.type='button';button.className='chip';button.textContent=member.label;
+button.addEventListener('click',()=>{hovered=null;selected=id;paint();});item.append(button,' · listed member, not a direct interaction');members.append(item);}}
+document.getElementById('connection-person-tools').hidden=!!n.groupChat;
+if(n.groupChat){document.getElementById('connection-category').hidden=true;combineNote.hidden=true;detail.hidden=false;empty.hidden=true;return;}
 const first=new Option('Choose someone…','');same.replaceChildren(first,...live().filter(x=>x.id!==selected&&!hiddenNow(x)&&named(tag(x.label)).length===1)
 .sort((x,y)=>x.label.localeCompare(y.label)).map(x=>new Option(x.label,x.id)));combine.disabled=true;
 const many=named(tag(n.label)).length;same.disabled=many>1;combineNote.hidden=many<2;
@@ -713,11 +760,15 @@ const biz=bizNow(n),cat=document.getElementById('connection-category'),mark=docu
 cat.hidden=!biz;cat.textContent=!biz?'':n.business&&!edits.business.includes(tag(n.label))?BASIS[n.business]:'Business: marked in this browser.';
 mark.textContent=biz?'Not a business':'Mark as business';mark.disabled=n.business==='contacts';
 detail.hidden=false;empty.hidden=true;}
-function select(id){selected=selected===id?null:id;paint();}
+function select(id){hovered=null;selected=selected===id?null:id;paint();}
 for(const el of nodes){el.addEventListener('click',e=>{e.stopPropagation();select(el.dataset.node);});
+el.addEventListener('pointerenter',()=>{if(byId.get(el.dataset.node).groupChat){hovered=el.dataset.node;paint();}});
+el.addEventListener('pointerleave',()=>{if(hovered===el.dataset.node){hovered=null;paint();}});
+el.addEventListener('focus',()=>{if(byId.get(el.dataset.node).groupChat){hovered=el.dataset.node;paint();}});
+el.addEventListener('blur',()=>{hovered=null;paint();});
 el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(el.dataset.node);}});}
 const checks=[...document.querySelectorAll('[data-platform-filter]')],search=document.getElementById('connection-search'),showBiz=document.getElementById('business-filter');
-function lists(){const hidden=[...byId.values()].filter(n=>!absorbed.has(n.id)&&hiddenNow(n)).sort((x,y)=>x.label.localeCompare(y.label));
+function lists(){const hidden=live().filter(hiddenNow).sort((x,y)=>x.label.localeCompare(y.label));
 document.getElementById('hidden-count').textContent=String(hidden.length);
 document.getElementById('hidden-list').replaceChildren(...hidden.map(n=>{const item=document.createElement('li'),b=document.createElement('button');
 b.type='button';b.className='chip';b.textContent='Show';b.addEventListener('click',()=>{const t=tag(n.label);edits.hide=without(edits.hide,t);
@@ -729,21 +780,46 @@ b.type='button';b.className='chip';b.textContent='Separate again';b.addEventList
 item.append(labelOf.get(a)+' → '+labelOf.get(t)+' ',b);return item;}));
 const stuck=document.getElementById('combine-blocked');stuck.hidden=!blocked;
 stuck.textContent=blocked+' saved combine(s) were not applied because more than one person now has that name or the entries show different people.';
-const firms=[...byId.values()].filter(n=>!absorbed.has(n.id)&&bizNow(n)).sort((x,y)=>x.label.localeCompare(y.label));
+const firms=live().filter(bizNow).sort((x,y)=>x.label.localeCompare(y.label));
 document.getElementById('business-list-count').textContent=String(firms.length);
 document.getElementById('business-list').replaceChildren(...firms.map(n=>{const item=document.createElement('li');
 item.append(n.label+(n.business==='guess'&&!edits.business.includes(tag(n.label))?' (guess) ':' '));
 if(n.business==='contacts'){item.append('(Google Contacts)');return item;}
 const b=document.createElement('button');b.type='button';b.className='chip';b.textContent='Not a business';b.addEventListener('click',()=>setBiz(n,false));
 item.append(b);return item;}));}
+const eligible=n=>!absorbed.has(n.id)&&!hiddenNow(n)&&(showBiz.checked||!bizNow(n));
+const homes=new Map();
+for(const n of live()){if(!groupOnly(n,chats))continue;let best=null;
+for(const id of n.chats){const g=byId.get('group-'+id);if(g&&(!best||(g.lastActivity||'')>(best.lastActivity||'')))best=g;}
+if(best)homes.set(n.id,best.id);}
+const homeOf=n=>homes.get(n.id);
+function bubbleMembers(group,members,term){const el=els.get(group.id),radius=Math.min(40,24+3*Math.sqrt(members.length));
+el.dataset.radius=String(radius);
+el.querySelector('.disc').setAttribute('r',radius);el.querySelector('.rim').setAttribute('r',radius);el.querySelector('.halo').setAttribute('r',radius+6);
+el.querySelector('.node-label').setAttribute('y',radius+17);const count=el.querySelector('.bubble-count');
+count.setAttribute('y',radius+30);count.textContent=members.length+' listed';
+const home=members.filter(n=>groupOnly(n,chats)&&homeOf(n)===group.id);
+el.classList.toggle('search-open',!!term&&home.some(n=>n.label.toLocaleLowerCase().includes(term)));
+const container=el.querySelector('.bubble-members');container.replaceChildren(...home.map((n,i)=>{
+const member=els.get(n.id).cloneNode(true),angle=-Math.PI/2+i*2*Math.PI/home.length;
+member.removeAttribute('data-node');member.setAttribute('class','member-preview');member.dataset.member=n.id;
+member.setAttribute('transform','translate('+((radius+28)*Math.cos(angle))+' '+((radius+28)*Math.sin(angle))+') scale(.6)');
+member.addEventListener('click',e=>{e.stopPropagation();hovered=null;selected=n.id;paint();});
+member.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();hovered=null;selected=n.id;paint();}});
+return member;}));}
 function filter(){const on=new Set(checks.filter(c=>c.checked).map(c=>c.value));const term=search.value.trim().toLocaleLowerCase();let shown=0,total=0,hid=0,firms=0;
 for(const el of nodes){const id=el.dataset.node,n=byId.get(id),gone=absorbed.has(id),off=!gone&&hiddenNow(n),firm=!gone&&!off&&bizNow(n);
-const ok=!gone&&!off&&(showBiz.checked||!firm)&&n.platforms.some(p=>on.has(p))&&(!term||n.label.toLocaleLowerCase().includes(term));
-el.classList.toggle('filtered',!ok);if(ok)shown++;if(!gone)total++;if(off)hid++;if(firm)firms++;}
+const members=n.groupChat?chats.get(n.groupChat).members.map(id=>byId.get(id)).filter(eligible):[];
+if(n.groupChat)bubbleMembers(n,members,term);
+const drawable=n.groupChat?members.some(m=>groupOnly(m,chats)):!gone&&!groupOnly(n,chats);
+const matches=!term||n.label.toLocaleLowerCase().includes(term)||(n.groupChat&&members.some(m=>m.label.toLocaleLowerCase().includes(term)));
+const ok=drawable&&(n.groupChat||eligible(n))&&n.platforms.some(p=>on.has(p))&&matches;
+el.classList.toggle('filtered',!ok);if(ok)shown++;if(drawable)total++;if(!n.groupChat&&off)hid++;if(!n.groupChat&&firm)firms++;}
 for(const s of svg.querySelectorAll('[data-spoke]'))s.classList.toggle('filtered',svg.querySelector('[data-node="'+s.dataset.spoke+'"]').classList.contains('filtered'));
 document.getElementById('business-count').textContent=String(firms);
 document.getElementById('connection-count').textContent=shown+' of '+total+' shown'+(hid?' · '+hid+' hidden':'')+(firms&&!showBiz.checked?' · '+firms+' businesses left out':'');
-if(selected&&(absorbed.has(selected)||hiddenNow(byId.get(selected))||(!showBiz.checked&&bizNow(byId.get(selected))))){selected=null;paint();}lists();}
+if(selected&&(byId.get(selected).groupChat?els.get(selected).classList.contains('filtered'):!eligible(byId.get(selected))))selected=null;
+hovered=null;paint();lists();}
 for(const c of [...checks,showBiz])c.addEventListener('change',filter);search.addEventListener('input',filter);
 document.getElementById('connection-business').addEventListener('click',()=>{const n=byId.get(selected);setBiz(n,!bizNow(n));});
 document.getElementById('connection-hide').addEventListener('click',()=>{const t=tag(byId.get(selected).label);
@@ -791,6 +867,9 @@ const CONNECTIONS_STYLE = `.graph-panel{margin-bottom:22px}.graph-layout{display
 .node .rim{fill:none;stroke:#fffdf9;stroke-width:2.5}.initials{font-size:13px;font-weight:700;fill:#735746}.node-label{font-size:11px;fill:#4d5752}
 .node:hover .halo,.node:focus-visible .halo{stroke:#cc624f}.node:focus{outline:none}.node.selected .halo{stroke:#df6958;fill:#fde7e1}.node.related .halo{stroke:#e9a08f;stroke-dasharray:3 3}
 .node.dimmed,.spoke.dimmed{opacity:.22}.node.filtered,.spoke.filtered{display:none}
+.bubble-hit{fill:transparent;pointer-events:all}.bubble-count{font-size:10px;fill:#6c7570}
+.bubble-members{display:none}.bubble:hover>.bubble-members,.bubble.open>.bubble-members,.bubble:focus-within>.bubble-members{display:inline}
+.member-preview{cursor:pointer}.member-preview:focus{outline:none}.member-preview:focus .halo{stroke:#cc624f}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#6c7570;margin-top:10px}.legend svg{width:18px;height:18px;vertical-align:-4px}
 #connection-chats{padding-left:18px;font-size:13px}
 [hidden]{display:none!important}.edit-tools{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.edit-tools select{max-width:170px}
@@ -802,19 +881,19 @@ function connectionsPanel(model: ConnectionModel): string {
   const platforms = (['messenger', 'instagram', 'messages', 'gmail'] as Platform[]).filter(p => model.nodes.some(n => n.platforms.includes(p)));
   const badge = (p: Platform) => `<svg viewBox="-10 -10 20 20" aria-hidden="true"><use href="#badge-${p}"/></svg>`;
   return `<section class="panel graph-panel" aria-labelledby="graph-heading"><h2 id="graph-heading">Your connections</h2>
-<p class="muted">Rings show how recently a chat you share was active, measured from each source's snapshot day${model.asOf ? ` (${escape(model.asOf)})` : ' (unknown: no time zone or dates)'}: most recent at the center, older further out. Click a person to see where you talked and who shares those chats. Drag to pan, scroll to zoom.</p>
+<p class="muted">Rings show how recently a chat you share was active, measured from each source's snapshot day${model.asOf ? ` (${escape(model.asOf)})` : ' (unknown: no time zone or dates)'}: most recent at the center, older further out. Group-only contacts appear in group-chat nodes: hover or click a group to reveal its members, then select a member to inspect or edit them. Group activity is not a direct interaction. Drag to pan, scroll to zoom.</p>
 <div class="graph-tools"><input id="connection-search" type="search" placeholder="Find in graph…" autocomplete="off" aria-label="Find in graph">
 ${platforms.map(p => `<label class="chip"><input type="checkbox" data-platform-filter value="${p}" checked>${badge(p)}${PLATFORMS[p]}</label>`).join('')}
 <label class="chip" title="Businesses are left out unless this is on"><input type="checkbox" id="business-filter">Show businesses (<span id="business-count">0</span>)</label>
 <span class="zoom"><button type="button" data-zoom="in" aria-label="Zoom in">+</button> <button type="button" data-zoom="out" aria-label="Zoom out">−</button> <button type="button" data-zoom="fit">Fit</button></span>
 <small id="connection-count">${model.nodes.length} of ${model.nodes.length} shown</small></div>
 <div class="graph-layout"><div>${connectionSVG(model)}
-<div class="legend">${platforms.map(p => `<span>${badge(p)} ${PLATFORMS[p]}</span>`).join('')}<span>Solid spoke: one-to-one · dashed: unlinked text conversation · no spoke: group chat only, so the ring reflects group activity</span></div></div>
+<div class="legend">${platforms.map(p => `<span>${badge(p)} ${PLATFORMS[p]}</span>`).join('')}<span>Solid spoke: one-to-one · dashed: unlinked text conversation · GC: group chat, no direct-interaction spoke</span></div></div>
 <aside><div id="connection-empty" class="notice">Select someone in the graph to inspect their chats.</div>
 <div id="connection-detail" hidden><div class="label">Selected</div><h2 id="connection-name"></h2><p id="connection-ring" class="muted"></p>
-<p id="connection-platforms"></p><ul id="connection-chats"></ul><p id="connection-identity" class="notice"></p>
+<p id="connection-platforms"></p><ul id="connection-chats"></ul><ul id="connection-members" aria-label="Listed group members" hidden></ul><p id="connection-identity" class="notice"></p>
 <p id="connection-category" class="muted" hidden></p>
-<div class="edit-tools"><button type="button" id="connection-hide" class="chip">Hide from chart</button>
+<div class="edit-tools" id="connection-person-tools"><button type="button" id="connection-hide" class="chip">Hide from chart</button>
 <button type="button" id="connection-business" class="chip">Mark as business</button>
 <label class="chip">Same person as <select id="connection-same" aria-label="Same person as"></select></label>
 <button type="button" id="connection-combine" class="chip" disabled>Combine</button>
