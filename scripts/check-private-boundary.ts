@@ -8,7 +8,7 @@ const PRIVATE_FILE = /^(?:(?:collection|identity-review|curated|prayer|audience|
 const WHATSAPP_FILE = /^(?:(?:whatsapp-registry\.synthetic|whatsapp\.synthetic|request\.synthetic)\.json(?:\.[a-f0-9-]+\.tmp)?|whatsapp-conversion\.lock)$/i;
 const MANUAL_FILE = /^(?:manual-handoff|projected-run)(?:\.synthetic)?(?:\.json|\.[a-f0-9-]+\.tmp)$/i;
 const PREVIEW_FILE = /^(?:contacts(?:\.original)?\.(?:csv|json)|people\.json|contact-import\.json|messages\.original\.json|muse-(?:messenger|instagram)\.original\.json|dashboard\.html(?:\.[a-f0-9-]+\.tmp)?|.+\.private\.(?:json|csv))$/i;
-const PHOTO_FILE = /^(?:profile-photos\.json|profile-photo-[a-f0-9]{64}\.(?:jpg|png|webp)|gallery\.html)$/i;
+const PHOTO_FILE = /^(?:profile-photos\.json|profile-photo-[a-f0-9]{64}\.(?:jpg|png|webp)|google-photos\.json|google-photo-[a-f0-9]{64}\.(?:jpg|png|webp)|gallery\.html)$/i;
 
 function checkBoundary(root = ROOT, extraOutputs = []) {
   for (const output of [...OUTPUT_ROOTS.map(name => path.join(root, name)), ...extraOutputs]) {

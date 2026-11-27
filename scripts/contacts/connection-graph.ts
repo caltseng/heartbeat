@@ -4,6 +4,8 @@ import { array, object, text, requireValue, hash } from './lib.ts';
 import { manualOutputLocation } from './manual-retrieval.ts';
 import { normalized } from './identity-review.ts';
 import type { GmailSource } from './gmail-metadata.ts';
+import { matchGooglePhotos } from './google-photos.ts';
+import type { GooglePhotoSet } from './google-photos.ts';
 
 type Platform = 'messenger' | 'instagram' | 'messages' | 'gmail';
 type Ring = 'today' | 'week' | 'fortnight' | 'month' | 'older' | 'unknown';
@@ -295,7 +297,8 @@ function gmailPeople(gmail: GmailSource, ownerAddresses: readonly string[] = [])
 
 function connectionModel(observations: TextObservations | null, muse: MuseSource[], photos: PhotoSet | null = null,
   zone: string | null = null, photoLinks: PhotoLinks | null = null, selfLinks: SelfLinks | null = null,
-  gmail: GmailSource | null = null, peopleLinks: PeopleLinks | null = null, contacts: readonly SavedContact[] | null = null): ConnectionModel {
+  gmail: GmailSource | null = null, peopleLinks: PeopleLinks | null = null, contacts: readonly SavedContact[] | null = null,
+  googlePhotos: GooglePhotoSet | null = null): ConnectionModel {
   // Calendar days need the owner's zone; without one, recency stays unknown rather than defaulting to UTC.
   const timeZone = observations?.period?.timeZone ?? zone;
   const formatter = timeZone ? new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }) : null;
@@ -524,6 +527,31 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     if (node.chats.includes(entry.chat.id)) continue;
     node.chats.push(entry.chat.id); node.kinds.add(entry.chat.kind); entry.chat.members.push(node.id);
   }
+  const googleAttached = new Set<string>();
+  if (googlePhotos) {
+    const evidence = [...nodes.values()].map(node => ({ node,
+      addresses: [...node.mail].map(value => ({ type: 'email', value })) }));
+    const contactEmails = new Map<string, Set<SavedContact>>();
+    for (const contact of contacts ?? []) for (const address of contact.addresses) {
+      const key = address.type === 'email' ? normalized('email', address.value) : null;
+      if (key) contactEmails.set(key, (contactEmails.get(key) ?? new Set()).add(contact));
+    }
+    // A phone can reach a graph person only through one saved contact's unique exact email.
+    // Unresolved contacts remain evidence holders so shared phone/email never becomes unique by omission.
+    for (const contact of contacts ?? []) {
+      const emails = contact.addresses.filter(address => address.type === 'email').map(address => normalized('email', address.value)).filter(Boolean);
+      const matches = evidence.filter(person => person.node && [...person.node.mail].some(mail => emails.includes(normalized('email', mail))));
+      if (matches.length === 1 && emails.every(email => contactEmails.get(email).size === 1)) {
+        matches[0].addresses.push(...contact.addresses);
+      } else evidence.push({ node: null, addresses: [...contact.addresses] });
+    }
+    for (const [person, photo] of matchGooglePhotos(evidence, googlePhotos)) {
+      if (!person.node || person.node.photo !== null) continue;
+      person.node.photo = photo.file;
+      googleAttached.add(person.node.id);
+      linked.set(photo.file, photo);
+    }
+  }
   // Each chat ages against its own source snapshot day, never the render clock or another source's later snapshot.
   const sourceDays = [...new Set(chats.map(c => c.asOf).filter((d): d is string => d !== null))].sort();
   const asOf = sourceDays.length === 0 ? null : sourceDays.length === 1 ? sourceDays[0] : `${sourceDays[0]} to ${sourceDays.at(-1)}`;
@@ -570,16 +598,17 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
               last.chat.kind === 'text' ? 'latest observed message (inferred day)' :
                 last.chat.platform === 'gmail' ? 'latest email with only them' : 'latest one-to-one activity'}`,
       platformLabels: node.platforms.map(p => PLATFORMS[p]),
-      identityNote: profile === 'sameAs' ? 'Combined because you said these names are the same person.' :
+      identityNote: (profile === 'sameAs' ? 'Combined because you said these names are the same person.' :
         profile === 'sameName' ? 'Joined by your rule that the same name is the same person; names you listed as separate, and namesakes in one chat, stay apart.' :
         profile === 'joined' ? 'You confirmed these entries are one person; they are joined only where you confirmed it.' :
         kind === 'text' ? 'Participants were not captured; not linked to any contact.' :
         profile === 'address' ? 'An email address you wrote to; joined with other sources only where you confirmed it.' :
         profile === 'contact' ? 'An email address you wrote to, named by the one contact it is saved under; addresses on that one contact show together, and other entries join only by your same-name rule.' :
         profile === 'confirmed' ? 'You confirmed this person matches a saved friend photo; joined only where you confirmed it.' :
-        profile ? `Muse-reported profile ID; unverified.${node.photo ? ' Photo attached by exact profile ID match.' : ''}` :
+        profile ? `Muse-reported profile ID; unverified.${node.photo && !googleAttached.has(node.id) ? ' Photo attached by exact profile ID match.' : ''}` :
           selfLinks?.sameNamePeople ? 'No profile ID; not joined with any other entry.' :
-          'No profile ID; this entry is local to one chat and never merged by name.',
+          'No profile ID; this entry is local to one chat and never merged by name.') +
+        (googleAttached.has(node.id) ? ' Google photo attached by unique exact connection email/phone evidence, not by name or image.' : ''),
       ...(reportedOn.length ? { reportedOn } : {}), ...(hiddenNames.has(comparableName(node.label)) ? { hidden: true } : {}),
       ...(business ? { business } : {}) };
   });
@@ -907,7 +936,7 @@ ${platforms.map(p => `<label class="chip"><input type="checkbox" data-platform-f
 <details id="business-people" class="notice"><summary>Businesses (<span id="business-list-count">0</span>)</summary><ul id="business-list"></ul>
 <p class="muted">Add a "Business" label to a contact in Google Contacts to mark it everywhere. Guesses come only from automated-looking addresses with no saved contact name.</p></details>
 ${model.sameAsUnjoined ? `<div class="notice">${model.sameAsUnjoined} of your "same person" names could not be combined because the entries show different people (different profiles, photos, or both in one chat).</div>` : ''}
-<div class="notice">Muse-reported, unverified and partial. Photos attach only by exact Facebook profile ID or a pairing you confirmed, never by automatic name or face matching. Entries from different chats or sources become one person only where you confirmed it.
+<div class="notice">Muse-reported, unverified and partial. Facebook photos attach only by exact profile ID or a pairing you confirmed; Google photos require unique exact connection email/phone evidence. All photos attach by those rules, never by automatic name or face matching. Entries from different chats or sources become one person only where you confirmed it.
 ${typeof model.gmailHidden === 'number' ? `Gmail shows only addresses you wrote to; ${model.gmailHidden} address(es) that only wrote to you are not shown.` : ''}
 ${model.selfIdentified ? '' : model.selfHidden
     ? `${model.selfHidden} of your own participant entries were hidden by your confirmation; your account was not identified by ID, so other entries for you may still appear.`

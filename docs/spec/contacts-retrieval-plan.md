@@ -160,6 +160,24 @@ historical media, profile content, source writes or recurring refresh.
 
 ### CSV preview operation
 
+The optional `--google-photos "<google-photos.json>"` accepts the
+[validated saved Google connections photo bundle](contacts-google-capability.md#separate-saved-google-photo-display-contract),
+not a raw account export. This is offline validation/display only; it performs
+no source or image retrieval. Any owner-run acquisition remains a separately
+bounded approval, not part of this coding assignment.
+
+Each photo belongs only to its connection resourceName. It reaches a graph
+person only through unique exact normalized email/phone from that same
+connection, never by display name or image. A saved CSV contact's phone may
+reach an existing Gmail graph person only through that contact's unique exact
+email. Shared addresses (including unshown contacts), multiple matching
+connections or people remain unresolved. Default photos are skipped; CONTACT
+precedes PROFILE; an already attached Facebook photo wins. This adds no person
+nodes, activity claims or canonical merges. Only attached, hash-validated assets
+are copied into `preview\photos`, with CSP unchanged. `contact-import.json`
+records Google counts, input digest and copied asset sha256 values. A bundle with
+no usable match still produces a partial preview without a photo directory.
+
 After synthetic validation and independent review, the owner-approved local
 operation accepts the supplied Google CSV and optional saved UI observation file:
 
