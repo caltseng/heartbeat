@@ -21,14 +21,16 @@ function fixture(t) {
   return { root, input, output, request, write };
 }
 
-test('one-round photo assets preserve provenance, escape labels and refuse overwrites', async t => {
+test('one-round photo assets preserve provenance, escape labels and refuse overwrites', { timeout: 30000 }, async t => {
   const f = fixture(t);
   let calls = 0;
+  t.diagnostic('Starting synthetic image response and local publication.');
   const result = await saveProfilePhotos(f.input, f.output, async (_, init) => {
     calls++; assert.equal(init.credentials, 'omit'); assert.equal(init.redirect, 'manual');
     return new Response(new Uint8Array(pixel), { headers: { 'content-type': 'image/png' } });
   });
   assert.equal(calls, 1); assert.equal(result.saved, 1); assert.equal(result.exitCode, 2);
+  t.diagnostic('Synthetic image response saved; checking local publication.');
   const folder = path.join(f.output, 'photos');
   const manifest = JSON.parse(fs.readFileSync(path.join(folder, 'profile-photos.json'), 'utf8'));
   assert.deepEqual(manifest.profiles.map(p => p.status), ['saved', 'missing']);
@@ -36,6 +38,7 @@ test('one-round photo assets preserve provenance, escape labels and refuse overw
   assert.deepEqual(fs.readFileSync(path.join(folder, 'input.original.private.json')), fs.readFileSync(f.input));
   assert.ok(!fs.readFileSync(result.file, 'utf8').includes('<script>fixture</script>'));
   await assert.rejects(saveProfilePhotos(f.input, f.output), /fresh output/);
+  t.diagnostic('Existing output rejected without retrieval.');
 });
 
 test('photo input rejects credentials, non-provider URLs, groups and unrequested content before reads', async t => {
