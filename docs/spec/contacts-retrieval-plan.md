@@ -355,6 +355,32 @@ name. The same guards apply, so a same-as that would combine namesakes in one
 chat, different reported profiles or photos, or two confirmed people stays apart
 and the chart counts it. Each update writes a new file and leaves the old one.
 
+### Businesses
+
+The owner asked to "exclude businesses", "or at least be able to categorize and
+filter them", with Google Contacts as "more of a source of truth" and a local
+copy as well. The chart marks a person as a business, in this order:
+
+1. **Google Contacts.** A contact filed under a label named `Business` (or
+   `Businesses`), or saved with a company and no person's name, is a business.
+   This cannot be overridden in the chart; change it in Google Contacts and
+   export again. A name or address counts only when every contact carrying it is
+   a business. A person saved with their employer stays a person.
+2. **Owner choices.** **Mark as business** / **Not a business** in a person's
+   panel are kept in this browser like hide and combine. Save them to the name
+   rule with `--business "<Name;address>"` and `--person "<Name>"`; choosing one
+   removes the name from the other list, and a name cannot be in both.
+3. **Guess.** A Gmail-only correspondent with no saved contact name, whose every
+   address is a role mailbox (`noreply`, `orders`, `info` …) or comes from a bulk
+   mail subdomain (`mail.`, `e.`, `news.` …), is shown as a guess.
+
+Businesses start filtered out of the chart; **Show businesses** brings them back,
+and the **Businesses** list names each one with its basis.
+
+```powershell
+npm run contacts:self-links -- --update "<owner name rule.json>" --business "<Name;shop@example.com>" --person "<Name>" --output "<new self-links.private.json>"
+```
+
 `contacts:csv --gmail` reads the saved Gmail observations. People are the to/cc
 addresses of messages the owner sent, minus the account, the owner's sending
 addresses and any extra own addresses saved with

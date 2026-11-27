@@ -82,7 +82,10 @@ and the saved Google Messages observations and Muse metadata for the first previ
 it projects names/email/phone, keeps original input bytes private, writes a fresh
 external bundle and produces offline HTML. Excluded CSV columns are not displayed,
 analyzed or retained in the normalized store; the owner-provided original remains
-an original private file. The operation does not merge identities, attribute
+an original private file. Contact labels and company are read only to decide
+whether a contact is a business (a `Business` label, or a company with no
+person's name); label text is not kept, and a company-only contact is named by
+its company. The operation does not merge identities, attribute
 anonymous conversations or change existing private guards. Optional Muse recency
 JSON stays supplemental and source-specific, with native evidence unverified;
 participants are not automatically matched to contacts or treated as historical
@@ -157,7 +160,8 @@ or different photos. The owner also asked to "exclude people easily" and to
 "combine entries": the chart's hide and combine choices stay in the browser's local
 storage as hashed name tags, never names, and `contacts:self-links --update`
 saves `hiddenNames` and `sameAs` decisions to a new private rule file under the
-same guards. Gmail correspondents are only the recipients of
+same guards. Business and person marks follow the same path (`businessNames`,
+`personNames`); a Google Contacts `Business` label decides first. Gmail correspondents are only the recipients of
 messages the owner sent, minus the owner's own addresses; addresses that only
 wrote to the owner are counted, not shown, and a message is one-to-one only when
 it has exactly one non-owner address. The candidates, review page, links file and Gmail copy in the

@@ -79,8 +79,8 @@ function saveOwnerNameRule(ownerName: string, output: string, dataClass = 'priva
 
 // Owner edits to people in the chart: hide names, show them again, or say one name is another person ("same as").
 // Each update writes a new rule file from an existing owner name rule, keeping every earlier decision.
-function updateNameRule(from: string, output: string, changes: { hide?: string[]; show?: string[]; sameAs?: string[]; notSame?: string[] },
-  dataClass = 'private', now = new Date().toISOString()) {
+function updateNameRule(from: string, output: string, changes: { hide?: string[]; show?: string[]; sameAs?: string[]; notSame?: string[];
+  business?: string[]; person?: string[] }, dataClass = 'private', now = new Date().toISOString()) {
   const source = path.resolve(from), target = path.resolve(output);
   const rule = readSelfLinks(source, dataClass);
   requireValue(rule.ownerName !== undefined, 'Update an owner name rule saved with --owner-name.');
@@ -102,11 +102,21 @@ function updateNameRule(from: string, output: string, changes: { hide?: string[]
     const row = { name: clean(pair.slice(0, at)), as: clean(pair.slice(at + 1)) };
     sameAs = [...sameAs.filter(old => comparable(old.name) !== comparable(row.name)), row];
   }
+  // Business and person are exclusive: marking a name as one removes it from the other.
+  const toBusiness = names(changes.business), toPerson = names(changes.person);
+  const marked = new Set([...toBusiness, ...toPerson].map(comparable));
+  requireValue(marked.size === new Set(toBusiness.map(comparable)).size + new Set(toPerson.map(comparable)).size,
+    'A name cannot be both a business and a person.');
+  const keep = (old: string[] | undefined, added: string[]) => [...(old ?? []).filter(name => !marked.has(comparable(name))),
+    ...added.filter((name, i) => added.findIndex(other => comparable(other) === comparable(name)) === i)];
+  const businessNames = keep(value.businessNames, toBusiness), personNames = keep(value.personNames, toPerson);
   const next = { ...value, confirmedAt: now };
-  delete next.hiddenNames; delete next.sameAs;
+  delete next.hiddenNames; delete next.sameAs; delete next.businessNames; delete next.personNames;
   if (hidden.length) next.hiddenNames = hidden;
   if (sameAs.length) next.sameAs = sameAs;
-  const counts = { hidden: hidden.length, sameAs: sameAs.length };
+  if (businessNames.length) next.businessNames = businessNames;
+  if (personNames.length) next.personNames = personNames;
+  const counts = { hidden: hidden.length, sameAs: sameAs.length, business: businessNames.length, person: personNames.length };
   publish(target, next);
   try { readSelfLinks(target, dataClass); } catch (error) { fs.rmSync(target); throw error; }
   return { ...counts, digest: hash(fs.readFileSync(target)) };
@@ -118,20 +128,21 @@ if (require.main === module) {
     requireValue(args.length % 2 === 0, 'Expected flag/value pairs.');
     for (let i = 0; i < args.length; i += 2) {
       requireValue(['--muse', '--name', '--output', '--candidates', '--approve', '--owner-name', '--owner-emails', '--same-name-people',
-        '--separate-names', '--update', '--hide', '--show', '--same-as', '--not-same'].includes(args[i]) && !flags.has(args[i]),
+        '--separate-names', '--update', '--hide', '--show', '--same-as', '--not-same', '--business', '--person'].includes(args[i]) && !flags.has(args[i]),
       'Invalid self link arguments.');
       flags.set(args[i], args[i + 1]);
     }
-    const edits = ['--hide', '--show', '--same-as', '--not-same'];
-    requireValue(flags.has('--update') || edits.every(flag => !flags.has(flag)), 'Use --hide, --show, --same-as or --not-same with --update.');
+    const edits = ['--hide', '--show', '--same-as', '--not-same', '--business', '--person'];
+    requireValue(flags.has('--update') || edits.every(flag => !flags.has(flag)), 'Use --hide, --show, --same-as, --not-same, --business or --person with --update.');
     if (flags.has('--update')) {
       const used = edits.filter(flag => flags.has(flag));
       requireValue(flags.has('--output') && used.length > 0 && flags.size === 2 + used.length,
-        'Usage: contacts:self-links --update <owner name rule.json> [--hide <Name A;Name B>] [--show <Name>] [--same-as <Other name=Person name;…>] [--not-same <Other name>] --output <new self.json>');
+        'Usage: contacts:self-links --update <owner name rule.json> [--hide <Name A;Name B>] [--show <Name>] [--same-as <Other name=Person name;…>] [--not-same <Other name>] [--business <Name;address>] [--person <Name>] --output <new self.json>');
       const list = (flag: string) => flags.get(flag)?.split(';');
       const result = updateNameRule(flags.get('--update'), flags.get('--output'),
-        { hide: list('--hide'), show: list('--show'), sameAs: list('--same-as'), notSame: list('--not-same') });
-      process.stdout.write(`Saved name rule: ${result.hidden} name(s) hidden from the chart, ${result.sameAs} same-person name(s).\n`);
+        { hide: list('--hide'), show: list('--show'), sameAs: list('--same-as'), notSame: list('--not-same'), business: list('--business'),
+          person: list('--person') });
+      process.stdout.write(`Saved name rule: ${result.hidden} name(s) hidden from the chart, ${result.sameAs} same-person name(s), ${result.business} business name(s), ${result.person} marked not a business.\n`);
     } else if (flags.has('--owner-name')) {
       const sameName = flags.get('--same-name-people');
       requireValue(flags.has('--output') && (sameName === undefined || sameName === 'on') &&

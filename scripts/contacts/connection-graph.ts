@@ -21,7 +21,7 @@ type PhotoLinks = Map<string, { name: string; key: string }> & { originalBytes?:
 // Owner-confirmed chat participant slots that are the owner, keyed `source|chatId|position`; they are never drawn as people.
 type SelfLinks = Map<string, string> & { originalBytes?: Buffer; inputDigest?: string; confirmedAt?: string; museInputDigest?: string;
   ownerName?: string; ownerAddresses?: string[]; sameNamePeople?: boolean; separateNames?: string[];
-  sameAs?: { name: string; as: string; label: string }[]; hiddenNames?: string[] };
+  sameAs?: { name: string; as: string; label: string }[]; hiddenNames?: string[]; businessNames?: string[]; personNames?: string[] };
 // Owner-confirmed people: each groups entries from any source that the owner said are the same person.
 type PersonMember = { source: 'messenger' | 'instagram'; reportedChatId: string; participantIndex: number; participantName: string } |
   { source: 'gmail'; address: string };
@@ -37,7 +37,14 @@ const mailboxKey = (value: string) => {
   const [local, domain] = key.split('@');
   return domain === 'gmail.com' || domain === 'googlemail.com' ? `${local.split('+')[0].replace(/\./g, '')}@gmail.com` : key;
 };
-interface SavedContact { displayName: string | null; addresses: { type: string; value: string }[] }
+interface SavedContact { displayName: string | null; addresses: { type: string; value: string }[]; business?: 'label' | 'company' }
+// Guesses only: role mailboxes (orders@, noreply@ …) and bulk-mail sending subdomains usually belong to organizations.
+const ROLE_MAILBOX = /^(no-?reply|do-?not-?reply|donotreply|info|support|help|hello|team|sales|billing|orders?|receipts?|notifications?|news|newsletters?|marketing|admin|contact|service|customer-?service|accounts?|updates|mail|mailer|jobs|careers|office|events|reservations?|bookings?|feedback|press|shop|store|front-?desk|reception|appointments?|scheduling|general|registrar|webmaster|postmaster|alerts?|membership|donations?|giving|invoices?|payments?|bounces?)([._+-].*)?$/;
+const BULK_DOMAIN = /^(e|em|email|mail|mailer|news|reply|notifications?|mg|mkt|marketing|info|bounce)\d*\./;
+const automatedAddress = (address: string) => {
+  const [local, domain = ''] = address.toLowerCase().split('@');
+  return ROLE_MAILBOX.test(local) || BULK_DOMAIN.test(domain) || /noreply|newsletter|mailer-daemon/.test(local);
+};
 const comparableName = (name: string | null | undefined) =>
   typeof name !== 'string' ? null : name.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US') || null;
 interface TextObservations { period?: { end: string; timeZone: string }; messages: { threadUiId: string; inferredLocalDate: string | null; requestedWindowMembership: string }[] }
@@ -45,6 +52,8 @@ interface GraphNode {
   id: string; label: string; initials: string; ring: Ring; ringLabel: string; kind: Kind; lastActivity: string | null;
   lastNote: string; platforms: Platform[]; platformLabels: string[]; chats: string[]; photo: string | null; identityNote: string;
   hidden?: boolean; reportedOn?: Platform[]; confirmed?: boolean;
+  // Why this entry counts as a business: the owner's Google Contacts, the owner's name rule, or an automated-address guess.
+  business?: 'contacts' | 'rule' | 'guess';
 }
 interface GraphChat { id: string; platform: Platform; kind: 'one-to-one' | 'group' | 'unknown' | 'text'; label: string; latest: string | null; asOf: string | null; members: string[] }
 interface ConnectionModel { nodes: GraphNode[]; chats: GraphChat[]; linkedPhotos: Photo[]; selfIdentified: boolean; selfHidden: number;
@@ -174,7 +183,7 @@ function readSelfLinks(file: string, dataClass: string): SelfLinks {
   if (value?.kind === 'owner-name-rule') {
     // The owner's standing rule: every participant with exactly the owner's normalized name is the owner, in any snapshot.
     object(value, ['schemaVersion', 'dataClass', 'kind', 'ownerName', 'confirmedAt', 'ownerAddresses', 'sameNamePeople', 'separateNames',
-      'sameAs', 'hiddenNames'], 'owner name rule');
+      'sameAs', 'hiddenNames', 'businessNames', 'personNames'], 'owner name rule');
     const ownerName = comparableName(text(value.ownerName, 'owner name'));
     const ownerAddresses = value.ownerAddresses === undefined ? [] :
       array(value.ownerAddresses, 'owner addresses').map(address => emailKey(text(address, 'owner address')));
@@ -190,9 +199,14 @@ function readSelfLinks(file: string, dataClass: string): SelfLinks {
       array(value.hiddenNames, 'hidden names').map(name => comparableName(text(name, 'hidden name')));
     requireValue(hiddenNames.every(name => name !== null) && new Set(hiddenNames).size === hiddenNames.length,
       'Hidden names must be distinct names.');
+    const category = (key: 'businessNames' | 'personNames', what: string) => value[key] === undefined ? [] :
+      array(value[key], `${what} names`).map(name => comparableName(text(name, `${what} name`)));
+    const businessNames = category('businessNames', 'business'), personNames = category('personNames', 'person');
+    requireValue([businessNames, personNames].every(list => list.every(name => name !== null) && new Set(list).size === list.length) &&
+      businessNames.every(name => !personNames.includes(name)), 'Business and person names must be distinct, and no name can be both.');
     return Object.assign(new Map<string, string>(), { originalBytes, inputDigest: hash(originalBytes),
       confirmedAt: value.confirmedAt as string, ownerName, ownerAddresses, sameNamePeople: value.sameNamePeople === true, separateNames,
-      sameAs, hiddenNames });
+      sameAs, hiddenNames, businessNames, personNames });
   }
   object(value, ['schemaVersion', 'dataClass', 'kind', 'museInputDigest', 'confirmedAt', 'slots'], 'self links');
   requireValue(value.schemaVersion === 1 && value.dataClass === dataClass && value.kind === 'owner-confirmed-self-slots' &&
@@ -290,7 +304,8 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     return `${parts.year}-${parts.month}-${parts.day}`;
   };
   type Profile = 'reported' | 'confirmed' | 'address' | 'contact' | 'joined' | 'sameName' | 'sameAs' | null;
-  const nodes = new Map<string, GraphNode & { kinds: Set<GraphChat['kind']>; profile: Profile; reported: Set<string> }>();
+  const nodes = new Map<string, GraphNode & { kinds: Set<GraphChat['kind']>; profile: Profile; reported: Set<string>; mail: Set<string>;
+    named: boolean }>();
   const usedLinks = new Set<string>(), usedSelf = new Set<string>();
   const chats: GraphChat[] = [];
   const photoByKey = new Map((photos?.photos ?? []).map(photo => [photo.key, photo]));
@@ -492,7 +507,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       const label = person ?? entry.label;
       node = { id: `n${nodes.size + 1}`, label, initials: initials(label), ring: 'unknown', ringLabel: '', kind: 'unknown',
         lastActivity: null, lastNote: '', platforms: [], platformLabels: [], chats: [], photo: null, identityNote: '',
-        kinds: new Set(), reported: new Set(), ...(linkedPeople.has(key) ? { confirmed: true } : {}), profile: sameAsJoined.has(key) ? 'sameAs' : sameNameJoined.has(key) ? 'sameName' : person ? 'joined' : entry.profile };
+        kinds: new Set(), reported: new Set(), mail: new Set(), named: false, ...(linkedPeople.has(key) ? { confirmed: true } : {}), profile: sameAsJoined.has(key) ? 'sameAs' : sameNameJoined.has(key) ? 'sameName' : person ? 'joined' : entry.profile };
       nodes.set(key, node);
     }
     if (entry.photo) {
@@ -501,6 +516,8 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     }
     if (!node.platforms.includes(entry.platform)) node.platforms.push(entry.platform);
     if (entry.profile === 'reported') node.reported.add(entry.key);
+    if (entry.platform === 'gmail') node.mail.add(entry.name);
+    if (entry.platform !== 'gmail' || entry.contactName) node.named = true;
     if (node.chats.includes(entry.chat.id)) continue;
     node.chats.push(entry.chat.id); node.kinds.add(entry.chat.kind); entry.chat.members.push(node.id);
   }
@@ -508,7 +525,27 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
   const sourceDays = [...new Set(chats.map(c => c.asOf).filter((d): d is string => d !== null))].sort();
   const asOf = sourceDays.length === 0 ? null : sourceDays.length === 1 ? sourceDays[0] : `${sourceDays[0]} to ${sourceDays.at(-1)}`;
   const direct = (chat: GraphChat) => chat.kind === 'one-to-one' || chat.kind === 'text';
-  const result = [...nodes.values()].map(({ kinds, profile, reported, ...node }) => {
+  // Google Contacts is the owner's source of truth: a name or mailbox counts as a business only when every saved contact
+  // carrying it is one. The owner's name rule decides next; automated-looking addresses with no saved name are only a guess.
+  const contactBusiness = new Map<string, boolean>(), mailBusiness = new Map<string, boolean>();
+  for (const contact of contacts ?? []) {
+    const name = comparableName(contact.displayName);
+    if (name) contactBusiness.set(name, (contactBusiness.get(name) ?? true) && !!contact.business);
+    for (const address of contact.addresses) {
+      const key = address.type === 'email' ? mailboxKey(address.value) : null;
+      if (key) mailBusiness.set(key, (mailBusiness.get(key) ?? true) && !!contact.business);
+    }
+  }
+  const businessNames = new Set(selfLinks?.businessNames ?? []), personNames = new Set(selfLinks?.personNames ?? []);
+  const businessOf = (label: string, mail: Set<string>, named: boolean): GraphNode['business'] | null => {
+    const names = [comparableName(label), ...[...mail].map(comparableName)];
+    if (contactBusiness.get(names[0]) === true || [...mail].some(address => mailBusiness.get(mailboxKey(address) ?? '') === true)) return 'contacts';
+    if (names.some(name => personNames.has(name))) return null;
+    if (names.some(name => businessNames.has(name))) return 'rule';
+    return !named && mail.size > 0 && [...mail].every(automatedAddress) ? 'guess' : null;
+  };
+  const result = [...nodes.values()].map(({ kinds, profile, reported, mail, named, ...node }) => {
+    const business = businessOf(node.label, mail, named);
     // Platforms where this person has a reported profile ID, so the page can refuse combining two different profiles.
     const reportedOn = [...reported].map(key => key.slice(0, key.indexOf('|')) as Platform).sort();
     const kind: Kind = kinds.has('one-to-one') ? 'direct' : kinds.has('text') ? 'text' : kinds.has('group') ? 'group' : 'unknown';
@@ -540,7 +577,8 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
         profile ? `Muse-reported profile ID; unverified.${node.photo ? ' Photo attached by exact profile ID match.' : ''}` :
           selfLinks?.sameNamePeople ? 'No profile ID; not joined with any other entry.' :
           'No profile ID; this entry is local to one chat and never merged by name.',
-      ...(reportedOn.length ? { reportedOn } : {}), ...(hiddenNames.has(comparableName(node.label)) ? { hidden: true } : {}) };
+      ...(reportedOn.length ? { reportedOn } : {}), ...(hiddenNames.has(comparableName(node.label)) ? { hidden: true } : {}),
+      ...(business ? { business } : {}) };
   });
   return { nodes: result, chats, linkedPhotos: [...linked.values()], selfIdentified, selfHidden, asOf, gmailHidden,
     ...(aliases.size ? { sameAsUnjoined } : {}) };
@@ -597,8 +635,9 @@ const canon=s=>String(s).normalize('NFKC').trim().replace(/\\s+/g,' ').toLocaleL
 function tag(s){let a=0xdeadbeef,b=0x41c6ce57;for(const ch of canon(s)){const c=ch.codePointAt(0);a=Math.imul(a^c,2654435761);b=Math.imul(b^c,1597334677);}
 a=Math.imul(a^(a>>>16),2246822507)^Math.imul(b^(b>>>13),3266489909);b=Math.imul(b^(b>>>16),2246822507)^Math.imul(a^(a>>>13),3266489909);
 return (b>>>0).toString(36)+'-'+(a>>>0).toString(36);}
-let edits={hide:[],show:[],combine:[]};
-try{const v=JSON.parse(localStorage.getItem(KEY)||'null');if(v&&[v.hide,v.show,v.combine].every(Array.isArray))edits=v;}catch(e){}
+let edits={hide:[],show:[],combine:[],business:[],person:[]};
+try{const v=JSON.parse(localStorage.getItem(KEY)||'null');if(v&&[v.hide,v.show,v.combine].every(Array.isArray))
+edits={hide:v.hide,show:v.show,combine:v.combine,business:Array.isArray(v.business)?v.business:[],person:Array.isArray(v.person)?v.person:[]};}catch(e){}
 const note=document.getElementById('edits-note');
 function save(){try{localStorage.setItem(KEY,JSON.stringify(edits));}catch(e){note.textContent='This browser could not save your changes; they last until you close this page.';}}
 const without=(list,t)=>list.filter(x=>x!==t);
@@ -641,6 +680,12 @@ byId.set(keep.id,merged);absorbed.set(other.id,keep.id);
 for(const c of chats.values())c.members=[...new Set(c.members.map(m=>m===other.id?keep.id:m))];
 redraw(keep.id,merged,els.get(other.id));}}
 const hiddenNow=n=>{const t=tag(n.label);return edits.hide.includes(t)||(!!n.hidden&&!edits.show.includes(t));};
+// Google Contacts labels cannot be overridden here; browser marks override the name rule and automatic guesses.
+const bizNow=n=>{if(n.business==='contacts')return true;const t=tag(n.label);return edits.business.includes(t)||(!!n.business&&!edits.person.includes(t));};
+const BASIS={contacts:'Business: from your Google Contacts (a "Business" label, or saved as a company). Change it there.',
+rule:'Business: saved in your name rule.',guess:'Business (guess): every address looks automated, like noreply, orders or a bulk-mail domain. Mark as not a business if wrong.'};
+function setBiz(n,on){const t=tag(n.label);edits.business=without(edits.business,t);edits.person=without(edits.person,t);
+if(on&&!n.business)edits.business.push(t);if(!on&&n.business)edits.person.push(t);save();filter();paint();}
 function related(id){const set=new Set();for(const c of byId.get(id).chats)for(const m of chats.get(c).members)set.add(m);return set;}
 const same=document.getElementById('connection-same'),combine=document.getElementById('connection-combine'),combineNote=document.getElementById('combine-note');
 function paint(){const rel=selected?related(selected):null;
@@ -662,11 +707,14 @@ const many=named(tag(n.label)).length;same.disabled=many>1;combineNote.hidden=ma
 combineNote.textContent=many>1?many+' people have this name, so combining by name is unavailable for them.':'';
 document.getElementById('connection-hide').textContent=many>1?'Hide everyone with this name ('+many+')':'Hide from chart';
 document.getElementById('connection-separate').hidden=!n.combined;
+const biz=bizNow(n),cat=document.getElementById('connection-category'),mark=document.getElementById('connection-business');
+cat.hidden=!biz;cat.textContent=!biz?'':n.business&&!edits.business.includes(tag(n.label))?BASIS[n.business]:'Business: marked in this browser.';
+mark.textContent=biz?'Not a business':'Mark as business';mark.disabled=n.business==='contacts';
 detail.hidden=false;empty.hidden=true;}
 function select(id){selected=selected===id?null:id;paint();}
 for(const el of nodes){el.addEventListener('click',e=>{e.stopPropagation();select(el.dataset.node);});
 el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(el.dataset.node);}});}
-const checks=[...document.querySelectorAll('[data-platform-filter]')],search=document.getElementById('connection-search');
+const checks=[...document.querySelectorAll('[data-platform-filter]')],search=document.getElementById('connection-search'),showBiz=document.getElementById('business-filter');
 function lists(){const hidden=[...byId.values()].filter(n=>!absorbed.has(n.id)&&hiddenNow(n)).sort((x,y)=>x.label.localeCompare(y.label));
 document.getElementById('hidden-count').textContent=String(hidden.length);
 document.getElementById('hidden-list').replaceChildren(...hidden.map(n=>{const item=document.createElement('li'),b=document.createElement('button');
@@ -678,15 +726,24 @@ document.getElementById('combined-list').replaceChildren(...combos.map(([a,t])=>
 b.type='button';b.className='chip';b.textContent='Separate again';b.addEventListener('click',()=>{edits.combine=edits.combine.filter(x=>x[0]!==a);save();location.reload();});
 item.append(labelOf.get(a)+' → '+labelOf.get(t)+' ',b);return item;}));
 const stuck=document.getElementById('combine-blocked');stuck.hidden=!blocked;
-stuck.textContent=blocked+' saved combine(s) were not applied because more than one person now has that name or the entries show different people.';}
-function filter(){const on=new Set(checks.filter(c=>c.checked).map(c=>c.value));const term=search.value.trim().toLocaleLowerCase();let shown=0,total=0,hid=0;
-for(const el of nodes){const id=el.dataset.node,n=byId.get(id),gone=absorbed.has(id),off=!gone&&hiddenNow(n);
-const ok=!gone&&!off&&n.platforms.some(p=>on.has(p))&&(!term||n.label.toLocaleLowerCase().includes(term));
-el.classList.toggle('filtered',!ok);if(ok)shown++;if(!gone)total++;if(off)hid++;}
+stuck.textContent=blocked+' saved combine(s) were not applied because more than one person now has that name or the entries show different people.';
+const firms=[...byId.values()].filter(n=>!absorbed.has(n.id)&&bizNow(n)).sort((x,y)=>x.label.localeCompare(y.label));
+document.getElementById('business-list-count').textContent=String(firms.length);
+document.getElementById('business-list').replaceChildren(...firms.map(n=>{const item=document.createElement('li');
+item.append(n.label+(n.business==='guess'&&!edits.business.includes(tag(n.label))?' (guess) ':' '));
+if(n.business==='contacts'){item.append('(Google Contacts)');return item;}
+const b=document.createElement('button');b.type='button';b.className='chip';b.textContent='Not a business';b.addEventListener('click',()=>setBiz(n,false));
+item.append(b);return item;}));}
+function filter(){const on=new Set(checks.filter(c=>c.checked).map(c=>c.value));const term=search.value.trim().toLocaleLowerCase();let shown=0,total=0,hid=0,firms=0;
+for(const el of nodes){const id=el.dataset.node,n=byId.get(id),gone=absorbed.has(id),off=!gone&&hiddenNow(n),firm=!gone&&!off&&bizNow(n);
+const ok=!gone&&!off&&(showBiz.checked||!firm)&&n.platforms.some(p=>on.has(p))&&(!term||n.label.toLocaleLowerCase().includes(term));
+el.classList.toggle('filtered',!ok);if(ok)shown++;if(!gone)total++;if(off)hid++;if(firm)firms++;}
 for(const s of svg.querySelectorAll('[data-spoke]'))s.classList.toggle('filtered',svg.querySelector('[data-node="'+s.dataset.spoke+'"]').classList.contains('filtered'));
-document.getElementById('connection-count').textContent=shown+' of '+total+' shown'+(hid?' · '+hid+' hidden':'');
-if(selected&&(absorbed.has(selected)||hiddenNow(byId.get(selected)))){selected=null;paint();}lists();}
-for(const c of checks)c.addEventListener('change',filter);search.addEventListener('input',filter);
+document.getElementById('business-count').textContent=String(firms);
+document.getElementById('connection-count').textContent=shown+' of '+total+' shown'+(hid?' · '+hid+' hidden':'')+(firms&&!showBiz.checked?' · '+firms+' businesses left out':'');
+if(selected&&(absorbed.has(selected)||hiddenNow(byId.get(selected))||(!showBiz.checked&&bizNow(byId.get(selected))))){selected=null;paint();}lists();}
+for(const c of [...checks,showBiz])c.addEventListener('change',filter);search.addEventListener('input',filter);
+document.getElementById('connection-business').addEventListener('click',()=>{const n=byId.get(selected);setBiz(n,!bizNow(n));});
 document.getElementById('connection-hide').addEventListener('click',()=>{const t=tag(byId.get(selected).label);
 if(!edits.hide.includes(t))edits.hide.push(t);edits.show=without(edits.show,t);save();filter();});
 same.addEventListener('change',()=>{combine.disabled=!same.value;});
@@ -699,6 +756,7 @@ document.getElementById('connection-separate').addEventListener('click',()=>{con
 edits.combine=edits.combine.filter(x=>!mine.has(x[0]));save();location.reload();});
 // Lets the owner's agent copy these browser choices into the saved name rule.
 window.heartbeatChartEdits=()=>({hide:edits.hide.map(t=>labelOf.get(t)).filter(Boolean),show:edits.show.map(t=>labelOf.get(t)).filter(Boolean),
+business:edits.business.map(t=>labelOf.get(t)).filter(Boolean),person:edits.person.map(t=>labelOf.get(t)).filter(Boolean),
 combine:edits.combine.filter(([a,t])=>labelOf.has(a)&&labelOf.has(t)).map(([a,t])=>({name:labelOf.get(a),as:labelOf.get(t)}))});
 const base=svg.getAttribute('viewBox').split(' ').map(Number);let box=base.slice(),drag=null;
 function view(){svg.setAttribute('viewBox',box.join(' '));}
@@ -734,7 +792,7 @@ const CONNECTIONS_STYLE = `.graph-panel{margin-bottom:22px}.graph-layout{display
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#6c7570;margin-top:10px}.legend svg{width:18px;height:18px;vertical-align:-4px}
 #connection-chats{padding-left:18px;font-size:13px}
 [hidden]{display:none!important}.edit-tools{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.edit-tools select{max-width:170px}
-#hidden-people summary{cursor:pointer;font-weight:600}#hidden-list,#combined-list{padding-left:18px;font-size:13px}#hidden-list li,#combined-list li{margin:4px 0}
+#hidden-people summary,#business-people summary{cursor:pointer;font-weight:600}#hidden-list,#combined-list,#business-list{padding-left:18px;font-size:13px}#hidden-list li,#combined-list li,#business-list li{margin:4px 0}
 @media(max-width:900px){.graph-layout{grid-template-columns:1fr}}`;
 
 function connectionsPanel(model: ConnectionModel): string {
@@ -745,6 +803,7 @@ function connectionsPanel(model: ConnectionModel): string {
 <p class="muted">Rings show how recently a chat you share was active, measured from each source's snapshot day${model.asOf ? ` (${escape(model.asOf)})` : ' (unknown: no time zone or dates)'}: most recent at the center, older further out. Click a person to see where you talked and who shares those chats. Drag to pan, scroll to zoom.</p>
 <div class="graph-tools"><input id="connection-search" type="search" placeholder="Find in graph…" autocomplete="off" aria-label="Find in graph">
 ${platforms.map(p => `<label class="chip"><input type="checkbox" data-platform-filter value="${p}" checked>${badge(p)}${PLATFORMS[p]}</label>`).join('')}
+<label class="chip" title="Businesses are left out unless this is on"><input type="checkbox" id="business-filter">Show businesses (<span id="business-count">0</span>)</label>
 <span class="zoom"><button type="button" data-zoom="in" aria-label="Zoom in">+</button> <button type="button" data-zoom="out" aria-label="Zoom out">−</button> <button type="button" data-zoom="fit">Fit</button></span>
 <small id="connection-count">${model.nodes.length} of ${model.nodes.length} shown</small></div>
 <div class="graph-layout"><div>${connectionSVG(model)}
@@ -752,7 +811,9 @@ ${platforms.map(p => `<label class="chip"><input type="checkbox" data-platform-f
 <aside><div id="connection-empty" class="notice">Select someone in the graph to inspect their chats.</div>
 <div id="connection-detail" hidden><div class="label">Selected</div><h2 id="connection-name"></h2><p id="connection-ring" class="muted"></p>
 <p id="connection-platforms"></p><ul id="connection-chats"></ul><p id="connection-identity" class="notice"></p>
+<p id="connection-category" class="muted" hidden></p>
 <div class="edit-tools"><button type="button" id="connection-hide" class="chip">Hide from chart</button>
+<button type="button" id="connection-business" class="chip">Mark as business</button>
 <label class="chip">Same person as <select id="connection-same" aria-label="Same person as"></select></label>
 <button type="button" id="connection-combine" class="chip" disabled>Combine</button>
 <button type="button" id="connection-separate" class="chip" hidden>Separate again</button></div>
@@ -760,7 +821,9 @@ ${platforms.map(p => `<label class="chip"><input type="checkbox" data-platform-f
 <button type="button" id="connection-clear" class="chip">Clear selection</button></div>
 <details id="hidden-people" class="notice"><summary>Hidden from chart (<span id="hidden-count">0</span>)</summary><ul id="hidden-list"></ul>
 <p id="combined-heading" hidden>Combined in this browser</p><ul id="combined-list"></ul><p id="combine-blocked" class="muted" hidden></p>
-<p id="edits-note" class="muted">Hide, show and combine are saved in this browser and apply to every rebuilt dashboard opened here. To keep them everywhere, save them to your name rule.</p></details>
+<p id="edits-note" class="muted">Hide, show, combine and business choices are saved in this browser and apply to every rebuilt dashboard opened here. To keep them everywhere, save them to your name rule.</p></details>
+<details id="business-people" class="notice"><summary>Businesses (<span id="business-list-count">0</span>)</summary><ul id="business-list"></ul>
+<p class="muted">Add a "Business" label to a contact in Google Contacts to mark it everywhere. Guesses come only from automated-looking addresses with no saved contact name.</p></details>
 ${model.sameAsUnjoined ? `<div class="notice">${model.sameAsUnjoined} of your "same person" names could not be combined because the entries show different people (different profiles, photos, or both in one chat).</div>` : ''}
 <div class="notice">Muse-reported, unverified and partial. Photos attach only by exact Facebook profile ID or a pairing you confirmed, never by automatic name or face matching. Entries from different chats or sources become one person only where you confirmed it.
 ${typeof model.gmailHidden === 'number' ? `Gmail shows only addresses you wrote to; ${model.gmailHidden} address(es) that only wrote to you are not shown.` : ''}

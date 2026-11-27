@@ -61,6 +61,16 @@ test('Google CSV projects selected columns, handles quoted multiline cells and p
   assert.equal(matches[0].people.length, 2);
 });
 
+test('a Business label or a company with no person name marks a contact as a business without keeping label text', () => {
+  const snapshot = projectGoogleCSV(bytes('First Name,Last Name,Organization Name,E-mail 1 - Value,Labels\r\n' +
+    'Ada,Fixture,Fixture Labs,ada@example.invalid,* myContacts ::: Family\r\n' +
+    ',,Corner Shop,shop@example.invalid,* myContacts\r\n' +
+    'Bo,Store,,bo@example.invalid,* myContacts ::: Business\r\n'), 'synthetic', now);
+  assert.deepEqual(snapshot.contacts.map(c => [c.displayName, c.business ?? null]),
+    [['Ada Fixture', null], ['Corner Shop', 'company'], ['Bo Store', 'label']], 'a person at a company stays a person');
+  assert.ok(!/Family|myContacts|Fixture Labs/.test(JSON.stringify(snapshot)));
+});
+
 test('CSV rejects malformed rows, duplicate headers and invalid UTF-8 without partial import', () => {
   for (const invalid of ['Name,Name\nA,B\n', 'Name,Phone 1 - Value\nA\n', 'Name\n"unfinished',
     'Name\n"quoted"x\n', 'Name\nun"quoted\n']) {
