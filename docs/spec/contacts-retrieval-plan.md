@@ -349,7 +349,8 @@ npm run contacts:self-links -- --update "<owner name rule.json>" --hide "<Name A
 
 `hiddenNames` people stay in the data but start hidden. Each `sameAs` row joins
 one chat name or Gmail address to the named person's entries, even with the
-same-name rule off. Rows cannot chain, name the owner or use a `separateNames`
+same-name rule off. When the named person has no other entry, the alias still
+shows under that person's name. Rows cannot chain, name the owner or use a `separateNames`
 name. The same guards apply, so a same-as that would combine namesakes in one
 chat, different reported profiles or photos, or two confirmed people stays apart
 and the chart counts it. Each update writes a new file and leaves the old one.
