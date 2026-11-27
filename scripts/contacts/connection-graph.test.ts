@@ -364,6 +364,46 @@ test('the same-name rule joins exact names across chats, except listed names and
   assert.throws(() => readSelfLinks(rule, 'private'), /Invalid owner name rule/);
 });
 
+test('Gmail addresses take the one contact name they are saved under, and the same-name rule joins them', t => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'contact-email-synthetic-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const museFile = path.join(folder, 'muse.private.json'), gmailFile = path.join(folder, 'gmail.json');
+  const on = path.join(folder, 'on.json'), off = path.join(folder, 'off.json');
+  fs.writeFileSync(museFile, JSON.stringify({ schemaVersion: 1, dataClass: 'private', kind: 'muse-reported-chat-recency', source: 'messenger',
+    retrievedAt: now, requestedPeriod: 'last 14 days', coverage: 'partial', gaps: ['Synthetic gap'], records: [
+      { chatType: 'one_to_one', reportedChatId: 'd1', participants: [{ name: 'Ada Fixture', id: null }], reportedLatestSentAt: now,
+        nativeEvidenceVerified: false }] }));
+  const sent = (to: string[]) => ({ timestamp: '2026-11-20T12:00:00.000Z', direction: 'sent', from: 'owner@example.com', to, cc: [], batch: 1 });
+  fs.writeFileSync(gmailFile, JSON.stringify({ dataClass: 'private', source: 'email', account: 'owner@example.com', connector: 'synthetic',
+    fields: [], excluded: [], providerIds: false, rawRows: 5, uniqueRows: 5,
+    coverage: { start: '2026-11-12T08:00:00.000Z', end: now, completeness: 'partial', basis: 'synthetic' }, observations: [
+      sent(['ada@example.com']), sent(['adafix+news@gmail.com']), sent(['bo@example.com']), sent(['me2@example.com']),
+      { ...sent(['ada@example.com']), timestamp: '2026-11-21T12:00:00.000Z', cc: ['adafix@gmail.com'] }] }));
+  const contacts = [
+    { displayName: 'Ada Fixture', addresses: [{ type: 'email', value: 'Ada@Example.com' }, { type: 'email', value: 'ada.fix@gmail.com' }] },
+    { displayName: 'Bo One', addresses: [{ type: 'email', value: 'bo@example.com' }] },
+    { displayName: 'Bo Two', addresses: [{ type: 'email', value: 'bo@example.com' }] },
+    { displayName: 'Owner  Fixture', addresses: [{ type: 'email', value: 'me2@example.com' }] }];
+  saveOwnerNameRule('owner fixture', on, 'private', now, [], { separateNames: [] });
+  saveOwnerNameRule('owner fixture', off, 'private', now);
+  const model = (rule: string) => connectionModel(null, [readMuseRecency(museFile, 'private')], null, 'UTC', null, readSelfLinks(rule, 'private'),
+    readGmailMetadata(gmailFile, 'private'), null, contacts).nodes;
+  const joined = model(on);
+  assert.deepEqual(joined.map(n => [n.label, n.platforms, n.chats.length]).sort(),
+    [['Ada Fixture', ['messenger', 'gmail'], 4], ['bo@example.com', ['gmail'], 1]],
+    'saved addresses join the chat entry by name, even when one email went to two of them; an address saved under two names stays unnamed; your own contact is hidden');
+  const apart = model(off);
+  assert.deepEqual(apart.map(n => [n.label, n.chats.length]).sort(), [['Ada Fixture', 1], ['Ada Fixture', 3], ['bo@example.com', 1]],
+    'without the rule, only the addresses saved on one contact show together');
+  assert.match(apart.find(n => n.platforms[0] === 'gmail' && n.label === 'Ada Fixture').identityNote, /named by the one contact/);
+  const zed = path.join(folder, 'zed.json');
+  updateNameRule(off, zed, { sameAs: ['Ada Fixture=ada@example.com'] }, 'private', now);
+  const aliased = connectionModel(null, [readMuseRecency(museFile, 'private')], null, 'UTC', null, readSelfLinks(zed, 'private'),
+    readGmailMetadata(gmailFile, 'private'), null, contacts).nodes;
+  assert.deepEqual(aliased.map(n => [n.label, n.platforms, n.chats.length]).sort(),
+    [['Ada Fixture', ['messenger', 'gmail'], 4], ['bo@example.com', ['gmail'], 1]], 'a same-as row naming an address joins that address');
+});
+
 test('owner same-as names combine people across chats and Gmail, hidden names start hidden, and rule updates are new files', t => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'same-as-rule-synthetic-'));
   t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
