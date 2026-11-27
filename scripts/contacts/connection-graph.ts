@@ -30,6 +30,14 @@ interface PeopleLinks { people: { displayName: string; members: PersonMember[] }
 const memberRef = (member: PersonMember) => member.source === 'gmail' ? `gmail|${member.address}` :
   `${member.source}|${member.reportedChatId}|${member.participantIndex}`;
 const emailKey = (value: string) => normalized('email', value)?.toLowerCase() ?? null;
+// Gmail itself ignores dots and +tags in gmail.com addresses, so those spellings are one mailbox; other domains match exactly.
+const mailboxKey = (value: string) => {
+  const key = emailKey(value);
+  if (key === null) return null;
+  const [local, domain] = key.split('@');
+  return domain === 'gmail.com' || domain === 'googlemail.com' ? `${local.split('+')[0].replace(/\./g, '')}@gmail.com` : key;
+};
+interface SavedContact { displayName: string | null; addresses: { type: string; value: string }[] }
 const comparableName = (name: string | null | undefined) =>
   typeof name !== 'string' ? null : name.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US') || null;
 interface TextObservations { period?: { end: string; timeZone: string }; messages: { threadUiId: string; inferredLocalDate: string | null; requestedWindowMembership: string }[] }
@@ -270,7 +278,7 @@ function gmailPeople(gmail: GmailSource, ownerAddresses: readonly string[] = [])
 
 function connectionModel(observations: TextObservations | null, muse: MuseSource[], photos: PhotoSet | null = null,
   zone: string | null = null, photoLinks: PhotoLinks | null = null, selfLinks: SelfLinks | null = null,
-  gmail: GmailSource | null = null, peopleLinks: PeopleLinks | null = null): ConnectionModel {
+  gmail: GmailSource | null = null, peopleLinks: PeopleLinks | null = null, contacts: readonly SavedContact[] | null = null): ConnectionModel {
   // Calendar days need the owner's zone; without one, recency stays unknown rather than defaulting to UTC.
   const timeZone = observations?.period?.timeZone ?? zone;
   const formatter = timeZone ? new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }) : null;
@@ -281,7 +289,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
     const parts = Object.fromEntries(formatter.formatToParts(new Date(value)).map(p => [p.type, p.value]));
     return `${parts.year}-${parts.month}-${parts.day}`;
   };
-  type Profile = 'reported' | 'confirmed' | 'address' | 'joined' | 'sameName' | 'sameAs' | null;
+  type Profile = 'reported' | 'confirmed' | 'address' | 'contact' | 'joined' | 'sameName' | 'sameAs' | null;
   const nodes = new Map<string, GraphNode & { kinds: Set<GraphChat['kind']>; profile: Profile; reported: Set<string> }>();
   const usedLinks = new Set<string>(), usedSelf = new Set<string>();
   const chats: GraphChat[] = [];
@@ -293,9 +301,10 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
   let selfHidden = 0;
   // Entries are collected first so owner-confirmed people can join them before nodes are numbered.
   const entries: { key: string; label: string; platform: Platform; chat: GraphChat; profile: Profile; photo: Photo | null;
-    ref: string | null; name: string | null }[] = [];
+    ref: string | null; name: string | null; contactName?: string }[] = [];
   const add = (key: string, label: string, platform: Platform, chat: GraphChat, profile: Profile, photo: Photo | null,
-    ref: string | null = null, name: string | null = null) => entries.push({ key, label, platform, chat, profile, photo, ref, name });
+    ref: string | null = null, name: string | null = null, contactName?: string) =>
+    entries.push({ key, label, platform, chat, profile, photo, ref, name, ...(contactName ? { contactName } : {}) });
   for (const source of muse) {
     const platform: Platform = source.source;
     const self = new Set((source.selfIds ?? []).map(id => participantKey(platform, id)).filter(Boolean));
@@ -348,14 +357,35 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
   });
   let gmailHidden: number | null = null;
   if (gmail) {
-    const people = gmailPeople(gmail, selfLinks?.ownerAddresses), asOf = dayOf(new Date(Date.parse(gmail.coverage.end) - 1).toISOString());
+    // A saved contact names an address only when every contact listing that mailbox has the same name; addresses saved under
+    // the owner's own name are the owner's.
+    const named = new Map<string, Map<string, string>>();
+    for (const contact of contacts ?? []) {
+      const label = contact.displayName?.trim(), name = comparableName(label);
+      if (!name) continue;
+      for (const address of contact.addresses) {
+        const key = address.type === 'email' ? mailboxKey(address.value) : null;
+        if (key) named.set(key, (named.get(key) ?? new Map()).set(name, label));
+      }
+    }
+    const contactOf = (address: string) => {
+      const names = named.get(mailboxKey(address) ?? '');
+      return names?.size === 1 ? [...names][0] : null;
+    };
+    const ownContact = [...new Set(gmail.observations.flatMap(row => [row.from, ...row.to, ...row.cc]))]
+      .filter(address => selfLinks?.ownerName !== undefined && contactOf(address)?.[0] === selfLinks.ownerName);
+    const people = gmailPeople(gmail, [...selfLinks?.ownerAddresses ?? [], ...ownContact]);
+    const asOf = dayOf(new Date(Date.parse(gmail.coverage.end) - 1).toISOString());
     gmailHidden = people.hiddenAddresses;
     people.threads.forEach((thread, index) => {
       const kind = thread.direct ? 'one-to-one' : 'group';
       const chat: GraphChat = { id: `c${chats.length + 1}`, platform: 'gmail', kind, latest: thread.latest, asOf, members: [],
         label: `${kind === 'group' ? 'Group email' : 'Email'} ${index + 1}` };
       chats.push(chat);
-      for (const address of thread.people) add(`gmail|${address}`, address, 'gmail', chat, 'address', null, `gmail|${address}`, address);
+      for (const address of thread.people) {
+        const contact = contactOf(address)?.[1];
+        add(`gmail|${address}`, contact ?? address, 'gmail', chat, contact ? 'contact' : 'address', null, `gmail|${address}`, address, contact);
+      }
     });
   }
   // Union only the entries the owner confirmed are one person; a person may never carry two different photos.
@@ -396,21 +426,24 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       fact.chats.set(entry.chat.id, new Set([...fact.chats.get(entry.chat.id) ?? [], entry.key]));
       facts.set(root, fact);
     }
+    // A Gmail entry's own name is the contact name its address is saved under, if any; chat entries use their chat name.
+    const nameOf = (entry: typeof entries[number]) => entry.platform === 'gmail' ? comparableName(entry.contactName) : comparableName(entry.name);
     const groups = new Map<string, typeof entries>();
     for (const entry of entries) {
       const raw = entry.platform === 'messages' ? null : comparableName(entry.name);
       if (raw === null) continue;
-      const explicit = aliases.has(raw) || aliasTargets.has(raw);
-      const byRule = selfLinks.sameNamePeople && entry.platform !== 'gmail' && !selfLinks.separateNames.includes(raw);
+      const own = nameOf(entry), alias = aliases.has(raw) ? raw : own !== null && aliases.has(own) ? own : null;
+      const explicit = alias !== null || (own !== null && aliasTargets.has(own));
+      const byRule = selfLinks.sameNamePeople && own !== null && !selfLinks.separateNames.includes(own);
       if (!explicit && !byRule) continue;
-      const name = aliases.get(raw)?.as ?? raw;
+      const name = alias !== null ? aliases.get(alias).as : own ?? raw;
       groups.set(name, [...groups.get(name) ?? [], entry]);
     }
     for (const [name, group] of groups) {
-      const explicit = group.some(entry => aliases.has(comparableName(entry.name)));
+      const explicit = group.some(entry => aliases.has(comparableName(entry.name)) || aliases.has(nameOf(entry)));
       if (!explicit && !selfLinks.sameNamePeople) continue;
       const roots = [...new Set(group.map(entry => find(entry.key)))];
-      const target = group.find(entry => comparableName(entry.name) === name)?.label ??
+      const target = group.find(entry => nameOf(entry) === name)?.label ??
         [...aliases.values()].find(row => row.as === name)?.label ?? group[0].label;
       if (roots.length < 2) {
         // An explicit same-as still gives a lone entry the name the owner said it belongs to.
@@ -486,6 +519,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
         profile === 'joined' ? 'You confirmed these entries are one person; they are joined only where you confirmed it.' :
         kind === 'text' ? 'Participants were not captured; not linked to any contact.' :
         profile === 'address' ? 'An email address you wrote to; joined with other sources only where you confirmed it.' :
+        profile === 'contact' ? 'An email address you wrote to, named by the one contact it is saved under; joined with other entries only by your same-name rule.' :
         profile === 'confirmed' ? 'You confirmed this person matches a saved friend photo; joined only where you confirmed it.' :
         profile ? `Muse-reported profile ID; unverified.${node.photo ? ' Photo attached by exact profile ID match.' : ''}` :
           selfLinks?.sameNamePeople ? 'No profile ID; not joined with any other entry.' :

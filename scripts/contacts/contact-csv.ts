@@ -189,7 +189,7 @@ function importContactCSV(input: string, output: string, observationsFile?: stri
         hiddenNames: selfLinks.hiddenNames?.length ? { names: selfLinks.hiddenNames.length,
           rule: 'people with these names stay in the data but start hidden from the chart' } : null } : null,
       gmail: gmail ? { file: 'gmail.original.json', inputDigest: gmail.inputDigest, records: gmail.observations.length,
-        coverage: 'partial', rule: 'only addresses the owner wrote to are shown; received-only addresses are counted, not shown' } : null,
+        coverage: 'partial', rule: 'only addresses the owner wrote to are shown; received-only addresses are counted, not shown; an address saved under exactly one contact name takes that name, and one saved under the owner\'s name is the owner' } : null,
       ownerConfirmedPeople: peopleLinks ? { file: 'people-links.original.json', inputDigest: peopleLinks.inputDigest,
         confirmedAt: peopleLinks.confirmedAt, people: peopleLinks.people.length,
         rule: 'listed entries are joined into one person only as the owner confirmed' } : null,
