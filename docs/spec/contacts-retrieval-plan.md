@@ -194,8 +194,10 @@ The preview presents one-to-one and group recency separately from observed
 message-frequency metrics; it does not link participants by name or force
 Instagram into the Messenger enum. Missing files/results remain unknown.
 An optional top-level `selfIds` array names the owner's own reported participant
-IDs so they are excluded from the graph; without it the owner may appear as a
-participant and the dashboard says so.
+IDs so they are excluded from the graph; unless every supplied source has one that
+resolves to a profile key and matches a participant, the
+owner may appear as a participant and the dashboard says so (with the count of
+entries hidden by owner-confirmed self links or the owner name rule, below).
 
 The dashboard's **Your connections** panel draws an interactive concentric map
 with you at the center. Each ring is a recency band (today, this week, last two
@@ -213,8 +215,9 @@ says so. A missing date stays in the unknown ring rather than being treated as o
 Each node carries a platform badge (Messenger, Instagram,
 Google Messages). Selecting a node lists its chats and highlights people who share
 those chats; search, platform filters, zoom and pan are local. People are joined
-across chats only by an exact reported profile ID; ID-less participants stay
-local to one chat and are never merged by name. The interaction script is fixed
+across chats only by an exact reported profile ID or an owner-confirmed photo link
+(below); other ID-less participants stay local to one chat and are never merged
+automatically by name. The interaction script is fixed
 and hash-pinned in the CSP.
 
 Add `--photos "<saved profile-photos.json>"` to show saved friend photos from a
@@ -226,6 +229,92 @@ ID after normalizing `profile.php?id=`, `/people/…/<id>` and vanity paths; nev
 display name, image or face. Only attached photos are copied into
 `preview\photos\` (CSP `img-src 'self'`); `contact-import.json` records the manifest
 digest and saved/linked counts. Unlinked people show initials.
+
+Muse's Messenger connector returns participant display names only (no profile
+IDs), so ID equality attaches no photos. For that case the owner chose to confirm
+name pairings once. `contacts:photo-links` proposes, and the owner decides:
+
+```powershell
+npm run contacts:photo-links -- --muse "<muse.private.json>" --photos "<profile-photos.json>" --output "<fresh-existing-external-directory>"
+npm run contacts:photo-links -- --candidates "<dir>\photo-link-candidates.json" --approve "1,3" --output "<new photo-links.private.json>"
+npm run contacts:csv -- ... --muse "<muse.private.json>" --photos "<profile-photos.json>" --photo-links "<photo-links.private.json>"
+```
+
+The first command writes numbered candidates and a private offline `review.html`
+(copied photos, CSP-pinned, no scripts). A candidate is one saved friend photo
+plus every ID-less Messenger participant whose name equals that friend's saved
+name after NFKC, trim, whitespace collapse and case folding. Names matching more
+than one saved friend are excluded and only counted. Nothing links until the
+owner approves candidate numbers (`none` is allowed). The links file
+(`kind: owner-confirmed-photo-links`) is bound to the photo manifest's input digest
+and to each exact chat/participant slot and name; any drift fails the preview
+rather than silently relinking. Approved slots join one person across chats and
+show the photo; the inspector says the owner confirmed it. Unapproved same-name
+participants stay separate. The preview copies the links file as
+`photo-links.original.json`, and `contact-import.json` records its digest, link
+count and the owner-confirmed link rule.
+
+Without profile IDs, the owner's own Messenger participant slots also appear in
+chats. `contacts:self-links` proposes every ID-less slot whose normalized name
+equals the owner's supplied name on a private review page (chat label plus the
+other participants), and only approved numbers (`all` and `none` allowed) are
+treated as the owner:
+
+```powershell
+npm run contacts:self-links -- --muse "<muse.private.json>" --name "<your display name>" --output "<fresh-existing-external-directory>"
+npm run contacts:self-links -- --candidates "<dir>\self-link-candidates.json" --approve all --output "<new self-links.private.json>"
+npm run contacts:csv -- ... --muse "<muse.private.json>" --self-links "<self-links.private.json>"
+```
+
+The file (`kind: owner-confirmed-self-slots`) is bound to the Muse snapshot digest
+and each exact slot and name; drift, a slot that is also photo-linked, or a
+different snapshot fails the preview. Approved slots are omitted from the graph;
+unapproved same-name participants stay. The preview copies it as
+`self-links.original.json` and records it under `ownerConfirmedSelf` in
+`contact-import.json`.
+
+The owner later directed: "just assume that anyone with my exact name is me". For
+that standing rule, save the name once instead of reviewing slots:
+
+```powershell
+npm run contacts:self-links -- --owner-name "<your exact display name>" --output "<new self-links.private.json>"
+```
+
+The file (`kind: owner-name-rule`) is not bound to one snapshot: every
+participant whose NFKC, whitespace- and case-normalized name equals it is omitted,
+in any snapshot, including reported profiles. Near matches stay, and an exact
+match that is also photo-linked fails the preview. `ownerConfirmedSelf` records
+the rule with `slots` and `museInputDigest` as null.
+
+## V0 collection runbook
+
+Repeat a collection with this sequence. Every run is owner-invoked and bounded:
+approve the source, account, fields, period, time zone, record budget and output
+folder first, per [`contacts-retrieve`](../../.github/skills/contacts-retrieve/SKILL.md)
+and the [privacy boundary](../privacy.md). Run each source in its own child chat so
+its signed-in browser canvas stays separate. Outputs go to a fresh folder outside
+Git, for example `%LOCALAPPDATA%\Heartbeat\<area>\<run>`. Report results only as
+counts; never paste names, IDs or records into chats, PRs or Library.
+
+| Source | Route | What to do | Result of the 2026-11-26 run |
+|---|---|---|---|
+| Google Contacts | Owner export | Export contacts as Google CSV and pass it to `contacts:csv --input`. | Imported; identity snapshot only, no activity. |
+| Google Messages | Owner-signed-in Messages for web canvas | Follow [Google Messages Web](#google-messages-web-current-canvas-path): read only metadata DOM nodes, scroll the real history scroller, label inferred dates. Save `*.private.json` observations. | 14-day metadata for up to three approved conversations; participants unlinked; no-progress scrolling is not proof of full history. |
+| Messenger (Muse) | Owner-signed-in Muse canvas | Ask Muse for metadata-only JSON (chat type, reported chat ID, participant names/IDs, latest sent time) for the period, excluding chats already saved; reconcile pending requests before resending. Save as `muse-reported-chat-recency` and validate with `contacts:csv --muse`. | 9 chats (7 group, 2 one-to-one), Muse-reported and unverified; names only, no profile IDs. Archived chats, message requests and communities unchecked. |
+| Instagram (Muse) | Muse | Same request once Instagram is connected in Muse. | Not connected; owner must connect it in Muse. |
+| Gmail | Preferred: official `gwscli` `METADATA_ONLY` | See [Gmail](#gmail). Needs the Desktop OAuth client JSON downloaded from the owner's Cloud project, then `gwscli auth setup` and sign-in. | Setup incomplete. Fallback used Gemini in Gmail with explicit `after:`/`before:` ranges: 100 metadata rows (timestamp, direction, addresses), no provider IDs, completeness unknown, older part of the period not covered. Saved with `contacts:retrieve-save` (exit 2, partial). |
+| Facebook photos | Owner-signed-in Facebook canvas | Follow [Current profile pictures](#current-profile-pictures); save with `contacts:photos`. | 19 friend photos saved with native friendship evidence. |
+
+Then build the private preview into a fresh folder:
+
+```powershell
+npm run contacts:csv -- --input "<contacts.csv>" --observations "<messages.private.json>" --muse "<muse.private.json>" --photos "<profile-photos.json>" --photo-links "<photo-links.private.json>" --self-links "<self-links.private.json>" --time-zone America/Los_Angeles --output "<fresh-existing-external-directory>"
+```
+
+Exit 2 is the expected partial result. Check it by counts in
+`preview\dashboard.html` (nodes per ring and kind, attached photos), then open it
+locally. Known owner actions that would improve the next run: download the Gmail
+OAuth client JSON, connect Instagram in Muse, and review photo-link candidates.
 
 ## Google client and authentication evidence
 
