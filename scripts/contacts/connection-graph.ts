@@ -62,7 +62,38 @@ interface GraphNode {
 }
 interface GraphChat { id: string; platform: Platform; kind: 'one-to-one' | 'group' | 'unknown' | 'text'; label: string; latest: string | null; asOf: string | null; members: string[] }
 interface ConnectionModel { nodes: GraphNode[]; groups: GraphNode[]; chats: GraphChat[]; linkedPhotos: Photo[]; selfIdentified: boolean; selfHidden: number;
-  asOf: string | null; gmailHidden?: number | null; sameAsUnjoined?: number }
+  asOf: string | null; timeZone?: string | null; gmailHidden?: number | null; sameAsUnjoined?: number }
+
+// Shared by the offline browser and synthetic tests; never upgrades a calendar day to a timestamp.
+function correspondenceHistory(chats: GraphChat[], timeZone: string | null = null) {
+  const dayFormat = new Intl.DateTimeFormat('en-CA', { timeZone: timeZone ?? 'UTC',
+    year: 'numeric', month: '2-digit', day: '2-digit' });
+  const rows = chats.map(chat => {
+    const dayOnly = chat.latest !== null && /^\d{4}-\d\d-\d\d$/.test(chat.latest);
+    const valid = chat.latest !== null && !Number.isNaN(Date.parse(chat.latest));
+    const parts = valid ? Object.fromEntries(dayFormat.formatToParts(new Date(chat.latest)).map(p => [p.type, p.value])) : null;
+    const day = !valid ? null : dayOnly ? chat.latest : `${parts.year}-${parts.month}-${parts.day}`;
+    const age = day === null || chat.asOf === null || (!dayOnly && timeZone === null) ? null :
+      (Date.parse(`${chat.asOf}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86400000;
+    const date = !valid ? 'Date unknown' : dayOnly ?
+      new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', dateStyle: 'medium' }).format(new Date(chat.latest)) + ' (inferred day only)' :
+      new Intl.DateTimeFormat('en-US', { timeZone: timeZone ?? 'UTC', year: 'numeric', month: 'short', day: 'numeric',
+        hour: 'numeric', minute: '2-digit', second: '2-digit', timeZoneName: 'short' }).format(new Date(chat.latest));
+    const relative = age === null ? 'Age unknown' : age === 0 ? 'same day as snapshot' :
+      `${Math.abs(age)} ${Math.abs(age) === 1 ? 'day' : 'days'} ${age > 0 ? 'before' : 'after'} snapshot`;
+    const note = chat.kind === 'group' ? 'Group activity, not necessarily correspondence with this person.' :
+      chat.kind === 'unknown' ? 'Chat type unknown; not necessarily correspondence with this person.' :
+        chat.kind === 'text' ? 'Observed conversation; participants unlinked, not attributed to a person.' : 'One-to-one correspondence.';
+    return { chat, day, dayOnly, date, relative: relative + (chat.asOf ? ` (${chat.asOf})` : ''),
+      note: note + (dayOnly ? ' Within-day ordering unknown.' : '') };
+  });
+  return rows.sort((a, b) => {
+    if (a.day === null || b.day === null) return a.day === b.day ? 0 : a.day === null ? 1 : -1;
+    // Keep exact instants together so an intervening day-only row cannot break their order.
+    return b.day.localeCompare(a.day) || Number(a.dayOnly) - Number(b.dayOnly) ||
+      (a.dayOnly ? 0 : Date.parse(b.chat.latest) - Date.parse(a.chat.latest));
+  });
+}
 
 const PLATFORMS: Record<Platform, string> = { messenger: 'Messenger', instagram: 'Instagram', messages: 'Google Messages', gmail: 'Gmail' };
 // Rings are calendar-day age of the latest shared-chat activity, relative to that chat's own source snapshot day.
@@ -624,7 +655,7 @@ function connectionModel(observations: TextObservations | null, muse: MuseSource
       platforms: [chat.platform], platformLabels: [PLATFORMS[chat.platform]], chats: [chat.id], photo: null,
       identityNote: 'Listed group membership is not evidence of a direct interaction. Members retain their own identity and hide/combine choices.' };
   });
-  return { nodes: result, groups, chats, linkedPhotos: [...linked.values()], selfIdentified, selfHidden, asOf, gmailHidden,
+  return { nodes: result, groups, chats, linkedPhotos: [...linked.values()], selfIdentified, selfHidden, asOf, timeZone, gmailHidden,
     ...(aliases.size ? { sameAsUnjoined } : {}) };
 }
 
@@ -686,6 +717,7 @@ const svg=document.getElementById('connections-svg');if(!svg)return;
 const model=JSON.parse(document.getElementById('connections-data').textContent);
 const byId=new Map([...model.nodes,...model.groups].map(n=>[n.id,n])),chats=new Map(model.chats.map(c=>[c.id,c]));
 const groupOnly=${groupOnly.toString()},connectionLayout=${connectionLayout.toString()};
+const correspondenceHistory=${correspondenceHistory.toString()};
 const nodes=[...svg.querySelectorAll('[data-node]')],els=new Map(nodes.map(el=>[el.dataset.node,el])),NS='http://www.w3.org/2000/svg';
 const detail=document.getElementById('connection-detail'),empty=document.getElementById('connection-empty');
 let selected=null,hovered=null,moved=false;
@@ -767,12 +799,25 @@ el.classList.toggle('open',!!open);el.querySelector('.bubble-hit').setAttribute(
 for(const s of svg.querySelectorAll('[data-spoke]'))s.classList.toggle('dimmed',!!rel&&!rel.has(s.dataset.spoke));
 if(!active){detail.hidden=true;empty.hidden=false;return;}
 const n=byId.get(active);document.getElementById('connection-name').textContent=n.label;
+const history=correspondenceHistory(n.chats.map(id=>chats.get(id)),model.timeZone),latest=history[0];
+document.getElementById('correspondence-heading').textContent=latest?.chat.kind==='one-to-one'?'Last corresponded (latest known)':
+latest?.chat.kind==='text'?'Latest unlinked conversation activity':'Latest shared-chat activity';
+document.getElementById('correspondence-date').textContent=latest?latest.date+' · '+latest.relative:'Date and age unknown';
+const where=document.getElementById('correspondence-where');where.replaceChildren();
+if(latest){const icon=document.createElementNS(NS,'svg'),use=document.createElementNS(NS,'use');
+icon.setAttribute('class','source-icon');icon.setAttribute('width','18');icon.setAttribute('height','18');
+icon.setAttribute('viewBox','-10 -10 20 20');icon.setAttribute('aria-hidden','true');use.setAttribute('href','#badge-'+latest.chat.platform);
+icon.append(use);where.append(icon,' '+platformLabel.get(latest.chat.platform)+' · '+latest.chat.label);}
+document.getElementById('correspondence-note').textContent=(latest?latest.note+' ':'')+
+'Saved partial metadata only; not complete history.'+(history.some(row=>row.day===null)?' Undated chats may be newer.':'')+
+(latest&&!latest.dayOnly&&history.some(row=>row.dayOnly&&row.day===latest.day)?' Day-only observations on this date may be newer.':'');
 document.getElementById('connection-ring').textContent=n.ringLabel+' · '+n.lastNote;
 document.getElementById('connection-platforms').textContent=n.platformLabels.join(' · ');
 document.getElementById('connection-identity').textContent=n.identityNote;
 const list=document.getElementById('connection-chats');list.replaceChildren();
-for(const id of n.chats){const c=chats.get(id);const item=document.createElement('li');
-item.textContent=c.label+' · latest sent as returned: '+(c.latest||'unknown')+(c.kind==='group'?' · '+c.members.length+' other listed members':'');list.append(item);}
+for(const row of history.slice(1)){const c=row.chat,item=document.createElement('li');
+item.textContent=platformLabel.get(c.platform)+' · '+c.label+' · '+row.date+' · '+row.relative+' · '+row.note;list.append(item);}
+document.getElementById('other-chats-heading').hidden=history.length<2;
 const members=document.getElementById('connection-members');members.replaceChildren();members.hidden=!n.groupChat;
 if(n.groupChat){for(const id of chats.get(n.groupChat).members){const member=byId.get(id);if(!eligible(member))continue;
 const item=document.createElement('li'),button=document.createElement('button');button.type='button';button.className='chip';button.textContent=member.label;
@@ -902,6 +947,8 @@ const CONNECTIONS_STYLE = `.graph-panel{margin-bottom:22px}.graph-layout{display
 .source-icon{flex:none;vertical-align:-4px}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#6c7570;margin-top:10px}
 #connection-chats{padding-left:18px;font-size:13px}
+#connection-chats li{margin:10px 0}#connection-latest{border-left:3px solid #cc624f;padding:8px 12px;margin:12px 0;overflow-wrap:anywhere}
+#connection-latest h3{margin:0 0 8px;font-size:14px}#correspondence-date{font-weight:600}#connection-latest p{margin:8px 0}
 [hidden]{display:none!important}.edit-tools{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.edit-tools select{max-width:170px}
 #hidden-people summary,#business-people summary{cursor:pointer;font-weight:600}#hidden-list,#combined-list,#business-list{padding-left:18px;font-size:13px}#hidden-list li,#combined-list li,#business-list li{margin:4px 0}
 @media(max-width:900px){.graph-layout{grid-template-columns:1fr}}`;
@@ -920,8 +967,11 @@ ${platforms.map(p => `<label class="chip"><input type="checkbox" data-platform-f
 <div class="graph-layout"><div>${connectionSVG(model)}
 <div class="legend">${platforms.map(p => `<span>${badge(p)} ${PLATFORMS[p]}</span>`).join('')}<span>Solid spoke: one-to-one · dashed: unlinked text conversation · GC: group chat, no direct-interaction spoke</span></div></div>
 <aside><div id="connection-empty" class="notice">Select someone in the graph to inspect their chats.</div>
-<div id="connection-detail" hidden><div class="label">Selected</div><h2 id="connection-name"></h2><p id="connection-ring" class="muted"></p>
-<p id="connection-platforms"></p><ul id="connection-chats"></ul><ul id="connection-members" aria-label="Listed group members" hidden></ul><p id="connection-identity" class="notice"></p>
+<div id="connection-detail" hidden><div class="label">Selected</div><h2 id="connection-name"></h2>
+<section id="connection-latest" aria-labelledby="correspondence-heading"><h3 id="correspondence-heading"></h3>
+<p id="correspondence-date"></p><p id="correspondence-where"></p><p id="correspondence-note" class="muted"></p></section>
+<h3 id="other-chats-heading">Other chats (newest dated first)</h3><ul id="connection-chats"></ul>
+<p id="connection-ring" class="muted"></p><p id="connection-platforms"></p><ul id="connection-members" aria-label="Listed group members" hidden></ul><p id="connection-identity" class="notice"></p>
 <p id="connection-category" class="muted" hidden></p>
 <div class="edit-tools" id="connection-person-tools"><button type="button" id="connection-hide" class="chip">Hide from chart</button>
 <button type="button" id="connection-business" class="chip">Mark as business</button>
@@ -944,6 +994,6 @@ ${model.selfIdentified ? '' : model.selfHidden
 }
 
 export { profileKey, participantKey, comparableName, memberRef, emailKey, gmailPeople, readProfilePhotos, readPhotoLinks, readSelfLinks, readPeopleLinks,
-  connectionModel,
+  connectionModel, correspondenceHistory,
   connectionSVG, connectionsPanel, CONNECTIONS_SCRIPT, CONNECTIONS_STYLE };
 export type { PhotoSet, ConnectionModel, PeopleLinks, PersonMember };

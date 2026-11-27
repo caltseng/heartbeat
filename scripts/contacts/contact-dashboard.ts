@@ -292,7 +292,7 @@ ${muse.flatMap(source => source.records.map((row, index) => `<div class="source-
 <script id="preview-data" type="application/json">${json({ contacts: snapshot.contacts,
   observations: observations ? { period: observations.period, messages: observations.messages, gaps: observations.gaps } : null,
   days })}</script><script>${DASHBOARD_SCRIPT}</script>
-${graph.nodes.length ? `<script id="connections-data" type="application/json">${json({ nodes: graph.nodes, groups: graph.groups, chats: graph.chats })}</script><script>${CONNECTIONS_SCRIPT}</script>` : ''}</body></html>`;
+${graph.nodes.length ? `<script id="connections-data" type="application/json">${json({ nodes: graph.nodes, groups: graph.groups, chats: graph.chats, timeZone: graph.timeZone })}</script><script>${CONNECTIONS_SCRIPT}</script>` : ''}</body></html>`;
 }
 
 export { validateObservations, readMetadata, readObservations, readMuseRecency, renderDashboard, DASHBOARD_SCRIPT };
