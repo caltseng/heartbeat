@@ -124,8 +124,8 @@ function contactSuggestions(snapshot: ContactSnapshot): { evidence: string; peop
     .map(([evidence, people]) => ({ evidence, people: [...people].sort() }));
 }
 
-function importContactCSV(input: string, output: string, observationsFile?: string, museFiles: string[] = [], photosFile?: string,
-  timeZone?: string, photoLinksFile?: string, selfLinksFile?: string, gmailFile?: string, peopleLinksFile?: string,
+function importContactCSV(input: string, output: string, observationsFile?: string, museFiles: string[] = [], photosFile?: string | string[],
+  timeZone?: string, photoLinksFile?: string | string[], selfLinksFile?: string, gmailFile?: string, peopleLinksFile?: string,
   googlePhotosFile?: string) {
   if (timeZone !== undefined) {
     let valid = false;
@@ -144,9 +144,36 @@ function importContactCSV(input: string, output: string, observationsFile?: stri
   const muse = museFiles.map(file => readMuseRecency(path.resolve(file), 'private'));
   requireValue(new Set(muse.map(snapshot => snapshot.source)).size === muse.length, 'Duplicate Muse source snapshot.');
   const people: Record<string, CanonicalPerson> = Object.fromEntries(snapshot.contacts.map(c => [c.personId, { mergedInto: null }]));
-  const photos = photosFile === undefined ? null : readProfilePhotos(photosFile, 'private');
-  requireValue(photoLinksFile === undefined || photos !== null, 'Photo links need the saved photos they were confirmed against.');
-  const photoLinks = photoLinksFile === undefined ? null : readPhotoLinks(photoLinksFile, 'private', photos);
+  const photoFiles = photosFile === undefined ? [] : typeof photosFile === 'string' ? [photosFile] : photosFile;
+  const linkFiles = photoLinksFile === undefined ? [] : typeof photoLinksFile === 'string' ? [photoLinksFile] : photoLinksFile;
+  requireValue(linkFiles.length === 0 || linkFiles.length === photoFiles.length,
+    'Provide one photo links file per photo round, in the same order, or omit all photo links.');
+  const photoRounds = photoFiles.map((file, index) => {
+    const photos = readProfilePhotos(file, 'private');
+    const links = linkFiles.length ? readPhotoLinks(linkFiles[index], 'private', photos) : null;
+    return { photos, links, linksFile: photoFiles.length === 1 ? 'photo-links.original.json' : `photo-links-${index + 1}.original.json` };
+  });
+  // Validate each digest pair before combining; timestamps, not flag order, choose the newest saved photo.
+  const byProfile = new Map<string, ReturnType<typeof readProfilePhotos>['photos'][number]>();
+  for (const round of [...photoRounds].sort((a, b) => Date.parse(a.photos.retrievedAt) - Date.parse(b.photos.retrievedAt))) {
+    for (const photo of round.photos.photos) byProfile.set(photo.key, photo);
+  }
+  const photos = photoRounds.length === 0 ? null : {
+    inputDigest: photoRounds.length === 1 ? photoRounds[0].photos.inputDigest : hash(JSON.stringify(photoRounds.map(round => round.photos.inputDigest))),
+    photos: [...byProfile.values()]
+  };
+  const photoLinks: ReturnType<typeof readPhotoLinks> | null = linkFiles.length ? new Map() : null;
+  for (const round of photoRounds) {
+    for (const [slot, link] of round.links ?? []) {
+      const previous = photoLinks.get(slot);
+      requireValue(previous === undefined || previous.key === link.key && previous.name === link.name,
+        'Photo rounds contain conflicting owner-confirmed links for one participant.');
+      photoLinks.set(slot, link);
+    }
+  }
+  const photoLinkRecords = photoRounds.filter(round => round.links !== null).map(round => ({
+    file: round.linksFile, inputDigest: round.links.inputDigest, confirmedAt: round.links.confirmedAt, links: round.links.size
+  }));
   const selfLinks = selfLinksFile === undefined ? null : readSelfLinks(selfLinksFile, 'private');
   requireValue(selfLinks === null || selfLinks.ownerName !== undefined || muse.some(source => source.inputDigest === selfLinks.museInputDigest),
     'Self links were confirmed against a different Muse snapshot.');
@@ -157,7 +184,14 @@ function importContactCSV(input: string, output: string, observationsFile?: stri
     'The time zone must match the saved observations period.');
   const html = renderDashboard(snapshot, observations, contactSuggestions(snapshot), muse, photos, timeZone ?? null, photoLinks, selfLinks,
     gmail, peopleLinks, googlePhotos);
-  const linkedFacebookPhotos = photos ? photos.photos.filter(photo => html.includes(`href="photos/${photo.file}"`)) : [];
+  const byFile = new Map<string, NonNullable<typeof photos>['photos'][number]>();
+  for (const photo of photos?.photos ?? []) {
+    if (!html.includes(`href="photos/${photo.file}"`)) continue;
+    requireValue(!byFile.has(photo.file) || byFile.get(photo.file).digest === photo.digest,
+      'Photo rounds contain different images with the same saved filename.');
+    byFile.set(photo.file, photo);
+  }
+  const linkedFacebookPhotos = [...byFile.values()];
   const linkedGooglePhotos = [...new Map((googlePhotos?.connections ?? []).flatMap(connection =>
     connection.photo && html.includes(`"photo":"${connection.photo.file}"`) ? [[connection.photo.file, connection.photo] as const] : [])).values()];
   const linkedPhotos = [...linkedFacebookPhotos, ...linkedGooglePhotos];
@@ -168,7 +202,9 @@ function importContactCSV(input: string, output: string, observationsFile?: stri
     fs.writeFileSync(path.join(staging, 'contacts.original.csv'), bytes, { flag: 'wx', mode: 0o600 });
     if (observations) fs.writeFileSync(path.join(staging, 'messages.original.json'), observations.originalBytes, { flag: 'wx', mode: 0o600 });
     for (const source of muse) fs.writeFileSync(path.join(staging, `muse-${source.source}.original.json`), source.originalBytes, { flag: 'wx', mode: 0o600 });
-    if (photoLinks) fs.writeFileSync(path.join(staging, 'photo-links.original.json'), photoLinks.originalBytes, { flag: 'wx', mode: 0o600 });
+    for (const round of photoRounds) {
+      if (round.links) fs.writeFileSync(path.join(staging, round.linksFile), round.links.originalBytes, { flag: 'wx', mode: 0o600 });
+    }
     if (selfLinks) fs.writeFileSync(path.join(staging, 'self-links.original.json'), selfLinks.originalBytes, { flag: 'wx', mode: 0o600 });
     if (gmail) fs.writeFileSync(path.join(staging, 'gmail.original.json'), gmail.originalBytes, { flag: 'wx', mode: 0o600 });
     if (peopleLinks) fs.writeFileSync(path.join(staging, 'people-links.original.json'), peopleLinks.originalBytes, { flag: 'wx', mode: 0o600 });
@@ -190,8 +226,11 @@ function importContactCSV(input: string, output: string, observationsFile?: stri
         directory: linkedFacebookPhotos.length ? 'photos' : null,
         linkRule: photoLinks ? 'exact Facebook profile reference, or owner-confirmed name pairing for listed participant slots'
           : 'exact Facebook profile reference only',
-        ownerConfirmedLinks: photoLinks ? { file: 'photo-links.original.json', inputDigest: photoLinks.inputDigest,
-          confirmedAt: photoLinks.confirmedAt, links: photoLinks.size } : null } : null,
+        ownerConfirmedLinks: photoLinks ? { file: photoLinkRecords.length === 1 ? photoLinkRecords[0].file : null,
+          inputDigest: photoLinkRecords.length === 1 ? photoLinkRecords[0].inputDigest : hash(JSON.stringify(photoLinkRecords.map(record => record.inputDigest))),
+          confirmedAt: photoLinkRecords.map(record => record.confirmedAt).sort().at(-1), links: photoLinks.size } : null,
+        rounds: photoRounds.map(round => ({ inputDigest: round.photos.inputDigest, retrievedAt: round.photos.retrievedAt,
+          saved: round.photos.photos.length, ownerConfirmedLinks: photoLinkRecords.find(record => record.file === round.linksFile) ?? null })) } : null,
       googlePhotos: googlePhotos ? { inputDigest: googlePhotos.inputDigest, observedAt: googlePhotos.observedAt,
         connections: googlePhotos.connections.length, saved: googlePhotos.saved, skippedDefault: googlePhotos.skippedDefault,
         eligibleConnections: googlePhotos.connections.filter(connection => connection.photo !== null).length,
@@ -241,7 +280,8 @@ function importContactCSV(input: string, output: string, observationsFile?: stri
         fs.rmdirSync(photoDir);
       }
       for (const name of ['contacts.original.csv', 'messages.original.json', 'muse-messenger.original.json', 'muse-instagram.original.json',
-              'photo-links.original.json', 'self-links.original.json', 'gmail.original.json', 'people-links.original.json',
+              ...photoRounds.filter(round => round.links !== null).map(round => round.linksFile),
+              'self-links.original.json', 'gmail.original.json', 'people-links.original.json',
               'contacts.json', 'people.json', 'dashboard.html', 'contact-import.json']) {
         const file = path.join(staging, name);
         if (fs.existsSync(file)) fs.unlinkSync(file);
@@ -253,18 +293,20 @@ function importContactCSV(input: string, output: string, observationsFile?: stri
 
 if (require.main === module) {
   runCLI(() => {
-    const args = process.argv.slice(2), flags = new Map<string, string>(), museFiles: string[] = [];
+    const args = process.argv.slice(2), flags = new Map<string, string>(), museFiles: string[] = [], photoFiles: string[] = [], linkFiles: string[] = [];
     requireValue(args.length % 2 === 0, 'Expected input/output argument pairs.');
     for (let i = 0; i < args.length; i += 2) {
       requireValue(['--input', '--output', '--observations', '--muse', '--photos', '--photo-links', '--self-links', '--gmail', '--people-links',
         '--time-zone', '--google-photos'].includes(args[i]) && !flags.has(args[i]), 'Invalid preview arguments.');
       if (args[i] === '--muse') museFiles.push(args[i + 1]);
+      else if (args[i] === '--photos') photoFiles.push(args[i + 1]);
+      else if (args[i] === '--photo-links') linkFiles.push(args[i + 1]);
       else flags.set(args[i], args[i + 1]);
     }
     requireValue(flags.has('--input') && flags.has('--output'),
-      'Usage: contacts:csv --input <owner-provided.csv> --output <fresh-local-directory> [--observations <saved-metadata.json>] [--muse <saved-recency.json>] [--photos <profile-photos.json> [--photo-links <owner-confirmed-links.json>]] [--google-photos <google-photos.json>] [--self-links <owner-confirmed-self.json>] [--gmail <saved-gmail-metadata.json>] [--people-links <owner-confirmed-people.json>] [--time-zone <IANA zone>]');
-    const result = importContactCSV(flags.get('--input'), flags.get('--output'), flags.get('--observations'), museFiles, flags.get('--photos'),
-            flags.get('--time-zone'), flags.get('--photo-links'), flags.get('--self-links'), flags.get('--gmail'), flags.get('--people-links'),
+      'Usage: contacts:csv --input <owner-provided.csv> --output <fresh-local-directory> [--observations <saved-metadata.json>] [--muse <saved-recency.json>] [--photos <profile-photos.json> --photo-links <owner-confirmed-links.json>]... [--google-photos <google-photos.json>] [--self-links <owner-confirmed-self.json>] [--gmail <saved-gmail-metadata.json>] [--people-links <owner-confirmed-people.json>] [--time-zone <IANA zone>]');
+    const result = importContactCSV(flags.get('--input'), flags.get('--output'), flags.get('--observations'), museFiles, photoFiles,
+            flags.get('--time-zone'), linkFiles, flags.get('--self-links'), flags.get('--gmail'), flags.get('--people-links'),
             flags.get('--google-photos'));
     process.stdout.write('Private contact snapshot and offline dashboard saved locally; source coverage remains partial.\n');
     return result.exitCode;

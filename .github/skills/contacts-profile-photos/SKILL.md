@@ -84,5 +84,17 @@ are not authorized. Follow [privacy](../../../docs/privacy.md).
    do not attach photos to Google/Heartbeat contacts by name. Existing generic
    private importer, identity-review, aggregation and graph guards stay unchanged.
 
+For an owner-requested offline preview using several already saved rounds,
+repeat `contacts:csv`'s `--photos <profile-photos.json> --photo-links <approved-links.json>`
+pair for each round. Each links file must match only its own manifest digest;
+provide all pairs in corresponding order, or omit all links for exact-profile-ID
+attachment only. Conflicting owner decisions for one chat slot fail. The newest
+`retrievedAt` round supplies each profile's saved photo, independent of argument
+order; later arguments break timestamp ties. Older saved photos remain when a
+newer round has no saved replacement. Only attached images and private per-round
+link provenance are copied into the preview. No automatic name matching, source
+reads, URL loads or authorization for another capture round is added.
+See the [CSV preview operation](../../../docs/spec/contacts-retrieval-plan.md#csv-preview-operation).
+
 No source writes, messages, reactions, recurring schedules, hosting, publication,
 image generation, biometric processing or implicit account access.
