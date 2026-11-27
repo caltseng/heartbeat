@@ -336,7 +336,11 @@ Each person's panel in the chart has **Hide from chart** and **Same person as â€
 â†’ **Combine**; the **Hidden from chart** list offers **Show** and **Separate
 again**. Those choices are kept in this browser's local storage as hashed name
 tags (no names) and apply to every dashboard opened in the same browser. To keep
-them across browsers and rebuilds, save them to a new owner name rule file;
+them across browsers and rebuilds, save them to a new owner name rule file. The
+page applies the same guards as the model: a name that more than one person in
+the chart has cannot be combined (hiding it hides all of them), and entries with
+different photos, a shared chat, profiles on one platform or two confirmed people
+are refused and counted rather than combined.
 `window.heartbeatChartEdits()` in the page console lists the current choices:
 
 ```powershell

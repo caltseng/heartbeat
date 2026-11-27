@@ -53,6 +53,8 @@ test('concentric graph keeps group membership spoke-free, excludes self IDs and 
   assert.equal(ada.find(node => node.kind === 'group').photo, null, 'same name with another profile never gets the photo');
   assert.equal(model.nodes.filter(node => node.label === 'Name Only').length, 2, 'ID-less participants stay chat-local');
   assert.equal(model.linkedPhotos.length, 1);
+  assert.deepEqual(direct.reportedOn, ['messenger'], 'the page refuses combining two reported profiles on one platform');
+  assert.equal(model.nodes.find(node => node.label === 'Name Only').reportedOn, undefined);
   assert.equal(model.asOf, '2026-11-26');
   assert.deepEqual([direct.ring, direct.lastActivity], ['today', '2026-11-26'], 'ring is the latest shared-chat day');
   assert.equal(ada.find(node => node.kind === 'group').ring, 'unknown', 'no returned date stays unknown, not old');
