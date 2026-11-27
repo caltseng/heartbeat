@@ -248,7 +248,9 @@ owner approves candidate numbers (`none` is allowed). The links file
 and to each exact chat/participant slot and name; any drift fails the preview
 rather than silently relinking. Approved slots join one person across chats and
 show the photo; the inspector says the owner confirmed it. Unapproved same-name
-participants stay separate.
+participants stay separate. The preview copies the links file as
+`photo-links.original.json`, and `contact-import.json` records its digest, link
+count and the owner-confirmed link rule.
 
 ## V0 collection runbook
 

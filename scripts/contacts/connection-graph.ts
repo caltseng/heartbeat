@@ -15,7 +15,7 @@ interface MuseSource {
   records: { chatType: string; reportedChatId?: string | null; participants: { name: string | null; id: string | null }[]; reportedLatestSentAt: string | null }[];
 }
 // Owner-confirmed pairings of one ID-less chat participant with one saved friend photo, keyed `source|chatId|position`.
-type PhotoLinks = Map<string, { name: string; key: string }>;
+type PhotoLinks = Map<string, { name: string; key: string }> & { originalBytes?: Buffer; inputDigest?: string; confirmedAt?: string };
 interface TextObservations { period?: { end: string; timeZone: string }; messages: { threadUiId: string; inferredLocalDate: string | null; requestedWindowMembership: string }[] }
 interface GraphNode {
   id: string; label: string; initials: string; ring: Ring; ringLabel: string; kind: Kind; lastActivity: string | null;
@@ -104,7 +104,7 @@ function readPhotoLinks(file: string, dataClass: string, photos: PhotoSet): Phot
   if (dataClass === 'private') manualOutputLocation(path.dirname(resolved), 'private');
   requireValue(fs.realpathSync(resolved) === resolved && fs.statSync(resolved).isFile() && fs.statSync(resolved).size <= 1024 * 1024,
     'Choose a bounded, non-redirected photo links file.');
-  const value = JSON.parse(fs.readFileSync(resolved, 'utf8'));
+  const originalBytes = fs.readFileSync(resolved), value = JSON.parse(originalBytes.toString('utf8'));
   object(value, ['schemaVersion', 'dataClass', 'kind', 'photosInputDigest', 'confirmedAt', 'links'], 'photo links');
   requireValue(value.schemaVersion === 1 && value.dataClass === dataClass && value.kind === 'owner-confirmed-photo-links' &&
     !Number.isNaN(Date.parse(text(value.confirmedAt, 'confirmation time'))), 'Invalid owner-confirmed photo links.');
@@ -119,7 +119,7 @@ function readPhotoLinks(file: string, dataClass: string, photos: PhotoSet): Phot
       key !== null && keys.has(key) && !links.has(at), 'Each photo link needs one distinct participant and a saved photo.');
     links.set(at, { name: text(row.participantName, 'participant name'), key });
   }
-  return links;
+  return Object.assign(links, { originalBytes, inputDigest: hash(originalBytes), confirmedAt: value.confirmedAt as string });
 }
 
 function initials(label: string): string {

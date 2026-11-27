@@ -189,4 +189,11 @@ test('photo-link review proposes unique exact-name pairs, and only approved numb
   assert.equal(ada.length, 1);
   assert.deepEqual(ada[0].chats.length, 2, 'approved pairings join one person across chats');
   assert.equal(model.nodes.filter(node => node.label === 'Bo Fixture')[0].photo, null);
+  const csv = path.join(folder, 'fixture.csv'), output = path.join(folder, 'preview-out');
+  fs.writeFileSync(csv, 'Name\nFixture\n'); fs.mkdirSync(output);
+  importContactCSV(csv, output, undefined, [museFile], photosFile, 'UTC', links);
+  const imported = JSON.parse(fs.readFileSync(path.join(output, 'preview', 'contact-import.json'), 'utf8')).profilePhotos;
+  assert.match(imported.linkRule, /owner-confirmed/);
+  assert.deepEqual([imported.ownerConfirmedLinks.links, imported.ownerConfirmedLinks.inputDigest], [2, hash(fs.readFileSync(links))]);
+  assert.deepEqual(fs.readFileSync(path.join(output, 'preview', 'photo-links.original.json')), fs.readFileSync(links));
 });

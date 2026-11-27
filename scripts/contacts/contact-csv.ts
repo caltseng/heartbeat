@@ -146,6 +146,7 @@ function importContactCSV(input: string, output: string, observationsFile?: stri
     fs.writeFileSync(path.join(staging, 'contacts.original.csv'), bytes, { flag: 'wx', mode: 0o600 });
     if (observations) fs.writeFileSync(path.join(staging, 'messages.original.json'), observations.originalBytes, { flag: 'wx', mode: 0o600 });
     for (const source of muse) fs.writeFileSync(path.join(staging, `muse-${source.source}.original.json`), source.originalBytes, { flag: 'wx', mode: 0o600 });
+    if (photoLinks) fs.writeFileSync(path.join(staging, 'photo-links.original.json'), photoLinks.originalBytes, { flag: 'wx', mode: 0o600 });
     if (linkedPhotos.length) {
       fs.mkdirSync(path.join(staging, 'photos'));
       for (const photo of linkedPhotos) fs.writeFileSync(path.join(staging, 'photos', photo.file), photo.bytes, { flag: 'wx', mode: 0o600 });
@@ -161,7 +162,11 @@ function importContactCSV(input: string, output: string, observationsFile?: stri
       museSources: muse.map(source => ({ source: source.source, file: `muse-${source.source}.original.json`,
         inputDigest: source.inputDigest, records: source.records.length, coverage: 'partial' })),
       profilePhotos: photos ? { inputDigest: photos.inputDigest, saved: photos.photos.length, linked: linkedPhotos.length,
-        directory: linkedPhotos.length ? 'photos' : null, linkRule: 'exact Facebook profile reference only' } : null,
+        directory: linkedPhotos.length ? 'photos' : null,
+        linkRule: photoLinks ? 'exact Facebook profile reference, or owner-confirmed name pairing for listed participant slots'
+          : 'exact Facebook profile reference only',
+        ownerConfirmedLinks: photoLinks ? { file: 'photo-links.original.json', inputDigest: photoLinks.inputDigest,
+          confirmedAt: photoLinks.confirmedAt, links: photoLinks.size } : null } : null,
       coverage: 'partial', ignoredRows: snapshot.ignoredRows,
       limitations: ['Provided export snapshot only; export scope/time are not independently verified.',
         'CSV lacks provider IDs; row IDs are bound to these exact bytes, not cross-export sync keys.',
@@ -182,7 +187,7 @@ function importContactCSV(input: string, output: string, observationsFile?: stri
         fs.rmdirSync(photoDir);
       }
       for (const name of ['contacts.original.csv', 'messages.original.json', 'muse-messenger.original.json', 'muse-instagram.original.json',
-        'contacts.json', 'people.json', 'dashboard.html', 'contact-import.json']) {
+              'photo-links.original.json', 'contacts.json', 'people.json', 'dashboard.html', 'contact-import.json']) {
         const file = path.join(staging, name);
         if (fs.existsSync(file)) fs.unlinkSync(file);
       }
